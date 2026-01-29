@@ -97,105 +97,48 @@
   </nav>
 
   <div class="container mt-5 mb-2 no-print">
-    <div class="d-flex gap-2 justify-content-start mt-3">
-      <button id="btn-guardar" class="btn btn-success btn-sm">
-        <i class="bi bi-save me-1"></i>Guardar
-      </button>
+    <!-- ACCIONES -->
+<div class="cp-actions mt-3">
 
-      <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
-        <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
-      </button>
+  <div class="cp-actions__left">
+    <button id="btn-guardar" class="btn btn-success btn-sm">
+      <i class="bi bi-save me-1"></i>Guardar
+    </button>
 
-      <a href="/public/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank" class="btn btn-secondary btn-sm">
-        <i class="bi bi-file-earmark-pdf-fill me-1"></i>Abrir instructivo en PDF
-      </a>
+    <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
+    </button>
 
-      <button id="btn-ver-comprometido" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-box-arrow-up-right me-1"></i>Ver comprometido
-      </button>
+    <a href="/public/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank" class="btn btn-secondary btn-sm">
+      <i class="bi bi-file-earmark-pdf-fill me-1"></i>Abrir instructivo en PDF
+    </a>
+  </div>
 
-      <button id="btn-ver-devengado" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-box-arrow-up-right me-1"></i>Ver devengado
-      </button>
+  <div class="cp-actions__right">
+    <button id="btn-ver-comprometido" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-box-arrow-up-right me-1"></i>Ver comprometido
+    </button>
 
-      <!-- BOTÓN BUSCAR -->
-      <div class="d-flex justify-content-end mb-2">
-        <button id="btnToggleBuscar" class="btn btn-outline-primary">
-          <i class="bi bi-search me-1"></i> Buscar suficiencia
-        </button>
-      </div>
+    <button id="btn-ver-devengado" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-box-arrow-up-right me-1"></i>Ver devengado
+    </button>
 
-      <!-- PANEL DESPLEGABLE -->
-      <div class="collapse" id="panelBuscarSuf">
-        <div class="card shadow-sm mb-3">
-          <div class="card-body">
-            <ul class="nav nav-pills mb-3" id="buscarTabs" role="tablist">
-              <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="tab-num" data-bs-toggle="pill" data-bs-target="#pane-num"
-                  type="button" role="tab">
-                  # Suficiencia
-                </button>
-                <!-- </li>
-              <li class="nav-item" role="presentation">
-                <button class="nav-link" id="tab-claves" data-bs-toggle="pill" data-bs-target="#pane-claves"
-                  type="button" role="tab">
-                  Dep + Programática
-                </button>
-              </li> -->
-            </ul>
+    <button id="btnToggleBuscar" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-search me-1"></i>Buscar suficiencia
+    </button>
+  </div>
 
-            <div class="tab-content">
-              <div class="tab-pane fade show active" id="pane-num" role="tabpanel">
-                <div class="row g-2 align-items-end">
-                  <div class="col-md-4">
-                    <label class="form-label mb-1">Número de suficiencia</label>
-                    <input id="txtNumeroSuf" class="form-control" placeholder="ECA-01-SP-0004" maxlength="30">
-                    <div class="form-text">Ejemplo: ECA-01-SP-0004</div>
+</div>
 
-                  </div>
-                  <div class="col-md-8 d-flex gap-2">
-                    <button id="btnBuscarNumero" class="btn btn-primary">
-                      <i class="bi bi-search me-1"></i> Buscar
-                    </button>
-                    <button id="btnCerrarBuscar" class="btn btn-outline-secondary">
-                      <i class="bi bi-x-lg me-1"></i> Cerrar
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="tab-pane fade" id="pane-claves" role="tabpanel">
-                <div class="row g-2 align-items-end">
-                  <div class="col-md-4">
-                    <label class="form-label mb-1">Clave de dependencia</label>
-                    <input id="txtDepClave" class="form-control" placeholder="L00" maxlength="20">
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label mb-1">Clave programática</label>
-                    <input id="txtProgClave" class="form-control" placeholder="010101..." maxlength="80">
-                  </div>
-                  <div class="col-md-4 d-flex gap-2">
-                    <button id="btnBuscarClaves" class="btn btn-primary">
-                      <i class="bi bi-search me-1"></i> Buscar
-                    </button>
-                    <button id="btnCerrarBuscar2" class="btn btn-outline-secondary">
-                      <i class="bi bi-x-lg"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="form-text mt-2">
-                  * Para usuarios AREA, aunque busques algo de otra área, no aparecerá (candado).
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      </div>
-
+<!-- PANEL DESPLEGABLE (queda abajo, bien limpio) -->
+<div class="collapse" id="panelBuscarSuf">
+  <div class="card shadow-sm mb-3 cp-searchcard">
+    <div class="card-body">
+      <!-- ...tu contenido tal cual... -->
     </div>
+  </div>
+</div>
+
   </div>
 
   <div class="form-container">

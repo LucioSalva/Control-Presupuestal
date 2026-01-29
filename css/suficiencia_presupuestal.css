@@ -405,3 +405,101 @@ input[type="date"].as-text::-webkit-inner-spin-button {
   width: 100%;
   min-width: 0;
 }
+
+
+/* =========================
+   ACTION BAR (BOTONES)
+   ========================= */
+
+.cp-actions{
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 14px;
+  padding: 14px 14px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.08);
+}
+
+.cp-actions__left,
+.cp-actions__right{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Botones: misma altura y look institucional */
+.cp-actions .btn{
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+  font-weight: 700;
+  letter-spacing: .2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+}
+
+/* Hover pro (sin exagerar) */
+.cp-actions .btn:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(0,0,0,.12);
+}
+
+/* Ajuste fino colores (institucional) */
+.cp-actions .btn-success{
+  box-shadow: 0 10px 18px rgba(25,135,84,.18);
+}
+
+.cp-actions .btn-outline-primary{
+  border-width: 2px;
+}
+
+.cp-actions .btn-outline-danger{
+  border-width: 2px;
+}
+
+/* Botón secundario (instructivo) más serio */
+.cp-actions .btn-secondary{
+  background: #6c757d;
+  border-color: #6c757d;
+}
+.cp-actions .btn-secondary:hover{
+  background: #5c636a;
+  border-color: #5c636a;
+}
+
+/* =========================
+   PANEL BUSCAR integrado
+   ========================= */
+.cp-searchcard{
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,.08);
+  overflow: hidden;
+}
+
+/* Nav pills más institucional */
+#buscarTabs .nav-link{
+  border-radius: 999px;
+  font-weight: 700;
+}
+#buscarTabs .nav-link.active{
+  background: #BC955C;
+}
+
+/* Responsive: apila bonito */
+@media (max-width: 992px){
+  .cp-actions{
+    justify-content: flex-start;
+  }
+  .cp-actions__left,
+  .cp-actions__right{
+    width: 100%;
+  }
+}
