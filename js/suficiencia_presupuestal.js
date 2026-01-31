@@ -30,19 +30,15 @@
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
   // ---------------------------
-  // ✅ BUSCADOR
-  // ---------------------------
-  const btnToggleBuscar = document.getElementById("btnToggleBuscar");
-  const panelBuscarEl = document.getElementById("panelBuscarSuf");
+// BUSCADOR (MODAL)
+// ---------------------------
+const btnAbrirBuscarSuf = document.getElementById("btnAbrirBuscarSuf");
+const modalBuscarEl = document.getElementById("modalBuscarSuf");
+const modalBuscar = modalBuscarEl ? new bootstrap.Modal(modalBuscarEl) : null;
 
-  const txtNumeroSuf = document.getElementById("txtNumeroSuf");
-  const txtDepClave = document.getElementById("txtDepClave"); // si lo usarás luego
-  const txtProgClave = document.getElementById("txtProgClave"); // si lo usarás luego
+const txtNumeroSuf = document.getElementById("txtNumeroSuf");
+const btnBuscarNumero = document.getElementById("btnBuscarNumero");
 
-  const btnBuscarNumero = document.getElementById("btnBuscarNumero");
-  const btnBuscarClaves = document.getElementById("btnBuscarClaves");
-  const btnCerrarBuscar = document.getElementById("btnCerrarBuscar");
-  const btnCerrarBuscar2 = document.getElementById("btnCerrarBuscar2");
 
   const panelBuscar = panelBuscarEl
     ? new bootstrap.Collapse(panelBuscarEl, { toggle: false })
@@ -114,6 +110,39 @@
     }
     return data;
   }
+
+  // ---------------------------
+// ✅ SweetAlert2 helpers (reemplazo de alert())
+// ---------------------------
+function hasSwal() {
+  return typeof window !== "undefined" && !!window.Swal;
+}
+
+function uiAlert(message, icon = "info", title = "Aviso") {
+  const msg = String(message ?? "");
+  if (!hasSwal()) return alert(`${title}: ${msg}`);
+
+  return window.Swal.fire({
+    icon,
+    title,
+    text: msg,
+    confirmButtonText: "Aceptar",
+    confirmButtonColor: "#BC955C",
+  });
+}
+
+function uiSuccess(message, title = "Listo") {
+  return uiAlert(message, "success", title);
+}
+
+function uiError(message, title = "Error") {
+  return uiAlert(message, "error", title);
+}
+
+function uiWarn(message, title = "Atención") {
+  return uiAlert(message, "warning", title);
+}
+
 
   function getLoggedUser() {
     try {
@@ -195,7 +224,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     });
 
     if (!data) {
-      alert("No se pudo cargar la suficiencia.");
+      await uiError("No se pudo cargar la suficiencia.");
       return;
     }
 
@@ -209,7 +238,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       Number.isFinite(myDa) &&
       (Number(data.id_dgeneral) !== myDg || Number(data.id_dauxiliar) !== myDa)
     ) {
-      alert("Esta suficiencia no corresponde a tu área (DG/DA).");
+      await uiWarn("Esta suficiencia no corresponde a tu área (DG/DA).");
       return;
     }
 
@@ -244,9 +273,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       idProy &&
       !Array.from(selProy.options).some((o) => o.value === idProy)
     ) {
-      alert(
-        "El proyecto de esta suficiencia no está permitido por el candado actual (DG/DA).",
-      );
+      await uiWarn("El proyecto de esta suficiencia no está permitido por el candado actual (DG/DA).");
       setVal("id_proyecto", "");
     }
 
@@ -331,17 +358,18 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     }
 
     panelBuscar?.hide?.();
-    alert("Suficiencia cargada correctamente.");
+    await uiSuccess("Suficiencia cargada correctamente.");
   }
 
   // ===========================
   // ✅ RESULTADOS BUSCADOR (solo UNA versión)
   // ===========================
-  function renderResultadosBusqueda(rows) {
+  async function renderResultadosBusqueda(rows) {
+
     console.log("[BUSCAR] resultados:", rows);
 
     if (!rows || !rows.length) {
-      alert("No encontrada (o no corresponde a tu área).");
+      await uiWarn("No encontrada (o no corresponde a tu área).");
       return;
     }
 
@@ -893,7 +921,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
 
     const next = rowCount() + 1;
     if (next > MAX_ROWS) {
-      alert(`Máximo ${MAX_ROWS} renglones.`);
+      uiWarn(`Máximo ${MAX_ROWS} renglones.`);
       return;
     }
 
@@ -931,7 +959,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
 
     const n = rowCount();
     if (n <= START_ROWS) {
-      alert(`Debes dejar mínimo ${START_ROWS} filas.`);
+      uiWarn(`Debes dejar mínimo ${START_ROWS} filas.`);
       return;
     }
 
@@ -1417,7 +1445,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       btnVerDevengado.classList.remove("disabled");
     }
 
-    alert("Guardado correctamente.");
+    await uiSuccess("Guardado correctamente.");
     return saved;
   }
 
@@ -1611,132 +1639,138 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
   // Eventos
   // ---------------------------
   function bindEvents() {
-    btnAddRow?.addEventListener("click", addRow);
-    btnRemoveRow?.addEventListener("click", removeRow);
+  btnAddRow?.addEventListener("click", addRow);
+  btnRemoveRow?.addEventListener("click", removeRow);
 
-    if (btnVerComprometido) btnVerComprometido.type = "button";
-    if (btnVerDevengado) btnVerDevengado.type = "button";
-    if (btnGuardar) btnGuardar.type = "button";
-    if (btnSi) btnSi.type = "button";
-    if (btnDescargarPdf) btnDescargarPdf.type = "button";
+  if (btnVerComprometido) btnVerComprometido.type = "button";
+  if (btnVerDevengado) btnVerDevengado.type = "button";
+  if (btnGuardar) btnGuardar.type = "button";
+  if (btnSi) btnSi.type = "button";
+  if (btnDescargarPdf) btnDescargarPdf.type = "button";
 
-    btnGuardar?.addEventListener("click", (e) => {
-      e.preventDefault();
-      modal?.show();
-    });
+  btnGuardar?.addEventListener("click", (e) => {
+    e.preventDefault();
+    modal?.show();
+  });
 
-    btnSi?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try {
-        btnSi.disabled = true;
-        await save();
-        modal?.hide();
-      } catch (err) {
-        console.error("[SP] save error:", err);
-        alert(err.message || "Error al guardar");
-      } finally {
-        btnSi.disabled = false;
-      }
-    });
+  btnSi?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try {
+      btnSi.disabled = true;
+      await save();
+      modal?.hide();
+    } catch (err) {
+      console.error("[SP] save error:", err);
+      await uiError(err?.message || "Error al guardar");
+    } finally {
+      btnSi.disabled = false;
+    }
+  });
 
-    btnDescargarPdf?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try {
-        await generarPDF();
-      } catch (err) {
-        console.error("[SP] PDF error:", err);
-        alert(err.message || "Error al generar PDF");
-      }
-    });
+  btnDescargarPdf?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try {
+      await generarPDF();
+    } catch (err) {
+      console.error("[SP] PDF error:", err);
+      await uiError(err?.message || "Error al generar PDF");
+    }
+  });
 
-    btnVerComprometido?.addEventListener("click", (e) => {
-      e.preventDefault();
+  // ✅ VER COMPROMETIDO
+  btnVerComprometido?.addEventListener("click", async (e) => {
+    e.preventDefault();
 
-      let id = btnVerComprometido.dataset.id
-        ? Number(btnVerComprometido.dataset.id)
-        : null;
-      if (!id && lastSavedId) id = Number(lastSavedId);
-      if (!id) id = readLastIdFromLocalStorage();
+    let id = btnVerComprometido.dataset.id
+      ? Number(btnVerComprometido.dataset.id)
+      : null;
 
-      if (!id)
-        return alert(
-          "Primero guarda la Suficiencia para generar el Comprometido.",
-        );
-      goComprometido(id);
-    });
+    if (!id && lastSavedId) id = Number(lastSavedId);
+    if (!id) id = readLastIdFromLocalStorage();
 
-    btnVerDevengado?.addEventListener("click", (e) => {
-      e.preventDefault();
-
-      let id = btnVerDevengado.dataset.id
-        ? Number(btnVerDevengado.dataset.id)
-        : null;
-      if (!id && lastSavedId) id = Number(lastSavedId);
-      if (!id) id = readLastIdFromLocalStorage();
-
-      if (!id)
-        return alert(
-          "Primero guarda la Suficiencia para generar el Devengado.",
-        );
-      goDevengado(id);
-    });
-
-    // ✅ cuando cambie proyecto: clave + meta readonly
-    document
-      .querySelector('[name="id_proyecto"]')
-      ?.addEventListener("change", () => {
-        updateClaveProgramatica();
-        syncMetaFromProyecto();
-        refreshTotales();
-      });
-
-    bindTaxEvents();
-
-    if (DEBUG_PDF_FIELDS) {
-      debugListPdfFields().catch((err) =>
-        console.warn("[PDF debug] ", err.message),
-      );
+    if (!id) {
+      await uiWarn("Primero guarda la Suficiencia para generar el Comprometido.");
+      return;
     }
 
-    // ✅ BUSCADOR
-    btnToggleBuscar?.addEventListener("click", () => {
-      if (!panelBuscar) return;
-      const isShown = panelBuscarEl.classList.contains("show");
-      if (isShown) panelBuscar.hide();
-      else panelBuscar.show();
-    });
+    goComprometido(id);
+  });
 
-    btnCerrarBuscar?.addEventListener("click", () => panelBuscar?.hide());
-    btnCerrarBuscar2?.addEventListener("click", () => panelBuscar?.hide());
+  // ✅ VER DEVENGADO
+  btnVerDevengado?.addEventListener("click", async (e) => {
+    e.preventDefault();
 
-    btnBuscarNumero?.addEventListener("click", async () => {
-      try {
-        const n = txtNumeroSuf?.value || "";
-        if (!String(n).trim())
-          return alert(
-            "Escribe el folio ECA/2026/01/SP/000001 o el número 000001.",
-          );
-        await buscarPorNumero(n);
-      } catch (err) {
-        console.error("[BUSCAR] error:", err);
-        alert(err.message || "Error al buscar");
-      }
-    });
+    let id = btnVerDevengado.dataset.id
+      ? Number(btnVerDevengado.dataset.id)
+      : null;
 
-    btnBuscarClaves?.addEventListener("click", async () => {
-      alert(
-        "Búsqueda por Dep + Programática: pendiente (aún no implementada). Usa búsqueda por número.",
-      );
-      // await buscarPorClaves(txtDepClave.value, txtProgClave.value);
-    });
+    if (!id && lastSavedId) id = Number(lastSavedId);
+    if (!id) id = readLastIdFromLocalStorage();
 
-    txtNumeroSuf?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") btnBuscarNumero?.click();
-    });
-    txtProgClave?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") btnBuscarClaves?.click();
-    });
+    if (!id) {
+      await uiWarn("Primero guarda la Suficiencia para generar el Devengado.");
+      return;
+    }
+
+    goDevengado(id);
+  });
+
+  // ✅ cuando cambie proyecto: clave + meta readonly
+  document.querySelector('[name="id_proyecto"]')?.addEventListener("change", () => {
+    updateClaveProgramatica();
+    syncMetaFromProyecto();
+    refreshTotales();
+  });
+
+  bindTaxEvents();
+
+  if (DEBUG_PDF_FIELDS) {
+    debugListPdfFields().catch((err) =>
+      console.warn("[PDF debug] ", err.message),
+    );
   }
+
+  // ✅ BUSCADOR
+  btnToggleBuscar?.addEventListener("click", () => {
+    if (!panelBuscar) return;
+    const isShown = panelBuscarEl.classList.contains("show");
+    if (isShown) panelBuscar.hide();
+    else panelBuscar.show();
+  });
+
+  btnCerrarBuscar?.addEventListener("click", () => panelBuscar?.hide());
+  btnCerrarBuscar2?.addEventListener("click", () => panelBuscar?.hide());
+
+  btnBuscarNumero?.addEventListener("click", async () => {
+    try {
+      const n = txtNumeroSuf?.value || "";
+      if (!String(n).trim()) {
+        await uiWarn("Escribe el folio ECA-2026-01-SP-0001 o el número 0001.");
+        return;
+      }
+      await buscarPorNumero(n);
+    } catch (err) {
+      console.error("[BUSCAR] error:", err);
+      await uiError(err?.message || "Error al buscar");
+    }
+  });
+
+  btnBuscarClaves?.addEventListener("click", async () => {
+    await uiAlert(
+      "Búsqueda por Dep + Programática: pendiente (aún no implementada). Usa búsqueda por número.",
+      "info",
+      "Pendiente",
+    );
+  });
+
+  txtNumeroSuf?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btnBuscarNumero?.click();
+  });
+
+  txtProgClave?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btnBuscarClaves?.click();
+  });
+}
 
   // ---------------------------
   // INIT
