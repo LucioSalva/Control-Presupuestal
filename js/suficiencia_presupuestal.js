@@ -1,14 +1,8 @@
 (() => {
   const MAX_ROWS = 20;
   const START_ROWS = 3;
-
-  // ✅ API base
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
-
-  // ✅ PDF plantilla
   const SUF_PDF_TEMPLATE_URL = "/public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
-
-  // ✅ Debug PDF fields
   const DEBUG_PDF_FIELDS = false;
 
   // ---------------------------
@@ -30,30 +24,24 @@
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
   // ---------------------------
-// BUSCADOR (MODAL)
-// ---------------------------
-const btnAbrirBuscarSuf = document.getElementById("btnAbrirBuscarSuf");
-const modalBuscarEl = document.getElementById("modalBuscarSuf");
-const modalBuscar = modalBuscarEl ? new bootstrap.Modal(modalBuscarEl) : null;
+  // BUSCADOR (MODAL)
+  // ---------------------------
+  const btnAbrirBuscarSuf = document.getElementById("btnAbrirBuscarSuf");
+  const modalBuscarEl = document.getElementById("modalBuscarSuf");
+  const modalBuscar = modalBuscarEl ? new bootstrap.Modal(modalBuscarEl) : null;
 
-const txtNumeroSuf = document.getElementById("txtNumeroSuf");
-const btnBuscarNumero = document.getElementById("btnBuscarNumero");
-
-
-  const panelBuscar = panelBuscarEl
-    ? new bootstrap.Collapse(panelBuscarEl, { toggle: false })
-    : null;
+  const txtNumeroSuf = document.getElementById("txtNumeroSuf");
+  const btnBuscarNumero = document.getElementById("btnBuscarNumero");
 
   let lastSavedId = null;
 
-  // caches
   let dgeneralInfo = null; // {id, clave, dependencia}
   let dauxiliarInfo = null; // {id, clave, dependencia}
   let proyectosById = {}; // { [id]: {id, clave, conac, descripcion} }
   let partidasMap = {}; // { "5151": "..." }
 
   // ---------------------------
-  // AUTH ✅
+  // AUTH
   // ---------------------------
   const getToken = () =>
     localStorage.getItem("cp_token") ||
@@ -89,7 +77,7 @@ const btnBuscarNumero = document.getElementById("btnBuscarNumero");
     return Number.isFinite(x) ? x : 0;
   }
 
-  // ✅ helper: evita "Unexpected token <" y muestra errores DB
+  // helper: evita "Unexpected token <" y muestra errores DB
   async function fetchJson(url, options = {}) {
     const r = await fetch(url, options);
     const text = await r.text();
@@ -112,37 +100,36 @@ const btnBuscarNumero = document.getElementById("btnBuscarNumero");
   }
 
   // ---------------------------
-// ✅ SweetAlert2 helpers (reemplazo de alert())
-// ---------------------------
-function hasSwal() {
-  return typeof window !== "undefined" && !!window.Swal;
-}
+  // SweetAlert2 helpers (reemplazo de alert())
+  // ---------------------------
+  function hasSwal() {
+    return typeof window !== "undefined" && !!window.Swal;
+  }
 
-function uiAlert(message, icon = "info", title = "Aviso") {
-  const msg = String(message ?? "");
-  if (!hasSwal()) return alert(`${title}: ${msg}`);
+  function uiAlert(message, icon = "info", title = "Aviso") {
+    const msg = String(message ?? "");
+    if (!hasSwal()) return alert(`${title}: ${msg}`);
 
-  return window.Swal.fire({
-    icon,
-    title,
-    text: msg,
-    confirmButtonText: "Aceptar",
-    confirmButtonColor: "#BC955C",
-  });
-}
+    return window.Swal.fire({
+      icon,
+      title,
+      text: msg,
+      confirmButtonText: "Aceptar",
+      confirmButtonColor: "#BC955C",
+    });
+  }
 
-function uiSuccess(message, title = "Listo") {
-  return uiAlert(message, "success", title);
-}
+  function uiSuccess(message, title = "Listo") {
+    return uiAlert(message, "success", title);
+  }
 
-function uiError(message, title = "Error") {
-  return uiAlert(message, "error", title);
-}
+  function uiError(message, title = "Error") {
+    return uiAlert(message, "error", title);
+  }
 
-function uiWarn(message, title = "Atención") {
-  return uiAlert(message, "warning", title);
-}
-
+  function uiWarn(message, title = "Atención") {
+    return uiAlert(message, "warning", title);
+  }
 
   function getLoggedUser() {
     try {
@@ -153,58 +140,48 @@ function uiWarn(message, title = "Atención") {
   }
 
   // ---------------------------
-  // ✅ Helpers BUSCADOR
+  // Helpers BUSCADOR
   // ---------------------------
-  // ============================
-  // ✅ Folio formato: ECA/2026/01/SP/000001
-  // ============================
   function normalizeFolioInput(input) {
     const raw = String(input || "").trim();
     if (!raw) return "";
 
-    // si ya viene con formato ECA/.../SP/xxxxxx
-    const m = raw.match(/ECA\/\d{4}\/\d{2}\/SP\/(\d{1,6})/i);
+    const m = raw.match(/ECA-\d{4}-\d{2}-SP-(\d{1,6})/i);
     if (m) {
-      const num = String(m[1]).padStart(6, "0");
-      return `ECA/2026/01/SP/${num}`; // ✅ tu formato fijo que pediste
+      const num = String(m[1]).padStart(4, "0");
+      return `ECA-2026-01-SP-${num}`;
     }
 
-    // si viene solo número
     if (/^\d{1,6}$/.test(raw)) {
-      const num = raw.padStart(6, "0");
-      return `ECA/2026/01/SP/${num}`;
+      const num = raw.padStart(4, "0");
+      return `ECA-2026-01-SP-${num}`;
     }
 
-    // si viene algo raro, intenta extraer últimos dígitos
     const onlyDigits = raw.replace(/\D/g, "");
     if (onlyDigits && onlyDigits.length <= 6) {
-      const num = onlyDigits.padStart(6, "0");
-      return `ECA/2026/01/SP/${num}`;
+      const num = onlyDigits.padStart(4, "0");
+      return `ECA-2026-01-SP-${num}`;
     }
 
-    return ""; // inválido
+    return "";
   }
 
-  function folioToNumero6(folio) {
-    // ECA/2026/01/SP/000123 -> 000123
-    const m = String(folio || "").match(/\/(\d{6})$/);
-    return m ? m[1] : "";
-  }
+  async function buscarPorNumero(numero) {
+    const raw = String(numero || "").trim();
+    if (!raw) return;
 
-  function pad6(value) {
-    const v = String(value || "").trim();
-    if (!v) return "";
-    if (/^\d+$/.test(v)) return v.padStart(6, "0");
-    return v;
-  }
+    const folio = normalizeFolioInput(raw);
+    if (!folio) {
+      await uiWarn("Escribe el folio como ECA-2026-01-SP-0001 o solo 0001.");
+      return;
+    }
 
- async function buscarPorNumero(numero) {
-  const raw = String(numero || "").trim();
-  if (!raw) return;
-const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
-  const json = await fetchJson(url, { headers: { ...authHeaders() } });
-  renderResultadosBusqueda(json?.data || []);
-}
+    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(
+      folio
+    )}`;
+    const json = await fetchJson(url, { headers: { ...authHeaders() } });
+    renderResultadosBusqueda(json?.data || []);
+  }
 
   async function buscarPorClaves(dep, prog) {
     const d = String(dep || "").trim();
@@ -228,7 +205,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       return;
     }
 
-    // ✅ Validar DG/DA contra usuario logueado (seguridad extra del front)
     const user = getLoggedUser();
     const myDg = Number(user?.id_dgeneral);
     const myDa = Number(user?.id_dauxiliar);
@@ -242,13 +218,12 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       return;
     }
 
-    // --- Cabecera ---
     setVal(
-  "no_suficiencia",
-  data.folio_oficial_suficiencia ||
-    data.no_suficiencia ||
-    String(data.folio_num || "").padStart(6, "0"),
-);
+      "no_suficiencia",
+      data.folio_oficial_suficiencia ||
+        data.no_suficiencia ||
+        String(data.folio_num || "").padStart(6, "0")
+    );
 
     setVal("fecha", data.fecha ? String(data.fecha).split("T")[0] : "");
     setVal("dependencia", data.dependencia || "");
@@ -256,30 +231,28 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     setVal("mes_pago", data.mes_pago || "");
     setVal("clave_programatica", data.clave_programatica || "");
 
-    // --- Proyecto ---
     if (!Object.keys(proyectosById || {}).length) {
       await loadProyectosCatalog();
     }
-    // aplica candado con DG/DA actuales
     applyProyectoFilters();
 
     const idProy = data.id_proyecto != null ? String(data.id_proyecto) : "";
     setVal("id_proyecto", idProy);
 
-    // ✅ Validación REAL: si el proyecto no está entre las options (candado), no dejarlo
     const selProy = document.querySelector('[name="id_proyecto"]');
     if (
       selProy &&
       idProy &&
       !Array.from(selProy.options).some((o) => o.value === idProy)
     ) {
-      await uiWarn("El proyecto de esta suficiencia no está permitido por el candado actual (DG/DA).");
+      await uiWarn(
+        "El proyecto de esta suficiencia no está permitido por el candado actual (DG/DA)."
+      );
       setVal("id_proyecto", "");
     }
 
     updateClaveProgramatica();
 
-    // ✅ META: readonly y toma NOMBRE/DESCRIPCIÓN del PROYECTO
     syncMetaFromProyecto();
 
     // --- Fuente ---
@@ -288,7 +261,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       setVal("id_fuente", String(data.id_fuente));
     }
 
-    // --- Impuestos (checkboxes) ---
     const chkIVA = document.querySelector('[name="imp_iva"]');
     const chkISR = document.querySelector('[name="imp_isr"]');
     const chkIEPS = document.querySelector('[name="imp_ieps"]');
@@ -305,17 +277,16 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
         data.isr_tasa != null
           ? String(data.isr_tasa)
           : chkISR?.checked
-            ? "10"
-            : "";
+          ? "10"
+          : "";
     if (iepsInput)
       iepsInput.value =
         data.ieps_tasa != null
           ? String(data.ieps_tasa)
           : chkIEPS?.checked
-            ? "8"
-            : "";
+          ? "8"
+          : "";
 
-    // --- Totales (si vienen del backend los respetas) ---
     setVal("subtotal", safeNumber(data.subtotal).toFixed(2));
     setVal("iva", safeNumber(data.iva).toFixed(2));
     setVal("isr", safeNumber(data.isr).toFixed(2));
@@ -324,7 +295,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     setVal("cantidad_pago", safeNumber(data.total).toFixed(2));
     setVal("cantidad_con_letra", data.cantidad_con_letra || "");
 
-    // --- Detalle ---
     const detalle = Array.isArray(data.detalle) ? data.detalle : [];
     if (detalleBody) {
       detalleBody.innerHTML = "";
@@ -341,7 +311,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       if (!detalle.length) initRows();
     }
 
-    // refresca totales por si cambió algo
     refreshTotales();
 
     // marca id cargado
@@ -357,48 +326,80 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       btnVerDevengado.classList.remove("disabled");
     }
 
-    panelBuscar?.hide?.();
+    modalBuscar?.hide?.();
+
     await uiSuccess("Suficiencia cargada correctamente.");
   }
 
   // ===========================
-  // ✅ RESULTADOS BUSCADOR (solo UNA versión)
+  // RESULTADOS BUSCADOR 
   // ===========================
   async function renderResultadosBusqueda(rows) {
+  console.log("[BUSCAR] resultados:", rows);
 
-    console.log("[BUSCAR] resultados:", rows);
-
-    if (!rows || !rows.length) {
-      await uiWarn("No encontrada (o no corresponde a tu área).");
-      return;
-    }
-
-    // ✅ si viene 1 sola, cargamos directo sin prompt
-    if (rows.length === 1) {
-      cargarSuficienciaEnFormulario(rows[0].id);
-      return;
-    }
-
-    const opciones = rows
-  .map((r, i) => {
-    const folio = r.no_suficiencia || String(r.folio_num || "").padStart(6, "0");
-    const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
-    return `${i + 1}. ${folio} - ${fecha}`;
-  })
-  .join("\n");
-
-
-    const seleccion = prompt(
-      `Se encontraron ${rows.length} suficiencias:\n\n${opciones}\n\nEscribe el número para cargar:`,
-    );
-
-    if (seleccion) {
-      const idx = parseInt(seleccion, 10) - 1;
-      if (idx >= 0 && idx < rows.length) {
-        cargarSuficienciaEnFormulario(rows[idx].id);
-      }
-    }
+  if (!rows || !rows.length) {
+    await uiWarn("No encontrada (o no corresponde a tu área).");
+    return;
   }
+
+  if (rows.length === 1) {
+    cargarSuficienciaEnFormulario(rows[0].id);
+    return;
+  }
+
+  const listHtml = `
+    <div class="list-group text-start">
+      ${rows
+        .map((r) => {
+          const folio =
+            r.no_suficiencia ||
+            (r.folio_num != null
+              ? `ECA-2026-01-SP-${String(r.folio_num).padStart(4, "0")}`
+              : "—");
+
+          const fecha = r.fecha
+            ? String(r.fecha).split("T")[0]
+            : "";
+
+          return `
+            <button
+              type="button"
+              class="list-group-item list-group-item-action"
+              data-id="${r.id}"
+            >
+              <div class="fw-semibold">${folio}</div>
+              <small class="text-muted">${fecha}</small>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+
+  await Swal.fire({
+    title: "Selecciona una Suficiencia",
+    html: listHtml,
+    icon: "info",
+    showConfirmButton: false,
+    showCancelButton: true,
+    cancelButtonText: "Cancelar",
+    cancelButtonColor: "#6c757d",
+    didOpen: () => {
+      const container = Swal.getHtmlContainer();
+      if (!container) return;
+
+      container
+        .querySelectorAll("button[data-id]")
+        .forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = Number(btn.dataset.id);
+            Swal.close();
+            cargarSuficienciaEnFormulario(id);
+          });
+        });
+    },
+  });
+}
 
   // ---------------------------
   // Fecha automática (hoy) + readonly
@@ -631,22 +632,19 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
         "0202010111|K",
         "0202010112|K",
         "0202010113|K",
+        "0202010114|K",
         "0202030105|K",
       ]),
     },
   };
 
   function _norm(v) {
-    return String(v || "")
-      .trim()
-      .toUpperCase();
+    return String(v || "").trim().toUpperCase();
   }
   function _normNum(v) {
     return String(v || "").trim();
   }
 
-  // null => no hay reglas para ese DG (sin candado)
-  // Set vacío => DG existe pero DA no (candado estricto => sin proyectos)
   function getAllowedProyectoSet() {
     const dg = _norm(dgeneralInfo?.clave);
     const da = _normNum(dauxiliarInfo?.clave);
@@ -658,7 +656,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     return dgRules[da] || new Set();
   }
 
-  // ✅ PINTA SELECT (filtrado o sin filtrar)
   function applyProyectoFilters() {
     const sel = document.querySelector('[name="id_proyecto"]');
     if (!sel) return;
@@ -728,21 +725,33 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     ]);
 
     dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === idDg) || null;
-    dauxiliarInfo =
-      (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
+    dauxiliarInfo = (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
 
-    const depGenNombre =
-      dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
-    const depAuxNombre =
-      dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
+    const depGenNombre = dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
+    const depAuxNombre = dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
 
     setVal("dependencia", depGenNombre);
     setVal("dependencia_aux", depAuxNombre);
 
     updateClaveProgramatica();
 
-    // si proyectos ya cargaron, reaplica filtros
     if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
+
+    // ✅ AUTOLLENAR FIRMA DIRECCIÓN SOLICITANTE DESDE DGENERAL
+const inputDireccionFirma = document.querySelector(
+  '[name="firma_direccion_solicitante"]'
+);
+
+if (inputDireccionFirma) {
+  // Prioridad: catálogo dgeneral → nombre del usuario → vacío
+  const nombreDireccion =
+    dgeneralInfo?.dependencia ||
+    dgeneralInfo?.nombre ||
+    "";
+
+  inputDireccionFirma.value = nombreDireccion;
+}
+
   }
 
   // ---------------------------
@@ -771,9 +780,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
 
       clave = clave.replace(/[^\d]/g, "");
       if (clave) clave = clave.padStart(10, "0");
-      conac = String(conac || "")
-        .trim()
-        .toUpperCase();
+      conac = String(conac || "").trim().toUpperCase();
 
       return { clave, conac };
     };
@@ -818,8 +825,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       "fuente",
       data,
       (x) => x.id,
-      (x) =>
-        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`,
+      (x) => `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
     );
   }
 
@@ -831,7 +837,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
   }
 
   // ---------------------------
-  // ✅ Clave programática
+  // Clave programática
   // ---------------------------
   function updateClaveProgramatica() {
     const idProyecto = Number(get("id_proyecto") || 0);
@@ -852,7 +858,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     if (descEl) descEl.textContent = p?.descripcion || "—";
   }
 
-  // ✅ META: readonly y toma la DESCRIPCIÓN del proyecto (NO la clave)
+  // META: readonly y toma la DESCRIPCIÓN del proyecto (NO la clave)
   function syncMetaFromProyecto() {
     const idProyecto = Number(get("id_proyecto") || 0);
     const p = proyectosById[idProyecto];
@@ -860,11 +866,10 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
 
     setVal("meta", metaText);
 
-    // si existe un select de meta en tu HTML, lo dejamos deshabilitado para evitar captura
     const selMeta = document.querySelector('[name="id_meta"]');
     if (selMeta) {
       selMeta.disabled = true;
-      selMeta.value = ""; // no se usa
+      selMeta.value = "";
     }
   }
 
@@ -930,9 +935,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
   }
 
   function renumberRows() {
-    const rows = detalleBody
-      ? Array.from(detalleBody.querySelectorAll("tr"))
-      : [];
+    const rows = detalleBody ? Array.from(detalleBody.querySelectorAll("tr")) : [];
     rows.forEach((tr, idx) => {
       const i = idx + 1;
       tr.setAttribute("data-row", String(i));
@@ -1034,7 +1037,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     return getIepsPercent() / 100;
   }
 
-  // ✅ FIX: ya existe y coincide con checkboxes
   function getImpuestoTipo() {
     const iva = useIVA();
     const isr = useISR();
@@ -1116,54 +1118,12 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     if (num === 0) return "CERO";
     if (num < 0) return "MENOS " + numeroALetras(Math.abs(num));
 
-    const unidades = [
-      "",
-      "UNO",
-      "DOS",
-      "TRES",
-      "CUATRO",
-      "CINCO",
-      "SEIS",
-      "SIETE",
-      "OCHO",
-      "NUEVE",
-    ];
+    const unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
     const decenas10 = [
-      "DIEZ",
-      "ONCE",
-      "DOCE",
-      "TRECE",
-      "CATORCE",
-      "QUINCE",
-      "DIECISÉIS",
-      "DIECISIETE",
-      "DIECIOCHO",
-      "DIECINUEVE",
+      "DIEZ","ONCE","DOCE","TRECE","CATORCE","QUINCE","DIECISÉIS","DIECISIETE","DIECIOCHO","DIECINUEVE"
     ];
-    const decenas = [
-      "",
-      "",
-      "VEINTE",
-      "TREINTA",
-      "CUARENTA",
-      "CINCUENTA",
-      "SESENTA",
-      "SETENTA",
-      "OCHENTA",
-      "NOVENTA",
-    ];
-    const centenas = [
-      "",
-      "CIENTO",
-      "DOSCIENTOS",
-      "TRESCIENTOS",
-      "CUATROCIENTOS",
-      "QUINIENTOS",
-      "SEISCIENTOS",
-      "SETECIENTOS",
-      "OCHOCIENTOS",
-      "NOVECIENTOS",
-    ];
+    const decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
+    const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
 
     function seccion(n) {
       if (n === 0) return "";
@@ -1178,9 +1138,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       if (c) out += centenas[c] + " ";
       if (du >= 10 && du <= 19) return (out + decenas10[du - 10]).trim();
       if (d === 2 && u !== 0)
-        return (out + ("VEINTI" + unidades[u].toLowerCase()))
-          .toUpperCase()
-          .trim();
+        return (out + ("VEINTI" + unidades[u].toLowerCase())).toUpperCase().trim();
 
       if (d) {
         out += decenas[d];
@@ -1245,23 +1203,84 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     isrInput?.addEventListener("input", refreshTotales);
     iepsInput?.addEventListener("input", refreshTotales);
 
+    chkISR?.addEventListener("change", async () => {
+  if (!chkISR.checked) return;
+
+  const val = Number(isrInput?.value || 0);
+  if (!val) {
+    isrInput.value = "10";
+  }
+
+  await Swal.fire({
+    icon: "question",
+    title: "Confirmar ISR",
+    html: `
+      <div style="font-size:13px; text-align:left;">
+        Estás por aplicar <b>ISR</b>.
+        <br/>Porcentaje actual: <b>${isrInput.value}%</b>
+        <br/><span class="text-muted">¿Es correcto? o lo puedes modificar</span>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: "Sí, aplicar",
+    cancelButtonText: "Cancelar",
+    confirmButtonColor: "#BC955C",
+    cancelButtonColor: "#6c757d",
+  }).then((res) => {
+    if (!res.isConfirmed) {
+      chkISR.checked = false;
+      isrInput.disabled = true;
+      refreshTotales();
+    }
+  });
+});
+
+chkIEPS?.addEventListener("change", async () => {
+  if (!chkIEPS.checked) return;
+
+  const val = Number(iepsInput?.value || 0);
+  if (!val) {
+    iepsInput.value = "8";
+  }
+
+  await Swal.fire({
+    icon: "question",
+    title: "Confirmar IEPS",
+    html: `
+      <div style="font-size:13px; text-align:left;">
+        Estás por aplicar <b>IEPS</b>.
+        <br/>Porcentaje actual: <b>${iepsInput.value}%</b>
+        <br/><span class="text-muted">¿Es correcto? o lo puedes modificar</span>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: "Sí, aplicar",
+    cancelButtonText: "Cancelar",
+    confirmButtonColor: "#BC955C",
+    cancelButtonColor: "#6c757d",
+  }).then((res) => {
+    if (!res.isConfirmed) {
+      chkIEPS.checked = false;
+      iepsInput.disabled = true;
+      refreshTotales();
+    }
+  });
+});
+
     sync();
   }
 
   // =====================================================================
-  // ✅ Payload COMPLETO para pasar a comprometido
+  // Payload COMPLETO para pasar a comprometido
   // =====================================================================
   function buildSufPayloadFromForm(saved) {
-    const getL = (name) =>
-      document.querySelector(`[name="${name}"]`)?.value ?? "";
+    const getL = (name) => document.querySelector(`[name="${name}"]`)?.value ?? "";
     const getNum = (name) => {
       const x = Number(getL(name));
       return Number.isFinite(x) ? x : 0;
     };
 
-    const detalle = Array.from(
-      document.querySelectorAll("#detalleBody tr"),
-    ).map((tr) => {
+    const detalle = Array.from(document.querySelectorAll("#detalleBody tr")).map((tr) => {
       const inputs = tr.querySelectorAll("input");
 
       const clave = inputs[1]?.value ?? "";
@@ -1275,14 +1294,12 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
 
     return {
       id: saved?.id ?? saved?.id_suficiencia ?? null,
-      folio_num:
-        saved?.folio_num ?? saved?.no_suficiencia ?? saved?.folio ?? null,
+      folio_num: saved?.folio_num ?? saved?.no_suficiencia ?? saved?.folio ?? null,
 
       fecha: getL("fecha"),
       dependencia: getL("dependencia"),
       id_dgeneral: getL("id_dgeneral"),
 
-      // ✅ alineación: en DB se llama "departamento"
       dependencia_aux: getL("dependencia_aux"),
       departamento: getL("dependencia_aux"),
 
@@ -1296,7 +1313,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       mes_pago: getL("mes_pago"),
       cantidad_pago: getNum("cantidad_pago"),
 
-      // ✅ META = nombre del proyecto (readonly)
       meta: getL("meta"),
 
       subtotal: getNum("subtotal"),
@@ -1322,7 +1338,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
         payload,
         loaded_from: "local",
         loaded_at: new Date().toISOString(),
-      }),
+      })
     );
   }
 
@@ -1337,14 +1353,9 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     const id_fuente = get("fuente") ? Number(get("fuente")) : null;
 
     const fuenteText =
-      document
-        .querySelector('[name="fuente"]')
-        ?.selectedOptions?.[0]?.textContent?.trim() || "";
+      document.querySelector('[name="fuente"]')?.selectedOptions?.[0]?.textContent?.trim() || "";
 
-    // ✅ meta readonly = descripción del proyecto
     const meta = get("meta") || null;
-
-    // ✅ alineación: tu DB usa "departamento"
     const departamento = get("dependencia_aux") || null;
 
     return {
@@ -1359,14 +1370,12 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       fecha: get("fecha") || null,
       dependencia: get("dependencia") || null,
 
-      // ✅ se guarda en columna departamento
       departamento,
 
       fuente: fuenteText,
       mes_pago: get("mes_pago") || null,
       clave_programatica: get("clave_programatica") || null,
 
-      // ✅ meta
       meta,
 
       impuesto_tipo: getImpuestoTipo(),
@@ -1389,9 +1398,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     const payloadBackend = buildPayload();
 
     if (!payloadBackend.id_usuario) {
-      throw new Error(
-        "No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión.",
-      );
+      throw new Error("No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión.");
     }
     if (!payloadBackend.id_proyecto) {
       throw new Error("Selecciona un PROYECTO antes de guardar.");
@@ -1421,7 +1428,6 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
       setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
     }
 
-    // ✅ construir payload COMPLETO (con detalle) y guardarlo para Comprometido/Devengado
     const payloadCompleto = buildSufPayloadFromForm(saved);
 
     localStorage.setItem(
@@ -1431,7 +1437,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
         payload: payloadCompleto,
         loaded_from: "save",
         loaded_at: new Date().toISOString(),
-      }),
+      })
     );
 
     if (btnVerComprometido) {
@@ -1476,10 +1482,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
   // ---------------------------
   async function fetchPdfTemplateBytesSuf() {
     const r = await fetch(SUF_PDF_TEMPLATE_URL);
-    if (!r.ok)
-      throw new Error(
-        `No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`,
-      );
+    if (!r.ok) throw new Error(`No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`);
     return await r.arrayBuffer();
   }
 
@@ -1487,19 +1490,14 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     const bytes = await fetchPdfTemplateBytesSuf();
     const pdfDoc = await PDFLib.PDFDocument.load(bytes);
     const form = pdfDoc.getForm();
-    console.log(
-      "[PDF] Campos:",
-      form.getFields().map((f) => f.getName()),
-    );
+    console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
   }
 
   async function generarPDF() {
     refreshTotales();
 
     if (!window.PDFLib?.PDFDocument) {
-      throw new Error(
-        "Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.",
-      );
+      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
     }
 
     const fuenteSel = document.querySelector('[name="fuente"]');
@@ -1541,22 +1539,14 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     };
 
     function splitFechaParts(iso) {
-      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso))
-        return { d: "", m: "", y: "" };
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
       const [y, m, d] = iso.split("-");
       return { d, m, y };
     }
 
-    // CABECERA
     setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
-    setTextSafe(
-      "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
-      payload.clave_programatica || "",
-    );
-    setTextSafe(
-      "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
-      payload.clave_programatica || "",
-    );
+    setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+    setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
 
     setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente_texto || ""));
     setTextSafe("NOMBRE F.F", String(payload.fuente_texto || ""));
@@ -1566,51 +1556,24 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     setTextSafe("fechames", m);
     setTextSafe("fechayear", y);
 
-    // PROGRAMACIÓN DE PAGO
-    const mesSel = String(payload.mes_pago || "")
-      .trim()
-      .toUpperCase();
+    const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
     const totalTxt = safeN(payload.total).toFixed(2);
     const meses = [
-      "ENERO",
-      "FEBRERO",
-      "MARZO",
-      "ABRIL",
-      "MAYO",
-      "JUNIO",
-      "JULIO",
-      "AGOSTO",
-      "SEPTIEMBRE",
-      "OCTUBRE",
-      "NOVIEMBRE",
-      "DICIEMBRE",
+      "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+      "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE",
     ];
     for (const mes of meses) {
       setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
     }
 
-    // DETALLE
     const detalle = payload.detalle || [];
     setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
     setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
-    setTextSafe(
-      "CONCEPTO DE PARTIDA",
-      detalle.map((r) => r.concepto_partida || "").join("\n"),
-    );
-    setTextSafe(
-      "JUSTIFICACIÓN",
-      detalle.map((r) => r.justificacion || "").join("\n"),
-    );
-    setTextSafe(
-      "DESCRIPCIÓN",
-      detalle.map((r) => r.descripcion || "").join("\n"),
-    );
-    setTextSafe(
-      "IMPORTE",
-      detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"),
-    );
+    setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
+    setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
+    setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
+    setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
 
-    // TOTALES
     setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
     setTextSafe("IVA", safeN(payload.iva).toFixed(2));
     setTextSafe("ISR", safeN(payload.isr).toFixed(2));
@@ -1625,7 +1588,7 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
     const blob = new Blob([outBytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
 
-    const folio = String(payload.folio_num || "").padStart(6, "0") || "000000";
+    const folio = (get("no_suficiencia") || "0000").replace(/\s+/g, "_");
     const a = document.createElement("a");
     a.href = url;
     a.download = `SUFICIENCIA_${folio}.pdf`;
@@ -1639,138 +1602,194 @@ const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
   // Eventos
   // ---------------------------
   function bindEvents() {
-  btnAddRow?.addEventListener("click", addRow);
-  btnRemoveRow?.addEventListener("click", removeRow);
+    btnAddRow?.addEventListener("click", addRow);
+    btnRemoveRow?.addEventListener("click", removeRow);
 
-  if (btnVerComprometido) btnVerComprometido.type = "button";
-  if (btnVerDevengado) btnVerDevengado.type = "button";
-  if (btnGuardar) btnGuardar.type = "button";
-  if (btnSi) btnSi.type = "button";
-  if (btnDescargarPdf) btnDescargarPdf.type = "button";
+    if (btnVerComprometido) btnVerComprometido.type = "button";
+    if (btnVerDevengado) btnVerDevengado.type = "button";
+    if (btnGuardar) btnGuardar.type = "button";
+    if (btnSi) btnSi.type = "button";
+    if (btnDescargarPdf) btnDescargarPdf.type = "button";
 
-  btnGuardar?.addEventListener("click", (e) => {
-    e.preventDefault();
-    modal?.show();
-  });
+    btnAbrirBuscarSuf?.addEventListener("click", (e) => {
+      e.preventDefault();
+      modalBuscar?.show();
+      setTimeout(() => txtNumeroSuf?.focus(), 250);
+    });
 
-  btnSi?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    try {
-      btnSi.disabled = true;
-      await save();
-      modal?.hide();
-    } catch (err) {
-      console.error("[SP] save error:", err);
-      await uiError(err?.message || "Error al guardar");
-    } finally {
-      btnSi.disabled = false;
-    }
-  });
+    btnBuscarNumero?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await buscarPorNumero(txtNumeroSuf?.value || "");
+      } catch (err) {
+        console.error("[BUSCAR] error:", err);
+        await uiError(err?.message || "Error al buscar");
+      }
+    });
 
-  btnDescargarPdf?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    try {
-      await generarPDF();
-    } catch (err) {
-      console.error("[SP] PDF error:", err);
-      await uiError(err?.message || "Error al generar PDF");
-    }
-  });
+    txtNumeroSuf?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        btnBuscarNumero?.click();
+      }
+    });
 
-  // ✅ VER COMPROMETIDO
-  btnVerComprometido?.addEventListener("click", async (e) => {
-    e.preventDefault();
+    btnGuardar?.addEventListener("click", (e) => {
+      e.preventDefault();
+      modal?.show();
+    });
 
-    let id = btnVerComprometido.dataset.id
-      ? Number(btnVerComprometido.dataset.id)
-      : null;
+    btnSi?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        btnSi.disabled = true;
+        await save();
+        modal?.hide();
+      } catch (err) {
+        console.error("[SP] save error:", err);
+        await uiError(err?.message || "Error al guardar");
+      } finally {
+        btnSi.disabled = false;
+      }
+    });
 
-    if (!id && lastSavedId) id = Number(lastSavedId);
-    if (!id) id = readLastIdFromLocalStorage();
+    btnDescargarPdf?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await generarPDF();
+      } catch (err) {
+        console.error("[SP] PDF error:", err);
+        await uiError(err?.message || "Error al generar PDF");
+      }
+    });
 
-    if (!id) {
-      await uiWarn("Primero guarda la Suficiencia para generar el Comprometido.");
-      return;
-    }
+    btnVerComprometido?.addEventListener("click", async (e) => {
+      e.preventDefault();
 
-    goComprometido(id);
-  });
+      let id = btnVerComprometido.dataset.id ? Number(btnVerComprometido.dataset.id) : null;
 
-  // ✅ VER DEVENGADO
-  btnVerDevengado?.addEventListener("click", async (e) => {
-    e.preventDefault();
+      if (!id && lastSavedId) id = Number(lastSavedId);
+      if (!id) id = readLastIdFromLocalStorage();
 
-    let id = btnVerDevengado.dataset.id
-      ? Number(btnVerDevengado.dataset.id)
-      : null;
-
-    if (!id && lastSavedId) id = Number(lastSavedId);
-    if (!id) id = readLastIdFromLocalStorage();
-
-    if (!id) {
-      await uiWarn("Primero guarda la Suficiencia para generar el Devengado.");
-      return;
-    }
-
-    goDevengado(id);
-  });
-
-  // ✅ cuando cambie proyecto: clave + meta readonly
-  document.querySelector('[name="id_proyecto"]')?.addEventListener("change", () => {
-    updateClaveProgramatica();
-    syncMetaFromProyecto();
-    refreshTotales();
-  });
-
-  bindTaxEvents();
-
-  if (DEBUG_PDF_FIELDS) {
-    debugListPdfFields().catch((err) =>
-      console.warn("[PDF debug] ", err.message),
-    );
-  }
-
-  // ✅ BUSCADOR
-  btnToggleBuscar?.addEventListener("click", () => {
-    if (!panelBuscar) return;
-    const isShown = panelBuscarEl.classList.contains("show");
-    if (isShown) panelBuscar.hide();
-    else panelBuscar.show();
-  });
-
-  btnCerrarBuscar?.addEventListener("click", () => panelBuscar?.hide());
-  btnCerrarBuscar2?.addEventListener("click", () => panelBuscar?.hide());
-
-  btnBuscarNumero?.addEventListener("click", async () => {
-    try {
-      const n = txtNumeroSuf?.value || "";
-      if (!String(n).trim()) {
-        await uiWarn("Escribe el folio ECA-2026-01-SP-0001 o el número 0001.");
+      if (!id) {
+        await uiWarn("Primero guarda la Suficiencia para generar el Comprometido.");
         return;
       }
-      await buscarPorNumero(n);
-    } catch (err) {
-      console.error("[BUSCAR] error:", err);
-      await uiError(err?.message || "Error al buscar");
+
+      goComprometido(id);
+    });
+
+    btnVerDevengado?.addEventListener("click", async (e) => {
+      e.preventDefault();
+
+      let id = btnVerDevengado.dataset.id ? Number(btnVerDevengado.dataset.id) : null;
+
+      if (!id && lastSavedId) id = Number(lastSavedId);
+      if (!id) id = readLastIdFromLocalStorage();
+
+      if (!id) {
+        await uiWarn("Primero guarda la Suficiencia para generar el Devengado.");
+        return;
+      }
+
+      goDevengado(id);
+    });
+
+    document.querySelector('[name="id_proyecto"]')?.addEventListener("change", () => {
+      updateClaveProgramatica();
+      syncMetaFromProyecto();
+      refreshTotales();
+    });
+
+    bindTaxEvents();
+
+    if (DEBUG_PDF_FIELDS) {
+      debugListPdfFields().catch((err) => console.warn("[PDF debug] ", err.message));
     }
+
+    // ℹ️ Info Dirección Solicitante
+document
+  .getElementById("infoDireccionSolicitante")
+  ?.addEventListener("click", () => {
+    Swal.fire({
+      icon: "info",
+      title: "Dirección solicitante",
+      html: `
+        <div style="font-size:13px; text-align:left;">
+          <p class="mb-2">
+            Este campo se llena automáticamente con la <b>Dirección General</b>.
+          </p>
+          <p class="mb-2">
+            Está habilitado únicamente para:
+          </p>
+          <ul class="mb-2">
+            <li>Quitar guiones bajos <code>_</code></li>
+            <li>Agregar espacios para mejorar la lectura</li>
+          </ul>
+          <p class="mb-0 text-muted">
+            No modifica la información oficial del sistema.
+          </p>
+        </div>
+      `,
+      confirmButtonText: "Entendido",
+      confirmButtonColor: "#BC955C",
+    });
   });
 
-  btnBuscarClaves?.addEventListener("click", async () => {
-    await uiAlert(
-      "Búsqueda por Dep + Programática: pendiente (aún no implementada). Usa búsqueda por número.",
-      "info",
-      "Pendiente",
-    );
-  });
+  // ℹ️ Info Impuestos (IVA / ISR / IEPS)
+document.getElementById("infoImpuestos")?.addEventListener("click", () => {
+  const hasSwal = typeof window !== "undefined" && !!window.Swal;
+  if (!hasSwal) {
+    alert("Info: Verifica el porcentaje antes de marcar ISR/IEPS. IVA es 16% fijo.");
+    return;
+  }
 
-  txtNumeroSuf?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") btnBuscarNumero?.click();
-  });
+  Swal.fire({
+    icon: "info",
+    title: "Impuestos",
+    html: `
+      <div style="font-size:13px; text-align:left;">
+        <p class="mb-2">
+          Antes de marcar un impuesto, <b>verifica el porcentaje</b> que te corresponde.
+          El sistema calcula el total con base en el <b>subtotal</b>.
+        </p>
 
-  txtProgClave?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") btnBuscarClaves?.click();
+        <div class="mb-2">
+          <b>IVA</b> <span class="text-muted">(16% fijo)</span><br/>
+          <span class="text-muted">Se aplica automáticamente al subtotal cuando lo marcas.</span>
+        </div>
+
+        <div class="mb-2">
+          <b>ISR</b><br/>
+          <span class="text-muted">
+            Se aplica al subtotal con el porcentaje que captures en <b>ISR %</b>.
+            Ejemplo: 10% = 0.10 × subtotal.
+          </span>
+        </div>
+
+        <div class="mb-2">
+          <b>IEPS</b><br/>
+          <span class="text-muted">
+            Se aplica al subtotal con el porcentaje que captures en <b>IEPS %</b>.
+            Ejemplo: 8% = 0.08 × subtotal.
+          </span>
+        </div>
+
+        <hr class="my-2"/>
+
+        <div class="text-muted" style="font-size:12px;">
+          <b>Recomendación:</b> confirma el porcentaje en tu soporte/documento antes de guardarlo.
+          Si no aplica, déjalo desmarcado.
+        </div>
+      </div>
+    `,
+    confirmButtonText: "Entendido",
+    confirmButtonColor: "#BC955C",
   });
-}
+});
+  
+
+  }
 
   // ---------------------------
   // INIT
