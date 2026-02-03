@@ -57,11 +57,14 @@
           <i class="bi bi-person-plus"></i>
           Nuevo usuario
         </button>
+        <button id="btnLogout" class="btn btn-outline-danger btn-ghost">
+  <i class="bi bi-box-arrow-right"></i>
+  Cerrar sesión
+</button>
       </div>
     </div>
     <!-- Alertas -->
     <div id="alertBox" class="alert d-none" role="alert"></div>
-
     <!-- Tarjeta con tabla -->
     <div class="card card-glass">
       <div class="card-body">
@@ -130,34 +133,64 @@
                 <input type="email" id="correo" class="form-control">
               </div>
 
-              <div class="col-md-4">
-                <label class="form-label">Contraseña</label>
-                <!-- SIN required para poder editar sin cambiar password -->
-                <input type="password" id="password" class="form-control">
-                <div class="form-text">
-                  Al crear es obligatorio; al editar solo escribe una nueva si quieres cambiarla.
-                </div>
-              </div>
+              <!-- FILA 1: Contraseña + generador (todo junto) -->
+<div class="row g-3 align-items-end">
+  <div class="col-12">
+    <label class="form-label">Contraseña</label>
 
-              <div class="col-md-4">
-                <label class="form-label">Dependencia general</label>
-                <select id="idDgeneral" class="form-select">
-                  <option value="">Seleccione...</option>
-                </select>
-                <div class="form-text">
-                  Selecciona la dependencia general del usuario.
-                </div>
-              </div>
+    <div class="pwd-row">
+      <!-- Input password -->
+      <div class="pwd-main">
+        <input id="password" name="password" type="text"
+          class="form-control"
+          autocomplete="new-password">
+        <div class="form-text">
+          Al crear es obligatorio; al editar déjala en blanco si no quieres cambiarla.
+        </div>
+      </div>
 
-              <div class="col-md-4">
-                <label class="form-label">Dependencia auxiliar</label>
-                <select id="idDauxiliar" class="form-select">
-                  <option value="">Seleccione...</option>
-                </select>
-                <div class="form-text">
-                  Selecciona la dependencia auxiliar del usuario.
-                </div>
-              </div>
+      <!-- Longitud -->
+      <div class="pwd-len">
+        <label class="form-label mb-1 small text-muted">Longitud</label>
+        <input id="pwd-len" type="number" class="form-control" value="12" min="10" max="64">
+      </div>
+
+      <!-- Botones -->
+      <div class="pwd-actions">
+        <button id="btn-gen-pwd" type="button" class="btn btn-outline-primary w-100">
+          <i class="bi bi-shield-lock me-1"></i>Generar
+        </button>
+        <button id="btn-copy-pwd" type="button" class="btn btn-outline-secondary w-100 mt-2">
+          <i class="bi bi-clipboard me-1"></i>Copiar
+        </button>
+      </div>
+    </div>
+
+    <div class="small text-muted mt-2">
+      Incluye mayús/minús/números/especiales.
+    </div>
+  </div>
+</div>
+
+<!-- FILA 2: Dependencias (bajadas) -->
+<div class="row g-3 mt-1">
+  <div class="col-md-6">
+    <label class="form-label">Dependencia general</label>
+    <select id="idDgeneral" class="form-select">
+      <option value="">Seleccione...</option>
+    </select>
+    <div class="form-text">Selecciona la dependencia general del usuario.</div>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label">Dependencia auxiliar</label>
+    <select id="idDauxiliar" class="form-select">
+      <option value="">Seleccione...</option>
+    </select>
+    <div class="form-text">Selecciona la dependencia auxiliar del usuario.</div>
+  </div>
+</div>
+
 
               <div class="col-md-4 d-flex align-items-center mt-4">
                 <div class="form-check mt-3">

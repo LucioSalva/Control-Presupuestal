@@ -6,6 +6,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+
 import { query } from "./db.js";
 import catalogosRoutes from "./routes/catalogos.routes.js";
 import adminUsuariosRouter from "./routes/admin-usuarios.routes.js";
@@ -15,15 +19,81 @@ import presupuestoRouter from "./routes/presupuesto.routes.js";
 import comprometidoRouter from "./routes/comprometido.routes.js";
 import devengadoRouter from "./routes/devengado.routes.js";
 import metasRouter from "./routes/metas.routes.js";
+
 dotenv.config();
+
 const app = express();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 // =====================================================
-//  MIDDLEWARE BASE
+//  TRUST PROXY (por si algún día lo subes a Render/Nginx)
 // =====================================================
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.set("trust proxy", 1);
+
+// =====================================================
+//  MIDDLEWARE BASE (SEGURIDAD)
+// =====================================================
+
+// 1) Helmet: headers de seguridad
+app.use(
+  helmet({
+    // Como tú sirves HTML estático desde /public, CSP puede romper cosas si usas inline scripts.
+    // Por eso lo apagamos para no darte broncas ahorita.
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// 2) Body size limit: evita payloads enormes
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// 3) CORS: NO uses origin:true en producción.
+// Para local dejamos whitelist (ajusta si usas otro puerto)
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://localhost:5502",
+  "http://127.0.0.1:5502",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]);
+
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Permitir tools como Postman/curl (sin origin)
+      if (!origin) return cb(null, true);
+      if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+      return cb(new Error("CORS bloqueado: " + origin), false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-user-id"],
+  })
+);
+
+// 4) Rate limit global para /api (suave)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 600, // ajusta si quieres
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes, intenta más tarde." },
+});
+app.use("/api", apiLimiter);
+
+// 5) Rate limit fuerte para LOGIN (anti brute-force)
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 min
+  max: 20, // 20 intentos por IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiados intentos de login. Espera 10 minutos." },
+});
+app.use("/api/login", loginLimiter);
 
 // =====================================================
 //  STATIC (FRONTEND)
@@ -53,7 +123,7 @@ function parseFakeToken(req) {
   const userId = Number(parts[1]);
   if (!Number.isFinite(userId) || userId <= 0) return null;
 
-  const ts = Number(parts[2]); // 👈 timestamp del token
+  const ts = Number(parts[2]); // timestamp del token
   if (!Number.isFinite(ts) || ts <= 0) return null;
 
   // ✅ expira si tiene más de 10 min
@@ -116,9 +186,15 @@ function isGodOrAdmin(req) {
   return roles.includes("GOD") || roles.includes("ADMIN");
 }
 
+function requireGodOrAdmin(req, res, next) {
+  if (!isGodOrAdmin(req)) {
+    return res.status(403).json({ error: "Solo GOD/ADMIN puede acceder." });
+  }
+  next();
+}
+
 /**
  * ✅ Bloquea escritura en catálogo PARTIDAS
- * (aunque hoy solo tienes GET, esto te blinda si mañana agregas POST/PUT/DELETE)
  */
 function blockPartidasWrite(req, res, next) {
   const method = String(req.method || "").toUpperCase();
@@ -127,8 +203,7 @@ function blockPartidasWrite(req, res, next) {
 
   if (!isGodOrAdmin(req)) {
     return res.status(403).json({
-      error:
-        "AREA no puede modificar el catálogo de partidas (solo GOD/ADMIN).",
+      error: "AREA no puede modificar el catálogo de partidas (solo GOD/ADMIN).",
     });
   }
   next();
@@ -138,12 +213,18 @@ function blockPartidasWrite(req, res, next) {
 //  ROUTERS API
 // =====================================================
 
+// Login / auth
 app.use("/api", authRouter);
-app.use("/api/admin/usuarios", adminUsuariosRouter);
+
+// 🔥 CIERRE DE HUECO: admin usuarios YA NO va público
+app.use("/api/admin/usuarios", authRequired, requireGodOrAdmin, adminUsuariosRouter);
+
 app.use("/api/suficiencias", authRequired, suficienciasRouter);
 app.use("/api/comprometido", authRequired, comprometidoRouter);
 app.use("/api/devengado", authRequired, devengadoRouter);
+
 app.use("/api", presupuestoRouter);
+
 app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite);
 app.use("/api/catalogos", authRequired, catalogosRoutes);
 app.use("/api/catalogos/metas", authRequired, metasRouter);
@@ -152,6 +233,7 @@ app.use("/api/catalogos/metas", authRequired, metasRouter);
 //  HEALTH
 // =====================================================
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
 // =====================================================
 //  404 — RUTAS NO ENCONTRADAS
 // =====================================================
@@ -161,6 +243,7 @@ app.use((req, res) => {
   }
   return res.status(404).sendFile(path.join(__dirname, "public", "404.html"));
 });
+
 // =====================================================
 //  ARRANQUE
 // =====================================================

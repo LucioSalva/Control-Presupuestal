@@ -200,7 +200,7 @@ html, body{
   border-radius: var(--radius);
   overflow: auto !important;
   border: 1px solid rgba(255,255,255,.12) !important;
-  max-height: calc(100vh - 160px); 
+  max-height: calc(100vh - 160px);
 }
 
 .table-pro thead th{
@@ -475,4 +475,41 @@ td.col-fecha *{
 
 #tablaUsuarios tbody tr:has(.badge.text-bg-dark.badge-role):hover{
   box-shadow: 0 0 0 1px rgba(250,204,21,.25), 0 22px 65px rgba(250,204,21,.14);
+}
+
+.modal-pro .pwd-row{
+  display: grid;
+  grid-template-columns: 1fr 120px 150px;
+  gap: 12px;
+  align-items: start;
+}
+
+.modal-pro .pwd-main input{
+  height: 44px;
+}
+
+.modal-pro .pwd-len input{
+  height: 44px;
+  text-align: center;
+}
+
+.modal-pro .pwd-actions .btn{
+  height: 44px;
+  border-radius: 14px !important;
+}
+
+.modal-pro .pwd-divider{
+  height: 1px;
+  background: rgba(255,255,255,.10);
+  border: 0;
+  margin: 12px 0 4px;
+}
+
+@media (max-width: 768px){
+  .modal-pro .pwd-row{
+    grid-template-columns: 1fr;
+  }
+  .modal-pro .pwd-actions .btn{
+    width: 100%;
+  }
 }

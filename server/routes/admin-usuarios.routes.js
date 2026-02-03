@@ -1,23 +1,19 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import { query, getClient } from "../db.js";
 
 const router = Router();
 
-/**
- * Auditoría: quién ejecuta la acción (viene del front en header)
- * Frontend manda: headers: { "x-user-id": <id del usuario logueado> }
- */
 function getActorId(req) {
   const actorId = Number(req.headers["x-user-id"] || 0);
   return Number.isFinite(actorId) && actorId > 0 ? actorId : null;
 }
 
-/* =====================================================
-   ADMINISTRACIÓN DE USUARIOS (CRUD) ✅ con auditoría
-   Base path: /api/admin/usuarios
-   ===================================================== */
+const SALT_ROUNDS = 12;
 
-// LISTA completa
+// =======================
+// GET
+// =======================
 router.get("/", async (_req, res) => {
   try {
     const sql = `
@@ -29,21 +25,17 @@ router.get("/", async (_req, res) => {
         u.activo,
         u.fecha_creacion,
 
-        -- Dependencia general
         u.id_dgeneral,
         dg.clave AS dgeneral_clave,
         dg.dependencia AS dgeneral_nombre,
 
-        -- Dependencia auxiliar
         u.id_dauxiliar,
         da.clave AS dauxiliar_clave,
         da.dependencia AS dauxiliar_nombre,
 
-        -- Auditoría
         u.updated_by,
         u.updated_at,
 
-        -- Roles
         COALESCE(
           ARRAY_AGG(DISTINCT r.clave) FILTER (WHERE r.clave IS NOT NULL),
           '{}'::text[]
@@ -73,7 +65,9 @@ router.get("/", async (_req, res) => {
   }
 });
 
-// CREAR usuario ✅ set updated_by/updated_at
+// =======================
+// POST (crear)
+// =======================
 router.post("/", async (req, res) => {
   const {
     nombre_completo,
@@ -98,6 +92,9 @@ router.post("/", async (req, res) => {
 
     const actorId = getActorId(req);
 
+    // ✅ bcrypt hash
+    const hash = await bcrypt.hash(String(password), SALT_ROUNDS);
+
     const ins = await client.query(
       `
       INSERT INTO usuarios (
@@ -118,7 +115,7 @@ router.post("/", async (req, res) => {
         nombre_completo,
         usuario,
         correo || null,
-        password,
+        hash,
         id_dgeneral || null,
         id_dauxiliar || null,
         !!activo,
@@ -170,7 +167,9 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ACTUALIZAR usuario ✅ set updated_by/updated_at
+// =======================
+// PUT (actualizar)
+// =======================
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id || 0);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -198,7 +197,10 @@ router.put("/:id", async (req, res) => {
 
     const actorId = getActorId(req);
 
-    if (password && password.trim().length > 0) {
+    // ✅ si viene password, lo hasheamos
+    if (password && String(password).trim().length > 0) {
+      const hash = await bcrypt.hash(String(password), SALT_ROUNDS);
+
       await client.query(
         `
         UPDATE usuarios
@@ -217,7 +219,7 @@ router.put("/:id", async (req, res) => {
           nombre_completo,
           usuario,
           correo || null,
-          password,
+          hash,
           id_dgeneral || null,
           id_dauxiliar || null,
           !!activo,
@@ -294,7 +296,9 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// ELIMINAR usuario ✅ set updated_by/updated_at antes de borrar
+// =======================
+// DELETE
+// =======================
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id || 0);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -305,7 +309,6 @@ router.delete("/:id", async (req, res) => {
 
     const actorId = getActorId(req);
 
-    // fuerza updated_by/updated_at antes del DELETE (útil para auditoría/trigger)
     await client.query(
       `UPDATE public.usuarios
           SET updated_by = $1,
@@ -327,5 +330,6 @@ router.delete("/:id", async (req, res) => {
     client.release();
   }
 });
+
 
 export default router;

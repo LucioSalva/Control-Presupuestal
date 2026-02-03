@@ -208,3 +208,17 @@ td .text-end.ro {
       border-color: #dc3545 !important;
       background-color: #f8d7da !important;
     }
+
+input[name="meta"],
+input[name="cantidad_con_letra"]{
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+td input[name="meta"].as-text,
+td input[name="cantidad_con_letra"].as-text,
+td input[name="meta"].ro,
+td input[name="cantidad_con_letra"].ro{
+  display: block !important;
+}

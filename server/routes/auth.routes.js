@@ -1,11 +1,14 @@
+// server/routes/auth.routes.js
 import express from "express";
-import { query } from "../db.js";
+import bcrypt from "bcryptjs";
+import { query, getClient } from "../db.js";
 
 const router = express.Router();
 
-/* =====================================================
-   LOGIN (simple, sin JWT por ahora)
-   ===================================================== */
+function isBcryptHash(str) {
+  return typeof str === "string" && /^\$2[aby]?\$\d{2}\$/.test(str);
+}
+
 router.post("/login", async (req, res) => {
   const { usuario, password } = req.body;
 
@@ -23,8 +26,8 @@ router.post("/login", async (req, res) => {
              u.id_dgeneral,
              u.id_dauxiliar,
              u.activo,
-             d.clave AS dgeneral_clave,
-             d.dependencia AS dgeneral_nombre,
+             dg.clave AS dgeneral_clave,
+             dg.dependencia AS dgeneral_nombre,
              ARRAY(
                SELECT r.clave
                FROM usuario_rol ur
@@ -32,13 +35,13 @@ router.post("/login", async (req, res) => {
                WHERE ur.id_usuario = u.id
              ) AS roles
       FROM usuarios u
-      LEFT JOIN dgeneral d ON d.id = u.id_dgeneral
+      LEFT JOIN dgeneral dg ON dg.id = u.id_dgeneral
       LEFT JOIN dauxiliar da ON da.id = u.id_dauxiliar
-      WHERE u.usuario = $1
+      WHERE LOWER(u.usuario) = LOWER($1)
       LIMIT 1;
     `;
 
-    const result = await query(sql, [usuario]);
+    const result = await query(sql, [String(usuario).trim()]);
 
     if (result.rowCount === 0) {
       return res.status(401).json({ error: "Credenciales inválidas" });
@@ -50,12 +53,41 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({ error: "Usuario inactivo" });
     }
 
-    // ⚠ SIN bcrypt, comparación directa
-    if (user.password !== password) {
+    const stored = user.password || "";
+    let ok = false;
+
+    // ✅ Caso 1: password ya es bcrypt
+    if (isBcryptHash(stored)) {
+      ok = await bcrypt.compare(password, stored);
+    } else {
+      // ✅ Caso 2: password está plano (legacy)
+      ok = stored === password;
+
+      // 🔁 Si fue correcto, lo migramos a bcrypt automáticamente
+      if (ok) {
+        const client = await getClient();
+        try {
+          await client.query("BEGIN");
+          const hash = await bcrypt.hash(password, 10);
+          await client.query(
+            "UPDATE usuarios SET password = $1, updated_at = NOW() WHERE id = $2",
+            [hash, user.id]
+          );
+          await client.query("COMMIT");
+        } catch (e) {
+          await client.query("ROLLBACK");
+          console.warn("[LOGIN] No se pudo migrar password a bcrypt:", e);
+        } finally {
+          client.release();
+        }
+      }
+    }
+
+    if (!ok) {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // Token "de mentiritas"
+    // token de mentiritas (tu mismo sistema)
     const token = `token-${user.id}-${Date.now()}`;
 
     return res.json({

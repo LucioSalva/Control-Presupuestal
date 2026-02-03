@@ -1,4 +1,3 @@
-// public/js/devengado.js
 (() => {
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
 
@@ -42,8 +41,9 @@
 
   function getUser() {
     try {
+      // ✅ tu sistema usa cp_usuario
       const raw =
-        localStorage.getItem("cp_user") || sessionStorage.getItem("cp_user");
+        localStorage.getItem("cp_usuario") || sessionStorage.getItem("cp_usuario");
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -87,6 +87,7 @@
     return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
+  // ✅ fetchJson con mensaje claro en 404
   async function fetchJson(url, options = {}) {
     const r = await fetch(url, options);
     const text = await r.text();
@@ -97,6 +98,9 @@
     } catch {}
 
     if (!r.ok) {
+      if (r.status === 404) {
+        throw new Error(`Ruta de API no encontrada: ${url}`);
+      }
       const msg = data?.error || data?.message || `HTTP ${r.status} en ${url}`;
       throw new Error(msg);
     }
@@ -131,7 +135,6 @@
       const b = Number(obj?.payload?.id_comprometido || 0);
       if (b > 0) return b;
 
-      // por si guardaron payload.id como id_comprometido (fallback)
       const c = Number(obj?.payload?.id || 0);
       if (c > 0) return c;
 
@@ -182,10 +185,7 @@
 
     const f = new Date(fechaBase);
     const hoy = new Date();
-    if (
-      f.getMonth() !== hoy.getMonth() ||
-      f.getFullYear() !== hoy.getFullYear()
-    ) {
+    if (f.getMonth() !== hoy.getMonth() || f.getFullYear() !== hoy.getFullYear()) {
       mostrarAlertaCancelado();
       deshabilitarFormulario();
       return false;
@@ -212,7 +212,7 @@
       const i = idx + 1;
       const importe = safeNumber(r?.importe).toFixed(2);
       const importeOriginal = safeNumber(
-        r?.importe_comprometido ?? r?.importe_original ?? r?.importe,
+        r?.importe_comprometido ?? r?.importe_original ?? r?.importe
       ).toFixed(2);
 
       detalleBody.insertAdjacentHTML(
@@ -242,7 +242,7 @@
               value="${importe}">
           </td>
         </tr>
-      `,
+      `
       );
     });
 
@@ -266,10 +266,103 @@
   }
 
   function numeroALetras(num) {
-    const entero = Math.floor(num);
-    const decimales = Math.round((num - entero) * 100);
-    return `${entero} PESOS ${String(decimales).padStart(2, "0")}/100 M.N.`;
+  const n = Number(num) || 0;
+  const entero = Math.floor(n);
+  const centavos = Math.round((n - entero) * 100);
+
+  const letras = convertirNumero(entero).trim();
+  const cents = String(centavos).padStart(2, "0");
+
+  // plural/singular
+  const pesoTxt = entero === 1 ? "PESO" : "PESOS";
+
+  return `${letras} ${pesoTxt} ${cents}/100 M.N.`
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+function convertirNumero(n) {
+  if (n === 0) return "CERO";
+
+  const unidades = [
+    "", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE",
+    "DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE",
+    "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE", "VEINTE",
+  ];
+
+  const decenas = [
+    "", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA",
+    "SESENTA", "SETENTA", "OCHENTA", "NOVENTA",
+  ];
+
+  const centenas = [
+    "", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS",
+    "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS",
+  ];
+
+  function seccion(n) {
+    let out = "";
+
+    if (n === 100) return "CIEN";
+
+    const c = Math.floor(n / 100);
+    const d = Math.floor((n % 100) / 10);
+    const u = n % 10;
+    const du = n % 100;
+
+    if (c) out += centenas[c] + " ";
+
+    if (du <= 20) {
+      out += unidades[du];
+      return out.trim();
+    }
+
+    if (d === 2) {
+      out += "VEINTI" + (u ? unidades[u].toLowerCase() : "");
+      return out.trim();
+    }
+
+    out += decenas[d];
+    if (u) out += " Y " + unidades[u];
+
+    return out.trim();
   }
+
+  function miles(n) {
+    if (n < 1000) return seccion(n);
+
+    const m = Math.floor(n / 1000);
+    const r = n % 1000;
+
+    let out = "";
+    if (m === 1) out += "MIL";
+    else out += seccion(m) + " MIL";
+
+    if (r) out += " " + seccion(r);
+
+    return out.trim();
+  }
+
+  function millones(n) {
+    if (n < 1000000) return miles(n);
+
+    const m = Math.floor(n / 1000000);
+    const r = n % 1000000;
+
+    let out = "";
+    if (m === 1) out += "UN MILLÓN";
+    else out += miles(m) + " MILLONES";
+
+    if (r) out += " " + miles(r);
+
+    return out.trim();
+  }
+
+  return millones(n)
+    .replace(/\bUNO\b/g, "UN")
+    .replace(/\bVEINTIUNO\b/g, "VEINTIUN");
+}
+
 
   function validarMontoTotal(total) {
     const inputMonto = document.querySelector('[name="monto_devengado"]');
@@ -312,18 +405,24 @@
 
     // ✅ Si viene id en URL, ese id es del COMPROMETIDO
     if (id) {
-      const resp = await fetchJson(`${API}/api/comprometido/${id}`, {
-        headers: { ...authHeaders() },
-      });
+      // ✅ PRIMERO plural: /api/comprometidos/:id
+      let resp = null;
+      try {
+        resp = await fetchJson(`${API}/api/comprometido/${id}`, {
+          headers: { ...authHeaders() },
+        });
+      } catch (e) {
+        // fallback singular: /api/comprometido/:id
+        resp = await fetchJson(`${API}/api/comprometido/${id}`, {
+          headers: { ...authHeaders() },
+        });
+      }
 
       const payload = resp?.data || resp?.payload || resp;
-      if (!payload)
-        throw new Error("No se encontró payload en /api/comprometido/:id");
+      if (!payload) throw new Error("No se encontró payload del Comprometido.");
 
-      // ✅ aseguramos que el payload traiga id_comprometido
       payload.id_comprometido = Number(payload.id_comprometido || payload.id || id);
 
-      // ✅ guarda para fallback
       localStorage.setItem(
         "cp_last_comprometido",
         JSON.stringify({
@@ -331,7 +430,7 @@
           payload,
           loaded_from: "api",
           loaded_at: new Date().toISOString(),
-        }),
+        })
       );
 
       return payload;
@@ -343,12 +442,9 @@
 
     const obj = JSON.parse(raw);
     const payload = obj?.payload || obj;
-    if (!payload)
-      throw new Error("No se encontró payload válido en cp_last_comprometido.");
+    if (!payload) throw new Error("No se encontró payload válido en cp_last_comprometido.");
 
-    // ✅ asegúrate que exista id_comprometido
     payload.id_comprometido = Number(payload.id_comprometido || obj?.id || 0);
-
     return payload;
   }
 
@@ -373,109 +469,68 @@
   async function renderPayload(payload) {
     currentPayload = payload;
 
-    // Folio devengado (texto)
     setVal(
       "no_devengado",
       payload?.no_devengado ||
         payload?.folio_oficial_devengado ||
-        (payload?.folio_devengado
-          ? String(payload.folio_devengado).padStart(6, "0")
-          : "NUEVO"),
+        (payload?.folio_devengado ? String(payload.folio_devengado).padStart(6, "0") : "NUEVO")
     );
 
-    // Ref comprometido
     setVal(
       "no_comprometido",
       payload?.no_comprometido ||
         payload?.folio_oficial_comprometido ||
-        (payload?.folio_comprometido
-          ? String(payload.folio_comprometido).padStart(6, "0")
-          : ""),
+        (payload?.folio_comprometido ? String(payload.folio_comprometido).padStart(6, "0") : "")
     );
 
-    // Generales
     setVal("dependencia", payload?.dependencia || "");
     setVal("dependencia_aux", payload?.dependencia_aux || "");
 
     const fecha = formatFecha(
-      payload?.fecha_devengado ||
-        payload?.fecha ||
-        new Date().toISOString().split("T")[0],
+      payload?.fecha_devengado || payload?.fecha || new Date().toISOString().split("T")[0]
     );
     setVal("fecha", fecha);
 
-    // ✅ tu HTML usa name="clave_programatica"
     setVal("clave_programatica", payload?.clave_programatica || "");
-    // ✅ por compatibilidad si existe otro input
-    setVal("id_proyecto_programatico", payload?.clave_programatica || "");
 
-    setVal("programa", payload?.programa || "");
-
-    // ================================
-    // ✅ FUENTE (mostrar "clave - fuente" aunque venga solo id)
-    // ================================
-    const idFuente =
-      payload?.id_fuente != null ? String(payload.id_fuente) : "";
-
-    // guarda id en hidden si existe
+    // FUENTE
+    const idFuente = payload?.id_fuente != null ? String(payload.id_fuente) : "";
     setReadonlyVal("id_fuente", idFuente);
 
-    // intenta tomar texto directo
     let fuenteLabel = String(payload?.fuente_text || payload?.fuente || "").trim();
-
-    // si no hay texto pero sí id, resolver catálogo
     if (!fuenteLabel && idFuente) {
       if (!window.__fuentesMap) window.__fuentesMap = await loadFuentesMap();
       fuenteLabel = window.__fuentesMap[idFuente] || "";
     }
-
-    // pinta input visible (cualquiera que exista en tu HTML)
     setReadonlyVal("fuente_text", fuenteLabel);
-    setReadonlyVal("fuente", fuenteLabel);
 
     setVal("mes_pago", payload?.mes_pago || "");
 
-    // Monto comprometido
     montoComprometido = safeNumber(payload?.total);
     setVal("monto_comprometido", formatMoney(montoComprometido));
     setVal("cantidad_pago", safeNumber(payload?.total).toFixed(2));
 
-    // Tasas
     const isrTasaRaw = payload?.isr_tasa || payload?.isr_rate || 0;
     tasaISR = isrTasaRaw > 1 ? isrTasaRaw / 100 : isrTasaRaw;
 
     tasaIVA =
       payload?.iva_rate ||
-      (payload?.iva && payload?.subtotal
-        ? safeNumber(payload.iva) / safeNumber(payload.subtotal)
-        : 0.16);
+      (payload?.iva && payload?.subtotal ? safeNumber(payload.iva) / safeNumber(payload.subtotal) : 0.16);
 
-    // Detalle
     const det = Array.isArray(payload?.detalle) ? payload.detalle : [];
     const detNorm = det.map((d) => ({
       ...d,
-      importe_comprometido: safeNumber(
-        d?.importe_comprometido ?? d?.importe_original ?? d?.importe,
-      ),
-      importe: safeNumber(
-        d?.importe ??
-          d?.importe_devengado ??
-          d?.importe_comprometido ??
-          d?.importe_original ??
-          0,
-      ),
+      importe_comprometido: safeNumber(d?.importe_comprometido ?? d?.importe_original ?? d?.importe),
+      importe: safeNumber(d?.importe ?? d?.importe_devengado ?? d?.importe_comprometido ?? d?.importe_original ?? 0),
     }));
 
     renderDetalle(detNorm);
 
-    // Totales
     setVal("meta", payload?.meta || "");
     recalcularTotales();
 
-    // Vigencia
     verificarVigencia(payload?.fecha_comprometido || payload?.fecha, payload?.estatus);
 
-    // Firmas
     updateFirmasSection(payload);
   }
 
@@ -483,9 +538,9 @@
   // Build payload para guardar
   // ---------------------------
   function buildSavePayload() {
-    getUser(); // (no lo usa backend, pero lo dejamos)
-    const detalle = [];
+    getUser(); // no se usa directo por backend
 
+    const detalle = [];
     document.querySelectorAll("#detalleBody tr").forEach((tr, idx) => {
       const importeInput = tr.querySelector(`[name="importe_${idx}"]`);
       const original = currentPayload?.detalle?.[idx] || {};
@@ -496,33 +551,23 @@
         no: renglon,
         renglon: renglon,
         importe: safeNumber(importeInput?.value),
-        importe_comprometido: safeNumber(
-          original?.importe_comprometido ??
-            original?.importe_original ??
-            original?.importe,
-        ),
+        importe_comprometido: safeNumber(original?.importe_comprometido ?? original?.importe_original ?? original?.importe),
       });
     });
 
     const montoDevengado = safeNumber(getVal("total"));
     const montoLiberado = montoComprometido - montoDevengado;
-
-    // ✅ ID comprometido SIEMPRE (URL o localStorage)
     const idComp = resolveIdComprometido();
 
     return {
-      id_suficiencia:
-        Number(currentPayload?.id_suficiencia || currentPayload?.id || 0) ||
-        null,
+      id_suficiencia: Number(currentPayload?.id_suficiencia || currentPayload?.id || 0) || null,
       id_comprometido: idComp > 0 ? idComp : null,
-
       fecha_devengado: getVal("fecha"),
 
       monto_comprometido: montoComprometido,
       monto_devengado: montoDevengado,
       monto_liberado: montoLiberado > 0 ? montoLiberado : 0,
 
-      // firmas
       firmante_area: getVal("firma_area_nombre"),
       firmante_direccion: getVal("firma_direccion_nombre"),
       firmante_coordinacion: getVal("firma_suficiencia_nombre"),
@@ -547,18 +592,17 @@
     if (!payload.id_suficiencia || payload.id_suficiencia <= 0) {
       throw new Error("Falta id_suficiencia válido");
     }
-
     if (payload.monto_devengado > payload.monto_comprometido) {
       throw new Error("El monto a devengar no puede ser mayor al comprometido.");
     }
 
+    // ✅ tu backend: POST /api/devengado
     const data = await fetchJson(`${API}/api/devengado`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(payload),
     });
 
-    // ✅ guarda el resultado para reusar
     try {
       localStorage.setItem(
         "cp_last_devengado",
@@ -567,17 +611,19 @@
           payload,
           result: data,
           saved_at: new Date().toISOString(),
-        }),
+        })
       );
     } catch {}
 
     return data;
   }
 
+  // ⚠️ OJO: tu backend NO tiene cancelar en devengado.routes.js
   async function cancelarDocumento() {
     const id = getQueryId();
     if (!id) throw new Error("No se puede cancelar: ID no encontrado");
 
+    // Si en tu server no existe esta ruta, dará 404.
     const data = await fetchJson(`${API}/api/devengado/${id}/cancelar`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -587,9 +633,6 @@
     return data;
   }
 
-  // ---------------------------
-  // PDF (placeholder)
-  // ---------------------------
   async function generarPDF() {
     alert("Conecta aquí tu generador real de PDF (pdf-lib) para Devengado.");
   }
@@ -636,8 +679,7 @@
         modalGuardar.hide();
 
         if (data?.no_devengado) setVal("no_devengado", data.no_devengado);
-        else if (data?.folio_num)
-          setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
+        else if (data?.folio_num) setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
 
         alert("Devengado guardado correctamente.");
       } catch (err) {
@@ -664,7 +706,7 @@
         alert("Documento cancelado.");
       } catch (err) {
         console.error("[DEVENGADO] cancelar:", err);
-        alert(err?.message || "Error al cancelar");
+        alert(err?.message || "Error al cancelar (revisa si existe la ruta /cancelar en el backend).");
       } finally {
         btnConfirmarCancelar.disabled = false;
       }
@@ -688,28 +730,15 @@
       }
     });
 
-    // Buscador (si existe nav-search / proj-code)
-    const form = document.getElementById("nav-search");
-    const input = document.getElementById("proj-code");
-    form?.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const id = String(input?.value || "").trim();
-      if (!id) return;
-      window.location.href = `devengado.html?id=${encodeURIComponent(id)}`;
+    document.querySelector('[name="monto_devengado"]')?.addEventListener("change", (e) => {
+      const monto = safeNumber(e.target.value);
+      if (monto > montoComprometido) {
+        e.target.value = montoComprometido.toFixed(2);
+        e.target.classList.add("monto-error");
+      } else {
+        e.target.classList.remove("monto-error");
+      }
     });
-
-    // Cambio manual del monto_devengado
-    document
-      .querySelector('[name="monto_devengado"]')
-      ?.addEventListener("change", (e) => {
-        const monto = safeNumber(e.target.value);
-        if (monto > montoComprometido) {
-          e.target.value = montoComprometido.toFixed(2);
-          e.target.classList.add("monto-error");
-        } else {
-          e.target.classList.remove("monto-error");
-        }
-      });
   }
 
   // ---------------------------

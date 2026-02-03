@@ -1,13 +1,6 @@
-// =====================================================
-//  CONFIG (SIN HARDcode pero con fallback correcto a API:3000)
-// =====================================================
-
-// Si window.API_URL existe (prod), úsalo.
-// Si NO existe, en desarrollo usa localhost:3000 (porque tu HTML corre en 5502).
 const ADMIN_API_BASE =
   (window.API_URL && String(window.API_URL).trim()) || "http://localhost:3000";
 
-// helper para evitar doble slash
 const joinUrl = (base, p) => String(base).replace(/\/$/, "") + String(p);
 
 // Endpoints
@@ -210,6 +203,26 @@ function hideAlert() {
   alertBox.classList.add("d-none");
 }
 
+// =====================================================
+//  LOGOUT
+// =====================================================
+function cerrarSesion() {
+  //  borrar tokens y usuario
+  localStorage.removeItem("cp_token");
+  localStorage.removeItem("cp_usuario");
+  localStorage.removeItem("token");
+  localStorage.removeItem("authToken");
+
+  sessionStorage.removeItem("cp_token");
+  sessionStorage.removeItem("cp_usuario");
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("authToken");
+
+  //  mandar al login
+  window.location.href = "login.html";
+}
+
+
 function formatFecha(fechaStr) {
   if (!fechaStr) return "—";
   const d = new Date(fechaStr);
@@ -226,9 +239,7 @@ function formatFecha(fechaStr) {
 //  CATALOGO DGENERAL (SELECT)
 // =====================================================
 async function fetchDgeneralCatalog() {
-  const res = await fetch(ENDPOINT_DGENERAL, {
-    headers: buildHeaders(false),
-  });
+  const res = await safeFetch(ENDPOINT_DGENERAL, { headers: buildHeaders(false) });
 
   const data = await res.json().catch(() => null);
 
@@ -538,9 +549,117 @@ function obtenerPayloadFormulario() {
 }
 
 // =====================================================
+//  GENERADOR DE CONTRASEÑAS (MODAL)
+// =====================================================
+function initPasswordGeneratorModal() {
+  const $len = document.getElementById("pwd-len");
+  const $btnGen = document.getElementById("btn-gen-pwd");
+  const $btnCopy = document.getElementById("btn-copy-pwd");
+  const $pass = document.getElementById("password");
+
+  // Si el modal no existe en esta página, no hacemos nada
+  if (!$len || !$btnGen || !$btnCopy || !$pass) return;
+
+  const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // sin I/O
+  const LOWER = "abcdefghijkmnpqrstuvwxyz";   // sin l/o
+  const DIGIT = "23456789";                   // sin 0/1
+  const SPEC  = "!@#$%^&*()-_=+[]{};:,.?";
+
+  const ALL = UPPER + LOWER + DIGIT + SPEC;
+
+  function randInt(max) {
+    const a = new Uint32Array(1);
+    window.crypto.getRandomValues(a);
+    return a[0] % max;
+  }
+
+  function pick(set) {
+    return set[randInt(set.length)];
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = randInt(i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function generatePassword(length) {
+    length = Number(length);
+    if (!Number.isFinite(length) || length < 10) length = 10;
+
+    // 1 de cada tipo garantizado
+    const chars = [pick(UPPER), pick(LOWER), pick(DIGIT), pick(SPEC)];
+
+    while (chars.length < length) chars.push(pick(ALL));
+
+    return shuffle(chars).join("");
+  }
+
+  function toastOk(msg) {
+    if (window.Swal) {
+      Swal.fire({ icon: "success", title: "Listo", text: msg, timer: 1200, showConfirmButton: false });
+    } else {
+      showAlert(msg, "success");
+    }
+  }
+
+  function toastErr(msg) {
+    if (window.Swal) {
+      Swal.fire({ icon: "error", title: "Error", text: msg });
+    } else {
+      showAlert(msg, "danger");
+    }
+  }
+
+  $btnGen.addEventListener("click", () => {
+    const pwd = generatePassword($len.value);
+    $pass.value = pwd;
+    $pass.dispatchEvent(new Event("input", { bubbles: true }));
+    toastOk("Contraseña generada y colocada.");
+  });
+
+  $btnCopy.addEventListener("click", async () => {
+    try {
+      if (!$pass.value) {
+        $pass.value = generatePassword($len.value);
+      }
+      await navigator.clipboard.writeText($pass.value);
+      toastOk("Contraseña copiada.");
+    } catch (e) {
+      toastErr("No se pudo copiar. Cópiala manualmente.");
+    }
+  });
+
+    // Botón Cerrar sesión
+  const btnLogout = document.getElementById("btnLogout");
+  if (btnLogout) {
+    btnLogout.addEventListener("click", () => {
+      if (window.Swal) {
+        Swal.fire({
+          title: "¿Cerrar sesión?",
+          text: "Tu sesión se cerrará y deberás iniciar sesión nuevamente.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, salir",
+          cancelButtonText: "Cancelar",
+        }).then((r) => {
+          if (r.isConfirmed) cerrarSesion();
+        });
+      } else {
+        cerrarSesion();
+      }
+    });
+  }
+
+}
+
+// =====================================================
 //  INIT
 // =====================================================
 document.addEventListener("DOMContentLoaded", async () => {
+  initPasswordGeneratorModal();
   const btnVolver = document.getElementById("btnVolver");
   if (btnVolver) btnVolver.addEventListener("click", () => (window.location.href = "index.html"));
 
@@ -632,4 +751,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   fetchUsuarios();
+  
 });
+
+async function safeFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    cerrarSesion();
+    throw new Error("Sesión expirada");
+  }
+  return res;
+}
+
