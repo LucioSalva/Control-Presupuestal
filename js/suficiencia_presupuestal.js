@@ -252,7 +252,6 @@
     }
 
     updateClaveProgramatica();
-
     syncMetaFromProyecto();
 
     // --- Fuente ---
@@ -332,74 +331,75 @@
   }
 
   // ===========================
-  // RESULTADOS BUSCADOR 
+  // RESULTADOS BUSCADOR
   // ===========================
   async function renderResultadosBusqueda(rows) {
-  console.log("[BUSCAR] resultados:", rows);
+    console.log("[BUSCAR] resultados:", rows);
 
-  if (!rows || !rows.length) {
-    await uiWarn("No encontrada (o no corresponde a tu área).");
-    return;
-  }
+    if (!rows || !rows.length) {
+      await uiWarn("No encontrada (o no corresponde a tu área).");
+      return;
+    }
 
-  if (rows.length === 1) {
-    cargarSuficienciaEnFormulario(rows[0].id);
-    return;
-  }
+    if (rows.length === 1) {
+      cargarSuficienciaEnFormulario(rows[0].id);
+      return;
+    }
 
-  const listHtml = `
-    <div class="list-group text-start">
-      ${rows
-        .map((r) => {
-          const folio =
-            r.no_suficiencia ||
-            (r.folio_num != null
-              ? `ECA-2026-01-SP-${String(r.folio_num).padStart(4, "0")}`
-              : "—");
+    if (!hasSwal()) {
+      await uiWarn("Falta SweetAlert2 para mostrar lista de resultados. (Swal no existe).");
+      return;
+    }
 
-          const fecha = r.fecha
-            ? String(r.fecha).split("T")[0]
-            : "";
+    const listHtml = `
+      <div class="list-group text-start">
+        ${rows
+          .map((r) => {
+            const folio =
+              r.no_suficiencia ||
+              (r.folio_num != null
+                ? `ECA-2026-01-SP-${String(r.folio_num).padStart(4, "0")}`
+                : "—");
 
-          return `
-            <button
-              type="button"
-              class="list-group-item list-group-item-action"
-              data-id="${r.id}"
-            >
-              <div class="fw-semibold">${folio}</div>
-              <small class="text-muted">${fecha}</small>
-            </button>
-          `;
-        })
-        .join("")}
-    </div>
-  `;
+            const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
 
-  await Swal.fire({
-    title: "Selecciona una Suficiencia",
-    html: listHtml,
-    icon: "info",
-    showConfirmButton: false,
-    showCancelButton: true,
-    cancelButtonText: "Cancelar",
-    cancelButtonColor: "#6c757d",
-    didOpen: () => {
-      const container = Swal.getHtmlContainer();
-      if (!container) return;
+            return `
+              <button
+                type="button"
+                class="list-group-item list-group-item-action"
+                data-id="${r.id}"
+              >
+                <div class="fw-semibold">${folio}</div>
+                <small class="text-muted">${fecha}</small>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
 
-      container
-        .querySelectorAll("button[data-id]")
-        .forEach((btn) => {
+    await Swal.fire({
+      title: "Selecciona una Suficiencia",
+      html: listHtml,
+      icon: "info",
+      showConfirmButton: false,
+      showCancelButton: true,
+      cancelButtonText: "Cancelar",
+      cancelButtonColor: "#6c757d",
+      didOpen: () => {
+        const container = Swal.getHtmlContainer();
+        if (!container) return;
+
+        container.querySelectorAll("button[data-id]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const id = Number(btn.dataset.id);
             Swal.close();
             cargarSuficienciaEnFormulario(id);
           });
         });
-    },
-  });
-}
+      },
+    });
+  }
 
   // ---------------------------
   // Fecha automática (hoy) + readonly
@@ -465,7 +465,6 @@
   // ✅ CANDADOS DG/DA -> PROYECTOS permitidos
   // =====================================================
   const DG_DA_PROYECTOS_FILTERS = {
-    // (tu mega objeto igualito al que pegaste)
     A00: {
       100: new Set(["0103010101|P", "0103010103|E"]),
       101: new Set(["0105020609|M", "0105020508|P"]),
@@ -670,9 +669,7 @@
       allowed === null
         ? all
         : all.filter((p) => {
-            let clave = String(p?.clave ?? "")
-              .trim()
-              .replace(/[^\d]/g, "");
+            let clave = String(p?.clave ?? "").trim().replace(/[^\d]/g, "");
             if (clave) clave = clave.padStart(10, "0");
             const conac = _norm(p?.conac);
             return allowed.has(`${clave}|${conac}`);
@@ -738,20 +735,14 @@
     if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
 
     // ✅ AUTOLLENAR FIRMA DIRECCIÓN SOLICITANTE DESDE DGENERAL
-const inputDireccionFirma = document.querySelector(
-  '[name="firma_direccion_solicitante"]'
-);
+    const inputDireccionFirma = document.querySelector(
+      '[name="firma_direccion_solicitante"]'
+    );
 
-if (inputDireccionFirma) {
-  // Prioridad: catálogo dgeneral → nombre del usuario → vacío
-  const nombreDireccion =
-    dgeneralInfo?.dependencia ||
-    dgeneralInfo?.nombre ||
-    "";
-
-  inputDireccionFirma.value = nombreDireccion;
-}
-
+    if (inputDireccionFirma) {
+      const nombreDireccion = dgeneralInfo?.dependencia || dgeneralInfo?.nombre || "";
+      inputDireccionFirma.value = nombreDireccion;
+    }
   }
 
   // ---------------------------
@@ -1011,6 +1002,30 @@ if (inputDireccionFirma) {
     return !!document.querySelector('[name="imp_ieps"]')?.checked;
   }
 
+  function usePension() {
+    return !!document.querySelector('[name="imp_pension"]')?.checked;
+  }
+
+  function clampPercent(val) {
+    let n = Number(val);
+    if (!Number.isFinite(n)) n = 0;
+    if (n < 0) n = 0;
+    if (n > 100) n = 100;
+    return n;
+  }
+
+  // Lee tasas de pensión que existan en el DOM (pension1_tasa..pension5_tasa)
+  function getPensionPercents() {
+    const out = [];
+    for (let k = 1; k <= 5; k++) {
+      const el = document.querySelector(`[name="pension${k}_tasa"]`);
+      if (!el) continue;
+      const v = clampPercent(el.value);
+      out.push({ k, percent: v, rate: v / 100 });
+    }
+    return out;
+  }
+
   function getIsrPercent() {
     const el = document.querySelector('[name="isr_tasa"]');
     let val = el ? Number(el.value) : 0;
@@ -1061,12 +1076,18 @@ if (inputDireccionFirma) {
     if (useISR()) isr = subtotal * getIsrRate();
     if (useIEPS()) ieps = subtotal * getIepsRate();
 
-    const total = subtotal + iva + isr + ieps;
+    // ✅ pensiones (RETENCIÓN => se RESTA)
+    let pension_total = 0;
+    const pensiones = usePension() ? getPensionPercents() : [];
+    for (const p of pensiones) pension_total += subtotal * (p.rate || 0);
+
+    const total = subtotal + iva + isr + ieps - pension_total;
 
     setVal("subtotal", subtotal.toFixed(2));
     setVal("iva", iva.toFixed(2));
     setVal("isr", isr.toFixed(2));
     setVal("ieps", ieps.toFixed(2));
+    setVal("pension_total", pension_total.toFixed(2));
     setVal("total", total.toFixed(2));
     setVal("cantidad_pago", total.toFixed(2));
     setVal("cantidad_con_letra", numeroALetrasMX(total));
@@ -1204,70 +1225,196 @@ if (inputDireccionFirma) {
     iepsInput?.addEventListener("input", refreshTotales);
 
     chkISR?.addEventListener("change", async () => {
-  if (!chkISR.checked) return;
+      if (!chkISR.checked) return;
 
-  const val = Number(isrInput?.value || 0);
-  if (!val) {
-    isrInput.value = "10";
-  }
+      const val = Number(isrInput?.value || 0);
+      if (!val) isrInput.value = "10";
 
-  await Swal.fire({
-    icon: "question",
-    title: "Confirmar ISR",
-    html: `
-      <div style="font-size:13px; text-align:left;">
-        Estás por aplicar <b>ISR</b>.
-        <br/>Porcentaje actual: <b>${isrInput.value}%</b>
-        <br/><span class="text-muted">¿Es correcto? o lo puedes modificar</span>
-      </div>
-    `,
-    showCancelButton: true,
-    confirmButtonText: "Sí, aplicar",
-    cancelButtonText: "Cancelar",
-    confirmButtonColor: "#BC955C",
-    cancelButtonColor: "#6c757d",
-  }).then((res) => {
-    if (!res.isConfirmed) {
-      chkISR.checked = false;
-      isrInput.disabled = true;
-      refreshTotales();
-    }
-  });
-});
+      await Swal.fire({
+        icon: "question",
+        title: "Confirmar ISR",
+        html: `
+          <div style="font-size:13px; text-align:left;">
+            Estás por aplicar <b>ISR</b>.
+            <br/>Porcentaje actual: <b>${isrInput.value}%</b>
+            <br/><span class="text-muted">¿Es correcto? o lo puedes modificar</span>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "Sí, aplicar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#BC955C",
+        cancelButtonColor: "#6c757d",
+      }).then((res) => {
+        if (!res.isConfirmed) {
+          chkISR.checked = false;
+          isrInput.disabled = true;
+          refreshTotales();
+        }
+      });
+    });
 
-chkIEPS?.addEventListener("change", async () => {
-  if (!chkIEPS.checked) return;
+    chkIEPS?.addEventListener("change", async () => {
+      if (!chkIEPS.checked) return;
 
-  const val = Number(iepsInput?.value || 0);
-  if (!val) {
-    iepsInput.value = "8";
-  }
+      const val = Number(iepsInput?.value || 0);
+      if (!val) iepsInput.value = "8";
 
-  await Swal.fire({
-    icon: "question",
-    title: "Confirmar IEPS",
-    html: `
-      <div style="font-size:13px; text-align:left;">
-        Estás por aplicar <b>IEPS</b>.
-        <br/>Porcentaje actual: <b>${iepsInput.value}%</b>
-        <br/><span class="text-muted">¿Es correcto? o lo puedes modificar</span>
-      </div>
-    `,
-    showCancelButton: true,
-    confirmButtonText: "Sí, aplicar",
-    cancelButtonText: "Cancelar",
-    confirmButtonColor: "#BC955C",
-    cancelButtonColor: "#6c757d",
-  }).then((res) => {
-    if (!res.isConfirmed) {
-      chkIEPS.checked = false;
-      iepsInput.disabled = true;
-      refreshTotales();
-    }
-  });
-});
+      await Swal.fire({
+        icon: "question",
+        title: "Confirmar IEPS",
+        html: `
+          <div style="font-size:13px; text-align:left;">
+            Estás por aplicar <b>IEPS</b>.
+            <br/>Porcentaje actual: <b>${iepsInput.value}%</b>
+            <br/><span class="text-muted">¿Es correcto? o lo puedes modificar</span>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "Sí, aplicar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#BC955C",
+        cancelButtonColor: "#6c757d",
+      }).then((res) => {
+        if (!res.isConfirmed) {
+          chkIEPS.checked = false;
+          iepsInput.disabled = true;
+          refreshTotales();
+        }
+      });
+    });
 
     sync();
+  }
+
+  function pensionRowTemplate(k) {
+    return `
+      <div class="d-flex align-items-center gap-2 mt-2" data-pension-row="${k}">
+        <span class="badge text-bg-secondary" style="min-width:52px;">P${k}</span>
+
+        <input
+          type="number"
+          class="form-control form-control-sm text-end"
+          name="pension${k}_tasa"
+          style="width: 120px"
+          placeholder="Ej. 15 %"
+          min="0" max="100" step="0.01"
+        />
+
+        <button type="button" class="btn btn-outline-danger btn-sm btnRemovePension" title="Quitar">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+  }
+
+  function bindPensionEvents() {
+    const chk = document.querySelector('[name="imp_pension"]');
+    const list = document.getElementById("pensionList");
+    const btnAdd = document.getElementById("btnAddPension");
+    const btnInfo = document.getElementById("btnInfoPension");
+
+    if (!chk || !list || !btnAdd) return;
+
+    const countRows = () => list.querySelectorAll("[data-pension-row]").length;
+
+    const syncPensionUI = () => {
+      const on = chk.checked;
+
+      btnAdd.disabled = !on;
+      list.classList.toggle("d-none", !on);
+
+      // Si apaga, limpia filas
+      if (!on) {
+        list.innerHTML = "";
+        refreshTotales();
+        return;
+      }
+
+      // Si prende y no hay filas, crea la primera
+      if (countRows() === 0) {
+        list.insertAdjacentHTML("beforeend", pensionRowTemplate(1));
+      }
+
+      // Deshabilita Add si ya son 5
+      btnAdd.disabled = countRows() >= 5;
+
+      // listeners de inputs
+      list.querySelectorAll('input[name^="pension"][name$="_tasa"]').forEach((inp) => {
+        inp.addEventListener("input", () => {
+          inp.value = String(clampPercent(inp.value));
+          refreshTotales();
+        });
+      });
+
+      // listeners de remove
+      list.querySelectorAll(".btnRemovePension").forEach((btn) => {
+        btn.onclick = () => {
+          btn.closest("[data-pension-row]")?.remove();
+          btnAdd.disabled = countRows() >= 5;
+          // si borró todas, deja una por default
+          if (countRows() === 0) {
+            list.insertAdjacentHTML("beforeend", pensionRowTemplate(1));
+          }
+          refreshTotales();
+        };
+      });
+
+      refreshTotales();
+    };
+
+    btnAdd.addEventListener("click", async () => {
+      if (!chk.checked) return;
+
+      const n = countRows();
+      if (n >= 5) {
+        await uiWarn("Máximo 5 pensiones.");
+        return;
+      }
+
+      const next = n + 1;
+      list.insertAdjacentHTML("beforeend", pensionRowTemplate(next));
+
+      // actualiza listeners
+      syncPensionUI();
+    });
+
+    chk.addEventListener("change", async () => {
+      if (chk.checked) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Confirmación",
+          html: `
+            <div style="font-size:13px; text-align:left;">
+              La <b>pensión alimenticia</b> se maneja como <b>retención</b> (se descuenta del total).
+              <br/>Puedes capturar hasta <b>5</b> pensiones independientes.
+            </div>
+          `,
+          confirmButtonText: "Entendido",
+          confirmButtonColor: "#BC955C",
+        });
+      }
+      syncPensionUI();
+    });
+
+    btnInfo?.addEventListener("click", () => {
+      Swal.fire({
+        icon: "info",
+        title: "Pensión alimenticia",
+        html: `
+          <div style="font-size:13px; text-align:left;">
+            <p class="mb-2">Puedes capturar de <b>1 a 5</b> pensiones. Cada una lleva su porcentaje.</p>
+            <p class="mb-2">Se calcula sobre el <b>subtotal</b> y se trata como <b>retención</b> (se descuenta).</p>
+            <p class="mb-0 text-muted">Recomendación: verifica el porcentaje antes de guardar.</p>
+          </div>
+        `,
+        confirmButtonText: "Ok",
+        confirmButtonColor: "#BC955C",
+      });
+    });
+
+    // inicial
+    syncPensionUI();
   }
 
   // =====================================================================
@@ -1330,18 +1477,6 @@ chkIEPS?.addEventListener("change", async () => {
     };
   }
 
-  function saveCpLastSuf(payload) {
-    localStorage.setItem(
-      "cp_last_suficiencia",
-      JSON.stringify({
-        id: payload.id,
-        payload,
-        loaded_from: "local",
-        loaded_at: new Date().toISOString(),
-      })
-    );
-  }
-
   // ---------------------------
   // Guardado (API)
   // ---------------------------
@@ -1357,6 +1492,21 @@ chkIEPS?.addEventListener("change", async () => {
 
     const meta = get("meta") || null;
     const departamento = get("dependencia_aux") || null;
+
+    const subtotal = safeNumber(get("subtotal"));
+
+    // ✅ Calcula pensiones (si aplica)
+    const p1 = clampPercent(get("pension1_tasa")) / 100;
+    const p2 = clampPercent(get("pension2_tasa")) / 100;
+    const p3 = clampPercent(get("pension3_tasa")) / 100;
+    const p4 = clampPercent(get("pension4_tasa")) / 100;
+    const p5 = clampPercent(get("pension5_tasa")) / 100;
+
+    const pension1 = usePension() ? subtotal * p1 : 0;
+    const pension2 = usePension() ? subtotal * p2 : 0;
+    const pension3 = usePension() ? subtotal * p3 : 0;
+    const pension4 = usePension() ? subtotal * p4 : 0;
+    const pension5 = usePension() ? subtotal * p5 : 0;
 
     return {
       id_usuario,
@@ -1389,6 +1539,22 @@ chkIEPS?.addEventListener("change", async () => {
       cantidad_con_letra: get("cantidad_con_letra") || "",
 
       detalle: buildDetalle(),
+
+      // ✅ Pensiones (hasta 5)
+      pension_total: safeNumber(get("pension_total")),
+
+      pension1_tasa: get("pension1_tasa") || null,
+      pension2_tasa: get("pension2_tasa") || null,
+      pension3_tasa: get("pension3_tasa") || null,
+      pension4_tasa: get("pension4_tasa") || null,
+      pension5_tasa: get("pension5_tasa") || null,
+
+      // ✅ Montos por pensión (se calculan con subtotal)
+      pension1,
+      pension2,
+      pension3,
+      pension4,
+      pension5,
     };
   }
 
@@ -1702,93 +1868,89 @@ chkIEPS?.addEventListener("change", async () => {
     });
 
     bindTaxEvents();
+    bindPensionEvents();
 
     if (DEBUG_PDF_FIELDS) {
       debugListPdfFields().catch((err) => console.warn("[PDF debug] ", err.message));
     }
 
     // ℹ️ Info Dirección Solicitante
-document
-  .getElementById("infoDireccionSolicitante")
-  ?.addEventListener("click", () => {
-    Swal.fire({
-      icon: "info",
-      title: "Dirección solicitante",
-      html: `
-        <div style="font-size:13px; text-align:left;">
-          <p class="mb-2">
-            Este campo se llena automáticamente con la <b>Dirección General</b>.
-          </p>
-          <p class="mb-2">
-            Está habilitado únicamente para:
-          </p>
-          <ul class="mb-2">
-            <li>Quitar guiones bajos <code>_</code></li>
-            <li>Agregar espacios para mejorar la lectura</li>
-          </ul>
-          <p class="mb-0 text-muted">
-            No modifica la información oficial del sistema.
-          </p>
-        </div>
-      `,
-      confirmButtonText: "Entendido",
-      confirmButtonColor: "#BC955C",
+    document.getElementById("infoDireccionSolicitante")?.addEventListener("click", () => {
+      Swal.fire({
+        icon: "info",
+        title: "Dirección solicitante",
+        html: `
+          <div style="font-size:13px; text-align:left;">
+            <p class="mb-2">
+              Este campo se llena automáticamente con la <b>Dirección General</b>.
+            </p>
+            <p class="mb-2">
+              Está habilitado únicamente para:
+            </p>
+            <ul class="mb-2">
+              <li>Quitar guiones bajos <code>_</code></li>
+              <li>Agregar espacios para mejorar la lectura</li>
+            </ul>
+            <p class="mb-0 text-muted">
+              No modifica la información oficial del sistema.
+            </p>
+          </div>
+        `,
+        confirmButtonText: "Entendido",
+        confirmButtonColor: "#BC955C",
+      });
     });
-  });
 
-  // ℹ️ Info Impuestos (IVA / ISR / IEPS)
-document.getElementById("infoImpuestos")?.addEventListener("click", () => {
-  const hasSwal = typeof window !== "undefined" && !!window.Swal;
-  if (!hasSwal) {
-    alert("Info: Verifica el porcentaje antes de marcar ISR/IEPS. IVA es 16% fijo.");
-    return;
-  }
+    // ℹ️ Info Impuestos
+    document.getElementById("infoImpuestos")?.addEventListener("click", () => {
+      if (!hasSwal()) {
+        alert("Info: Verifica el porcentaje antes de marcar ISR/IEPS. IVA es 16% fijo.");
+        return;
+      }
 
-  Swal.fire({
-    icon: "info",
-    title: "Impuestos",
-    html: `
-      <div style="font-size:13px; text-align:left;">
-        <p class="mb-2">
-          Antes de marcar un impuesto, <b>verifica el porcentaje</b> que te corresponde.
-          El sistema calcula el total con base en el <b>subtotal</b>.
-        </p>
+      Swal.fire({
+        icon: "info",
+        title: "Impuestos",
+        html: `
+          <div style="font-size:13px; text-align:left;">
+            <p class="mb-2">
+              Antes de marcar un impuesto, <b>verifica el porcentaje</b> que te corresponde.
+              El sistema calcula el total con base en el <b>subtotal</b>.
+            </p>
 
-        <div class="mb-2">
-          <b>IVA</b> <span class="text-muted">(16% fijo)</span><br/>
-          <span class="text-muted">Se aplica automáticamente al subtotal cuando lo marcas.</span>
-        </div>
+            <div class="mb-2">
+              <b>IVA</b> <span class="text-muted">(16% fijo)</span><br/>
+              <span class="text-muted">Se aplica automáticamente al subtotal cuando lo marcas.</span>
+            </div>
 
-        <div class="mb-2">
-          <b>ISR</b><br/>
-          <span class="text-muted">
-            Se aplica al subtotal con el porcentaje que captures en <b>ISR %</b>.
-            Ejemplo: 10% = 0.10 × subtotal.
-          </span>
-        </div>
+            <div class="mb-2">
+              <b>ISR</b><br/>
+              <span class="text-muted">
+                Se aplica al subtotal con el porcentaje que captures en <b>ISR %</b>.
+                Ejemplo: 10% = 0.10 × subtotal.
+              </span>
+            </div>
 
-        <div class="mb-2">
-          <b>IEPS</b><br/>
-          <span class="text-muted">
-            Se aplica al subtotal con el porcentaje que captures en <b>IEPS %</b>.
-            Ejemplo: 8% = 0.08 × subtotal.
-          </span>
-        </div>
+            <div class="mb-2">
+              <b>IEPS</b><br/>
+              <span class="text-muted">
+                Se aplica al subtotal con el porcentaje que captures en <b>IEPS %</b>.
+                Ejemplo: 8% = 0.08 × subtotal.
+              </span>
+            </div>
 
-        <hr class="my-2"/>
+            <hr class="my-2"/>
 
-        <div class="text-muted" style="font-size:12px;">
-          <b>Recomendación:</b> confirma el porcentaje en tu soporte/documento antes de guardarlo.
-          Si no aplica, déjalo desmarcado.
-        </div>
-      </div>
-    `,
-    confirmButtonText: "Entendido",
-    confirmButtonColor: "#BC955C",
-  });
-});
-  
-
+            <div class="text-muted" style="font-size:12px;">
+              <b>Recomendación:</b> confirma el porcentaje en tu soporte/documento antes de guardarlo.
+              Si no aplica, déjalo desmarcado.
+            </div>
+          </div>
+        `,
+        confirmButtonText: "Entendido",
+        confirmButtonColor: "#BC955C",
+      });
+    });
   }
 
   // ---------------------------
