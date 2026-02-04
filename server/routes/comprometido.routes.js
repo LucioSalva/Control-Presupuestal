@@ -30,6 +30,10 @@ function getMonthCode(dateStr) {
   return String(now.getMonth() + 1).padStart(2, "0");
 }
 
+// =====================================================
+// POST /api/comprometido
+// Crea cabecera + detalle (1 comprometido por suficiencia)
+// =====================================================
 router.post("/", async (req, res) => {
   const client = await getClient();
   try {
@@ -45,7 +49,7 @@ router.post("/", async (req, res) => {
        FROM comprometidos
        WHERE id_suficiencia = $1
        LIMIT 1`,
-      [idSuf],
+      [idSuf]
     );
 
     if (exists.rows.length) {
@@ -59,9 +63,7 @@ router.post("/", async (req, res) => {
     }
 
     const fechaBaseRaw = b.fecha ? new Date(b.fecha) : new Date();
-    const fechaBase = Number.isNaN(fechaBaseRaw.getTime())
-      ? new Date()
-      : fechaBaseRaw;
+    const fechaBase = Number.isNaN(fechaBaseRaw.getTime()) ? new Date() : fechaBaseRaw;
 
     const mes = String(fechaBase.getMonth() + 1).padStart(2, "0");
     const tipo = "CP";
@@ -79,13 +81,15 @@ router.post("/", async (req, res) => {
         WHERE no_comprometido LIKE $1
           AND DATE_PART('year', fecha) = DATE_PART('year', $2::date)
       `,
-      [`${prefijo}%`, fechaBase],
+      [`${prefijo}%`, fechaBase]
     );
 
     const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
     const noComprometido = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
 
     // 1) INSERT CABECERA
+    // Nota: si tu tabla ya tiene estatus/fecha_cierre/monto_liberado,
+    // se recomienda iniciar estatus='ABIERTO' desde DB o por defecto.
     const sqlHead = `
       INSERT INTO comprometidos (
         id_suficiencia,
@@ -167,7 +171,7 @@ router.post("/", async (req, res) => {
       for (let j = 0; j < detalle.length; j++) {
         const d = detalle[j] || {};
         values.push(
-          `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`,
+          `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`
         );
         params.push(
           idComp,
@@ -176,7 +180,7 @@ router.post("/", async (req, res) => {
           d.concepto_partida ?? null,
           d.justificacion ?? null,
           d.descripcion ?? null,
-          d.importe ?? 0,
+          toNumOrZero(d.importe)
         );
       }
 
@@ -208,6 +212,51 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.get("/buscar", async (req, res) => {
+  console.log("[GET /api/comprometido/buscar] hit", req.query.no);
+
+  try {
+    const no = String(req.query.no || "").trim();
+    if (!no) return res.status(400).json({ error: "Falta parámetro ?no=" });
+
+    const sql = `
+      SELECT
+        c.*,
+        COALESCE(c.estatus,'ABIERTO') AS estatus
+      FROM comprometidos c
+      WHERE c.no_comprometido = $1
+      LIMIT 1
+    `;
+    const r = await query(sql, [no]);
+
+    if (!r.rowCount) return res.status(404).json({ error: "Comprometido no encontrado" });
+
+    // Traer detalle
+    const rDet = await query(
+      `
+      SELECT renglon, clave, concepto_partida, justificacion, descripcion, importe
+      FROM comprometido_detalle
+      WHERE id_comprometido = $1
+      ORDER BY renglon ASC
+      `,
+      [r.rows[0].id]
+    );
+
+    return res.json({
+      ok: true,
+      ...r.rows[0],
+      detalle: rDet.rows,
+    });
+  } catch (e) {
+    console.error("[GET comprometido buscar]", e);
+    return res.status(500).json({ error: "Error buscando comprometido", db: e.message });
+  }
+});
+
+// =====================================================
+// GET /api/comprometido/por-suficiencia/:id
+// (lo dejé igual)
+// =====================================================
 router.get("/por-suficiencia/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -232,7 +281,8 @@ router.get("/por-suficiencia/:id", async (req, res) => {
       c.subtotal,
       c.iva,
       c.isr,
-      c.total
+      c.total,
+      COALESCE(c.estatus,'ABIERTO') AS estatus
 
     FROM comprometidos c
     LEFT JOIN proyectos p   ON p.id = c.id_proyecto
@@ -255,6 +305,181 @@ router.get("/por-suficiencia/:id", async (req, res) => {
   }
 });
 
+// =====================================================
+// GET /api/comprometido/:id/resumen
+// Tablero: total, devengado, saldo, estatus
+// =====================================================
+router.get("/:id/resumen", async (req, res) => {
+  const idComp = Number(req.params.id || 0);
+  if (!Number.isFinite(idComp) || idComp <= 0) {
+    return res.status(400).json({ error: "ID de comprometido inválido" });
+  }
 
+  try {
+    const rComp = await query(
+      `
+      SELECT
+        id,
+        id_suficiencia,
+        total,
+        COALESCE(estatus,'ABIERTO') AS estatus,
+        fecha_cierre,
+        COALESCE(monto_liberado, 0) AS monto_liberado
+      FROM comprometidos
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [idComp]
+    );
+
+    if (!rComp.rowCount) {
+      return res.status(404).json({ error: "Comprometido no encontrado" });
+    }
+
+    const totalComp = toNumOrZero(rComp.rows[0].total);
+
+    const rSum = await query(
+      `
+      SELECT COALESCE(SUM(total), 0) AS dev_acum
+      FROM devengados
+      WHERE id_comprometido = $1
+        AND COALESCE(estatus,'ACTIVO') <> 'CANCELADO'
+      `,
+      [idComp]
+    );
+
+    const devAcum = Number(rSum.rows[0]?.dev_acum || 0);
+    const saldo = totalComp - devAcum;
+
+    return res.json({
+      ok: true,
+      id: rComp.rows[0].id,
+      id_suficiencia: rComp.rows[0].id_suficiencia,
+      estatus: rComp.rows[0].estatus,
+      total_comprometido: totalComp,
+      devengado_acumulado: devAcum,
+      saldo_restante: saldo,
+      fecha_cierre: rComp.rows[0].fecha_cierre ?? null,
+      monto_liberado: Number(rComp.rows[0].monto_liberado || 0),
+    });
+  } catch (err) {
+    console.error("[GET comprometido resumen] error:", err);
+    return res.status(500).json({ error: "Error consultando resumen", db: err.message });
+  }
+});
+
+// =====================================================
+// POST /api/comprometido/:id/cerrar
+// Cierra comprometido y libera sobrante (solo al cerrar)
+// =====================================================
+router.post("/:id/cerrar", async (req, res) => {
+  const client = await getClient();
+  try {
+    const idComp = Number(req.params.id || 0);
+    if (!Number.isFinite(idComp) || idComp <= 0) {
+      return res.status(400).json({ error: "ID de comprometido inválido" });
+    }
+
+    await client.query("BEGIN");
+
+    // 1) Bloquear comprometido
+    const rComp = await client.query(
+      `
+      SELECT
+        id,
+        total,
+        COALESCE(estatus,'ABIERTO') AS estatus
+      FROM comprometidos
+      WHERE id = $1
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [idComp]
+    );
+
+    if (!rComp.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Comprometido no encontrado" });
+    }
+
+    const comp = rComp.rows[0];
+    const estatus = String(comp.estatus || "ABIERTO").toUpperCase();
+
+    if (estatus === "CERRADO") {
+      await client.query("ROLLBACK");
+      return res.json({ ok: true, already_closed: true, id: idComp });
+    }
+
+    const totalComp = toNumOrZero(comp.total);
+
+    // 2) Sumar devengados activos
+    const rSum = await client.query(
+      `
+      SELECT COALESCE(SUM(total), 0) AS dev_acum
+      FROM devengados
+      WHERE id_comprometido = $1
+        AND COALESCE(estatus,'ACTIVO') <> 'CANCELADO'
+      `,
+      [idComp]
+    );
+
+    const devAcum = Number(rSum.rows[0]?.dev_acum || 0);
+    const saldo = totalComp - devAcum;
+
+    if (saldo < 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Inconsistencia: devengado acumulado excede el total comprometido",
+        total_comprometido: totalComp,
+        devengado_acumulado: devAcum,
+        saldo_restante: saldo,
+      });
+    }
+
+    // 3) Cerrar y guardar liberación
+    // Nota: esto requiere columnas:
+    // - estatus
+    // - fecha_cierre
+    // - monto_liberado
+    await client.query(
+      `
+      UPDATE comprometidos
+      SET
+        estatus = 'CERRADO',
+        fecha_cierre = NOW(),
+        monto_liberado = $2
+      WHERE id = $1
+      `,
+      [idComp, saldo]
+    );
+
+    // ✅ Aquí es donde "regresa a la partida"
+    // Como no me pasaste tabla/campo de "disponible" por partida,
+    // lo dejamos registrado en comprometidos.monto_liberado.
+    // Luego en reportes se suma como liberación.
+    // Si tú tienes una tabla tipo "presupuesto_partidas" con "disponible",
+    // aquí metemos el UPDATE exacto en el siguiente paso.
+
+    await client.query("COMMIT");
+
+    return res.json({
+      ok: true,
+      id: idComp,
+      estatus: "CERRADO",
+      total_comprometido: totalComp,
+      devengado_acumulado: devAcum,
+      monto_liberado: saldo,
+      saldo_restante: 0,
+    });
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_e) {}
+    console.error("[POST comprometido cerrar] error:", err);
+    return res.status(500).json({ error: "Error al cerrar comprometido", db: err.message });
+  } finally {
+    client.release();
+  }
+});
 
 export default router;

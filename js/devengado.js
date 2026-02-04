@@ -8,12 +8,21 @@
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnRecargar = document.getElementById("btn-recargar");
   const btnCancelar = document.getElementById("btn-cancelar");
-  const btnConfirmarCancelar = document.getElementById("btnConfirmarCancelar");
   const btnConfirmarGuardar = document.getElementById("btnConfirmarGuardar");
   const detalleBody = document.getElementById("detalleBody");
   const alertaCancelado = document.getElementById("alertaCancelado");
 
-  let modalCancelar = null;
+  const txtNoComprometido = document.getElementById("txtNoComprometido");
+  const btnBuscarComprometido = document.getElementById(
+    "btnBuscarComprometido",
+  );
+  const btnNuevoDevengado = document.getElementById("btnNuevoDevengado");
+  const tbodyParcialidades = document.getElementById("tbodyParcialidades");
+
+  const lblTotalComprometido = document.getElementById("lblTotalComprometido");
+  const lblDevAcum = document.getElementById("lblDevAcum");
+  const lblSaldo = document.getElementById("lblSaldo");
+
   let modalGuardar = null;
 
   // Estado
@@ -43,7 +52,8 @@
     try {
       // ✅ tu sistema usa cp_usuario
       const raw =
-        localStorage.getItem("cp_usuario") || sessionStorage.getItem("cp_usuario");
+        localStorage.getItem("cp_usuario") ||
+        sessionStorage.getItem("cp_usuario");
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -87,7 +97,74 @@
     return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
-  // ✅ fetchJson con mensaje claro en 404
+  function setText(idEl, text) {
+    if (!idEl) return;
+    idEl.textContent = text;
+  }
+
+  function renderResumen({
+    total_comprometido = 0,
+    devengado_acumulado = 0,
+    saldo_restante = 0,
+  } = {}) {
+    setText(lblTotalComprometido, formatMoney(total_comprometido));
+    setText(lblDevAcum, formatMoney(devengado_acumulado));
+    setText(lblSaldo, formatMoney(saldo_restante));
+  }
+
+  function renderParcialidades(rows = []) {
+    if (!tbodyParcialidades) return;
+    const arr = Array.isArray(rows) ? rows : [];
+    if (!arr.length) {
+      tbodyParcialidades.innerHTML = `<tr><td colspan="5" class="text-center small text-muted">Sin parcialidades</td></tr>`;
+      return;
+    }
+
+    tbodyParcialidades.innerHTML = arr
+      .map((r) => {
+        const est = String(r.estatus || "ACTIVO").toUpperCase();
+        const disabled = est === "CANCELADO" ? "disabled" : "";
+        return `
+        <tr>
+          <td class="text-nowrap">${String(r.no_devengado || "").trim()}</td>
+          <td>${formatFecha(r.fecha)}</td>
+          <td class="text-end">${formatMoney(r.total)}</td>
+          <td>${est}</td>
+          <td>
+            <button class="btn btn-outline-danger btn-sm btn-cancelar-dev" data-id="${r.id}" ${disabled}>
+              <i class="bi bi-x-circle me-1"></i>Cancelar
+            </button>
+          </td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    // bind cancelar
+    tbodyParcialidades.querySelectorAll(".btn-cancelar-dev").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const idDev = Number(btn.dataset.id || 0);
+        if (!idDev) return;
+
+        try {
+          const res = await fetchJson(
+            `${API}/api/devengado/${idDev}/cancelar`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json", ...authHeaders() },
+            },
+          );
+          if (res?.ok) {
+            await refrescarResumenYParcialidades();
+            alert("Devengado cancelado.");
+          }
+        } catch (e) {
+          alert(e?.message || "Error al cancelar devengado");
+        }
+      });
+    });
+  }
+
   async function fetchJson(url, options = {}) {
     const r = await fetch(url, options);
     const text = await r.text();
@@ -96,14 +173,14 @@
     try {
       data = text ? JSON.parse(text) : null;
     } catch {}
-
     if (!r.ok) {
-      if (r.status === 404) {
-        throw new Error(`Ruta de API no encontrada: ${url}`);
-      }
-      const msg = data?.error || data?.message || `HTTP ${r.status} en ${url}`;
-      throw new Error(msg);
-    }
+  const msg = data?.error || data?.message || `HTTP ${r.status} en ${url}`;
+  if (r.status === 404 && !data) {
+    throw new Error(`Ruta de API no encontrada: ${url}`);
+  }
+  throw new Error(msg);
+}
+
     return data;
   }
 
@@ -113,38 +190,13 @@
     return id ? String(id).trim() : "";
   }
 
-  // ✅ Resolver robusto de id_comprometido:
-  // 1) URL ?id=
-  // 2) currentPayload.id_comprometido
-  // 3) localStorage cp_last_comprometido (id / payload.id_comprometido)
+  let currentIdComp = 0;
+
   function resolveIdComprometido() {
-    const fromUrl = Number(getQueryId() || 0);
-    if (fromUrl > 0) return fromUrl;
-
-    const fromPayload = Number(currentPayload?.id_comprometido || 0);
-    if (fromPayload > 0) return fromPayload;
-
-    try {
-      const raw = localStorage.getItem("cp_last_comprometido");
-      if (!raw) return 0;
-      const obj = JSON.parse(raw);
-
-      const a = Number(obj?.id || 0);
-      if (a > 0) return a;
-
-      const b = Number(obj?.payload?.id_comprometido || 0);
-      if (b > 0) return b;
-
-      const c = Number(obj?.payload?.id || 0);
-      if (c > 0) return c;
-
-      return 0;
-    } catch {
-      return 0;
-    }
+    return Number(currentIdComp || 0);
   }
 
-  // ✅ Catálogo fuentes (id -> "clave - fuente")
+  // Catálogo fuentes (id -> "clave - fuente")
   async function loadFuentesMap() {
     const r = await fetch(`${API}/api/catalogos/fuentes`, {
       headers: { ...authHeaders() },
@@ -185,7 +237,10 @@
 
     const f = new Date(fechaBase);
     const hoy = new Date();
-    if (f.getMonth() !== hoy.getMonth() || f.getFullYear() !== hoy.getFullYear()) {
+    if (
+      f.getMonth() !== hoy.getMonth() ||
+      f.getFullYear() !== hoy.getFullYear()
+    ) {
       mostrarAlertaCancelado();
       deshabilitarFormulario();
       return false;
@@ -212,7 +267,7 @@
       const i = idx + 1;
       const importe = safeNumber(r?.importe).toFixed(2);
       const importeOriginal = safeNumber(
-        r?.importe_comprometido ?? r?.importe_original ?? r?.importe
+        r?.importe_comprometido ?? r?.importe_original ?? r?.importe,
       ).toFixed(2);
 
       detalleBody.insertAdjacentHTML(
@@ -242,7 +297,7 @@
               value="${importe}">
           </td>
         </tr>
-      `
+      `,
       );
     });
 
@@ -266,103 +321,136 @@
   }
 
   function numeroALetras(num) {
-  const n = Number(num) || 0;
-  const entero = Math.floor(n);
-  const centavos = Math.round((n - entero) * 100);
+    const n = Number(num) || 0;
+    const entero = Math.floor(n);
+    const centavos = Math.round((n - entero) * 100);
 
-  const letras = convertirNumero(entero).trim();
-  const cents = String(centavos).padStart(2, "0");
+    const letras = convertirNumero(entero).trim();
+    const cents = String(centavos).padStart(2, "0");
 
-  // plural/singular
-  const pesoTxt = entero === 1 ? "PESO" : "PESOS";
+    // plural/singular
+    const pesoTxt = entero === 1 ? "PESO" : "PESOS";
 
-  return `${letras} ${pesoTxt} ${cents}/100 M.N.`
-    .replace(/\s+/g, " ")
-    .toUpperCase();
-}
+    return `${letras} ${pesoTxt} ${cents}/100 M.N.`
+      .replace(/\s+/g, " ")
+      .toUpperCase();
+  }
 
-function convertirNumero(n) {
-  if (n === 0) return "CERO";
+  function convertirNumero(n) {
+    if (n === 0) return "CERO";
 
-  const unidades = [
-    "", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE",
-    "DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE",
-    "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE", "VEINTE",
-  ];
+    const unidades = [
+      "",
+      "UNO",
+      "DOS",
+      "TRES",
+      "CUATRO",
+      "CINCO",
+      "SEIS",
+      "SIETE",
+      "OCHO",
+      "NUEVE",
+      "DIEZ",
+      "ONCE",
+      "DOCE",
+      "TRECE",
+      "CATORCE",
+      "QUINCE",
+      "DIECISÉIS",
+      "DIECISIETE",
+      "DIECIOCHO",
+      "DIECINUEVE",
+      "VEINTE",
+    ];
 
-  const decenas = [
-    "", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA",
-    "SESENTA", "SETENTA", "OCHENTA", "NOVENTA",
-  ];
+    const decenas = [
+      "",
+      "",
+      "VEINTE",
+      "TREINTA",
+      "CUARENTA",
+      "CINCUENTA",
+      "SESENTA",
+      "SETENTA",
+      "OCHENTA",
+      "NOVENTA",
+    ];
 
-  const centenas = [
-    "", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS",
-    "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS",
-  ];
+    const centenas = [
+      "",
+      "CIENTO",
+      "DOSCIENTOS",
+      "TRESCIENTOS",
+      "CUATROCIENTOS",
+      "QUINIENTOS",
+      "SEISCIENTOS",
+      "SETECIENTOS",
+      "OCHOCIENTOS",
+      "NOVECIENTOS",
+    ];
 
-  function seccion(n) {
-    let out = "";
+    function seccion(n) {
+      let out = "";
 
-    if (n === 100) return "CIEN";
+      if (n === 100) return "CIEN";
 
-    const c = Math.floor(n / 100);
-    const d = Math.floor((n % 100) / 10);
-    const u = n % 10;
-    const du = n % 100;
+      const c = Math.floor(n / 100);
+      const d = Math.floor((n % 100) / 10);
+      const u = n % 10;
+      const du = n % 100;
 
-    if (c) out += centenas[c] + " ";
+      if (c) out += centenas[c] + " ";
 
-    if (du <= 20) {
-      out += unidades[du];
+      if (du <= 20) {
+        out += unidades[du];
+        return out.trim();
+      }
+
+      if (d === 2) {
+        out += "VEINTI" + (u ? unidades[u].toLowerCase() : "");
+        return out.trim();
+      }
+
+      out += decenas[d];
+      if (u) out += " Y " + unidades[u];
+
       return out.trim();
     }
 
-    if (d === 2) {
-      out += "VEINTI" + (u ? unidades[u].toLowerCase() : "");
+    function miles(n) {
+      if (n < 1000) return seccion(n);
+
+      const m = Math.floor(n / 1000);
+      const r = n % 1000;
+
+      let out = "";
+      if (m === 1) out += "MIL";
+      else out += seccion(m) + " MIL";
+
+      if (r) out += " " + seccion(r);
+
       return out.trim();
     }
 
-    out += decenas[d];
-    if (u) out += " Y " + unidades[u];
+    function millones(n) {
+      if (n < 1000000) return miles(n);
 
-    return out.trim();
+      const m = Math.floor(n / 1000000);
+      const r = n % 1000000;
+
+      let out = "";
+      if (m === 1) out += "UN MILLÓN";
+      else out += miles(m) + " MILLONES";
+
+      if (r) out += " " + miles(r);
+
+      return out.trim();
+    }
+
+    return millones(n)
+      .replace(/\bUNO\b/g, "UN")
+      .replace(/\bVEINTIUNO\b/g, "VEINTIUN");
   }
-
-  function miles(n) {
-    if (n < 1000) return seccion(n);
-
-    const m = Math.floor(n / 1000);
-    const r = n % 1000;
-
-    let out = "";
-    if (m === 1) out += "MIL";
-    else out += seccion(m) + " MIL";
-
-    if (r) out += " " + seccion(r);
-
-    return out.trim();
-  }
-
-  function millones(n) {
-    if (n < 1000000) return miles(n);
-
-    const m = Math.floor(n / 1000000);
-    const r = n % 1000000;
-
-    let out = "";
-    if (m === 1) out += "UN MILLÓN";
-    else out += miles(m) + " MILLONES";
-
-    if (r) out += " " + miles(r);
-
-    return out.trim();
-  }
-
-  return millones(n)
-    .replace(/\bUNO\b/g, "UN")
-    .replace(/\bVEINTIUNO\b/g, "VEINTIUN");
-}
-
 
   function validarMontoTotal(total) {
     const inputMonto = document.querySelector('[name="monto_devengado"]');
@@ -421,7 +509,9 @@ function convertirNumero(n) {
       const payload = resp?.data || resp?.payload || resp;
       if (!payload) throw new Error("No se encontró payload del Comprometido.");
 
-      payload.id_comprometido = Number(payload.id_comprometido || payload.id || id);
+      payload.id_comprometido = Number(
+        payload.id_comprometido || payload.id || id,
+      );
 
       localStorage.setItem(
         "cp_last_comprometido",
@@ -430,7 +520,7 @@ function convertirNumero(n) {
           payload,
           loaded_from: "api",
           loaded_at: new Date().toISOString(),
-        })
+        }),
       );
 
       return payload;
@@ -442,10 +532,74 @@ function convertirNumero(n) {
 
     const obj = JSON.parse(raw);
     const payload = obj?.payload || obj;
-    if (!payload) throw new Error("No se encontró payload válido en cp_last_comprometido.");
+    if (!payload)
+      throw new Error("No se encontró payload válido en cp_last_comprometido.");
 
     payload.id_comprometido = Number(payload.id_comprometido || obj?.id || 0);
     return payload;
+  }
+
+  async function buscarComprometidoPorFolio(noComprometido) {
+    const no = String(noComprometido || "").trim();
+    if (!no) throw new Error("Escribe el No. de Comprometido");
+
+    const data = await fetchJson(
+      `${API}/api/comprometido/buscar?no=${encodeURIComponent(no)}`,
+      {
+        headers: { ...authHeaders() },
+      },
+    );
+
+    // Normaliza a tu payload esperado por renderPayload
+    const payload = data; // ya viene con detalle
+    payload.id_comprometido = Number(data.id);
+    payload.no_comprometido = data.no_comprometido;
+
+    // este id_suficiencia es real para el backend devengado
+    payload.id_suficiencia = Number(data.id_suficiencia);
+
+    return payload;
+  }
+
+  async function refrescarResumenYParcialidades() {
+    if (!currentIdComp) return;
+
+    // 1) resumen
+    const resumen = await fetchJson(
+      `${API}/api/comprometido/${currentIdComp}/resumen`,
+      {
+        headers: { ...authHeaders() },
+      },
+    );
+    if (resumen?.ok) {
+      renderResumen(resumen);
+      // habilita nuevo devengado si hay saldo
+      const saldo = safeNumber(resumen.saldo_restante);
+      if (btnNuevoDevengado) btnNuevoDevengado.disabled = !(saldo > 0);
+    }
+
+    // 2) parcialidades
+    const lista = await fetchJson(
+      `${API}/api/devengado/por-comprometido/${currentIdComp}`,
+      {
+        headers: { ...authHeaders() },
+      },
+    );
+    renderParcialidades(lista?.rows || []);
+  }
+
+  function limpiarParaNuevoDevengado() {
+    // Folio devengado vuelve a NUEVO
+    setVal("no_devengado", "NUEVO");
+
+    // Poner importes en 0
+    document.querySelectorAll(".importe-devengado").forEach((inp) => {
+      inp.value = "0.00";
+      inp.classList.remove("monto-error");
+    });
+
+    // recalcula
+    recalcularTotales();
   }
 
   // ---------------------------
@@ -473,31 +627,40 @@ function convertirNumero(n) {
       "no_devengado",
       payload?.no_devengado ||
         payload?.folio_oficial_devengado ||
-        (payload?.folio_devengado ? String(payload.folio_devengado).padStart(6, "0") : "NUEVO")
+        (payload?.folio_devengado
+          ? String(payload.folio_devengado).padStart(6, "0")
+          : "NUEVO"),
     );
 
     setVal(
       "no_comprometido",
       payload?.no_comprometido ||
         payload?.folio_oficial_comprometido ||
-        (payload?.folio_comprometido ? String(payload.folio_comprometido).padStart(6, "0") : "")
+        (payload?.folio_comprometido
+          ? String(payload.folio_comprometido).padStart(6, "0")
+          : ""),
     );
 
     setVal("dependencia", payload?.dependencia || "");
     setVal("dependencia_aux", payload?.dependencia_aux || "");
 
     const fecha = formatFecha(
-      payload?.fecha_devengado || payload?.fecha || new Date().toISOString().split("T")[0]
+      payload?.fecha_devengado ||
+        payload?.fecha ||
+        new Date().toISOString().split("T")[0],
     );
     setVal("fecha", fecha);
 
     setVal("clave_programatica", payload?.clave_programatica || "");
 
     // FUENTE
-    const idFuente = payload?.id_fuente != null ? String(payload.id_fuente) : "";
+    const idFuente =
+      payload?.id_fuente != null ? String(payload.id_fuente) : "";
     setReadonlyVal("id_fuente", idFuente);
 
-    let fuenteLabel = String(payload?.fuente_text || payload?.fuente || "").trim();
+    let fuenteLabel = String(
+      payload?.fuente_text || payload?.fuente || "",
+    ).trim();
     if (!fuenteLabel && idFuente) {
       if (!window.__fuentesMap) window.__fuentesMap = await loadFuentesMap();
       fuenteLabel = window.__fuentesMap[idFuente] || "";
@@ -515,13 +678,23 @@ function convertirNumero(n) {
 
     tasaIVA =
       payload?.iva_rate ||
-      (payload?.iva && payload?.subtotal ? safeNumber(payload.iva) / safeNumber(payload.subtotal) : 0.16);
+      (payload?.iva && payload?.subtotal
+        ? safeNumber(payload.iva) / safeNumber(payload.subtotal)
+        : 0.16);
 
     const det = Array.isArray(payload?.detalle) ? payload.detalle : [];
     const detNorm = det.map((d) => ({
       ...d,
-      importe_comprometido: safeNumber(d?.importe_comprometido ?? d?.importe_original ?? d?.importe),
-      importe: safeNumber(d?.importe ?? d?.importe_devengado ?? d?.importe_comprometido ?? d?.importe_original ?? 0),
+      importe_comprometido: safeNumber(
+        d?.importe_comprometido ?? d?.importe_original ?? d?.importe,
+      ),
+      importe: safeNumber(
+        d?.importe ??
+          d?.importe_devengado ??
+          d?.importe_comprometido ??
+          d?.importe_original ??
+          0,
+      ),
     }));
 
     renderDetalle(detNorm);
@@ -529,7 +702,10 @@ function convertirNumero(n) {
     setVal("meta", payload?.meta || "");
     recalcularTotales();
 
-    verificarVigencia(payload?.fecha_comprometido || payload?.fecha, payload?.estatus);
+    verificarVigencia(
+      payload?.fecha_comprometido || payload?.fecha,
+      payload?.estatus,
+    );
 
     updateFirmasSection(payload);
   }
@@ -551,22 +727,27 @@ function convertirNumero(n) {
         no: renglon,
         renglon: renglon,
         importe: safeNumber(importeInput?.value),
-        importe_comprometido: safeNumber(original?.importe_comprometido ?? original?.importe_original ?? original?.importe),
+        importe_comprometido: safeNumber(
+          original?.importe_comprometido ??
+            original?.importe_original ??
+            original?.importe,
+        ),
       });
     });
 
     const montoDevengado = safeNumber(getVal("total"));
-    const montoLiberado = montoComprometido - montoDevengado;
+    const saldo = montoComprometido - montoDevengado;
     const idComp = resolveIdComprometido();
 
     return {
-      id_suficiencia: Number(currentPayload?.id_suficiencia || currentPayload?.id || 0) || null,
+      id_suficiencia:
+        Number(currentPayload?.id_suficiencia || currentPayload?.id || 0) ||
+        null,
       id_comprometido: idComp > 0 ? idComp : null,
       fecha_devengado: getVal("fecha"),
 
       monto_comprometido: montoComprometido,
       monto_devengado: montoDevengado,
-      monto_liberado: montoLiberado > 0 ? montoLiberado : 0,
 
       firmante_area: getVal("firma_area_nombre"),
       firmante_direccion: getVal("firma_direccion_nombre"),
@@ -593,7 +774,9 @@ function convertirNumero(n) {
       throw new Error("Falta id_suficiencia válido");
     }
     if (payload.monto_devengado > payload.monto_comprometido) {
-      throw new Error("El monto a devengar no puede ser mayor al comprometido.");
+      throw new Error(
+        "El monto a devengar no puede ser mayor al comprometido.",
+      );
     }
 
     // ✅ tu backend: POST /api/devengado
@@ -611,24 +794,9 @@ function convertirNumero(n) {
           payload,
           result: data,
           saved_at: new Date().toISOString(),
-        })
+        }),
       );
     } catch {}
-
-    return data;
-  }
-
-  // ⚠️ OJO: tu backend NO tiene cancelar en devengado.routes.js
-  async function cancelarDocumento() {
-    const id = getQueryId();
-    if (!id) throw new Error("No se puede cancelar: ID no encontrado");
-
-    // Si en tu server no existe esta ruta, dará 404.
-    const data = await fetchJson(`${API}/api/devengado/${id}/cancelar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ motivo: "Cancelación manual por usuario" }),
-    });
 
     return data;
   }
@@ -641,14 +809,14 @@ function convertirNumero(n) {
   // Eventos
   // ---------------------------
   function bindEvents() {
-    modalCancelar = new bootstrap.Modal(document.getElementById("modalCancelar"));
+    
     modalGuardar = new bootstrap.Modal(document.getElementById("modalGuardar"));
 
     btnGuardar?.addEventListener("click", (e) => {
       e.preventDefault();
 
       const montoDevengado = safeNumber(getVal("total"));
-      const montoLiberado = montoComprometido - montoDevengado;
+      const saldo = montoComprometido - montoDevengado;
 
       if (montoDevengado > montoComprometido) {
         alert("El monto a devengar no puede ser mayor al monto comprometido.");
@@ -659,9 +827,9 @@ function convertirNumero(n) {
       const montoLiberarSpan = document.getElementById("montoLiberar");
 
       if (infoLiberacion && montoLiberarSpan) {
-        if (montoLiberado > 0) {
+        if (saldo > 0) {
           infoLiberacion.style.display = "block";
-          montoLiberarSpan.textContent = formatMoney(montoLiberado);
+          montoLiberarSpan.textContent = formatMoney(saldo);
         } else {
           infoLiberacion.style.display = "none";
         }
@@ -679,36 +847,16 @@ function convertirNumero(n) {
         modalGuardar.hide();
 
         if (data?.no_devengado) setVal("no_devengado", data.no_devengado);
-        else if (data?.folio_num) setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
+        else if (data?.folio_num)
+          setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
 
         alert("Devengado guardado correctamente.");
+        await refrescarResumenYParcialidades();
       } catch (err) {
         console.error("[DEVENGADO] guardar:", err);
         alert(err?.message || "Error al guardar");
       } finally {
         btnConfirmarGuardar.disabled = false;
-      }
-    });
-
-    btnCancelar?.addEventListener("click", (e) => {
-      e.preventDefault();
-      modalCancelar.show();
-    });
-
-    btnConfirmarCancelar?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try {
-        btnConfirmarCancelar.disabled = true;
-        await cancelarDocumento();
-        modalCancelar.hide();
-        mostrarAlertaCancelado();
-        deshabilitarFormulario();
-        alert("Documento cancelado.");
-      } catch (err) {
-        console.error("[DEVENGADO] cancelar:", err);
-        alert(err?.message || "Error al cancelar (revisa si existe la ruta /cancelar en el backend).");
-      } finally {
-        btnConfirmarCancelar.disabled = false;
       }
     });
 
@@ -723,21 +871,59 @@ function convertirNumero(n) {
 
     btnRecargar?.addEventListener("click", async () => {
       try {
-        const payload = await loadData();
-        await renderPayload(payload);
+        if (!currentIdComp)
+          throw new Error("Primero busca un No. de Comprometido.");
+        await refrescarResumenYParcialidades();
       } catch (err) {
         alert(err?.message || "No se pudo recargar");
       }
     });
 
-    document.querySelector('[name="monto_devengado"]')?.addEventListener("change", (e) => {
-      const monto = safeNumber(e.target.value);
-      if (monto > montoComprometido) {
-        e.target.value = montoComprometido.toFixed(2);
-        e.target.classList.add("monto-error");
-      } else {
-        e.target.classList.remove("monto-error");
+    document
+      .querySelector('[name="monto_devengado"]')
+      ?.addEventListener("change", (e) => {
+        const monto = safeNumber(e.target.value);
+        if (monto > montoComprometido) {
+          e.target.value = montoComprometido.toFixed(2);
+          e.target.classList.add("monto-error");
+        } else {
+          e.target.classList.remove("monto-error");
+        }
+      });
+
+    btnBuscarComprometido?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        btnBuscarComprometido.disabled = true;
+
+        const payload = await buscarComprometidoPorFolio(
+          txtNoComprometido.value,
+        );
+        currentIdComp = Number(payload.id_comprometido);
+
+        await renderPayload(payload);
+        await refrescarResumenYParcialidades();
+
+        // guardamos último comprometido buscado
+        localStorage.setItem(
+          "cp_last_comprometido",
+          JSON.stringify({
+            id: String(currentIdComp),
+            payload,
+            loaded_from: "buscar_folio",
+            loaded_at: new Date().toISOString(),
+          }),
+        );
+      } catch (err) {
+        alert(err?.message || "No se pudo buscar el comprometido");
+      } finally {
+        btnBuscarComprometido.disabled = false;
       }
+    });
+
+    btnNuevoDevengado?.addEventListener("click", (e) => {
+      e.preventDefault();
+      limpiarParaNuevoDevengado();
     });
   }
 
@@ -745,14 +931,13 @@ function convertirNumero(n) {
   // INIT
   // ---------------------------
   async function init() {
-    try {
-      const payload = await loadData();
-      await renderPayload(payload);
-    } catch (err) {
-      console.error("[DEVENGADO]", err);
-      alert(err?.message || "No se pudieron cargar datos");
-    }
     bindEvents();
+    if (btnCancelar) btnCancelar.style.display = "none";
+    renderResumen({
+      total_comprometido: 0,
+      devengado_acumulado: 0,
+      saldo_restante: 0,
+    });
   }
 
   if (document.readyState === "loading") {

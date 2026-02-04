@@ -1,6 +1,6 @@
 // server/routes/devengado.routes.js
 import express from "express";
-import { query, getClient } from "../db.js";
+import { getClient } from "../db.js";
 
 const router = express.Router();
 
@@ -35,10 +35,41 @@ function monthCode(dateStr) {
 }
 
 // =====================================================
+// GET /api/devengado/por-comprometido/:id
+// Lista parcialidades (devengados) de ese comprometido
+// =====================================================
+router.get("/por-comprometido/:id", async (req, res) => {
+  const client = await getClient();
+  try {
+    const idComp = Number(req.params.id || 0);
+    if (!Number.isFinite(idComp) || idComp <= 0) {
+      return res.status(400).json({ error: "ID comprometido inválido" });
+    }
+
+    const r = await client.query(
+      `
+      SELECT id, no_devengado, fecha, total, COALESCE(estatus,'ACTIVO') AS estatus
+      FROM devengados
+      WHERE id_comprometido = $1
+      ORDER BY fecha ASC, id ASC
+      `,
+      [idComp]
+    );
+
+    return res.json({ ok: true, rows: r.rows });
+  } catch (e) {
+    console.error("[GET devengados por comprometido]", e);
+    return res.status(500).json({ error: "Error consultando devengados", db: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+// =====================================================
 // POST /api/devengado
-// Guarda cabecera + detalle en:
-// - devengados
-// - devengado_detalle
+// Crea UN devengado (parcialidad) ligado a un comprometido
+// - devengados (cabecera)
+// - devengado_detalle (detalle)
 // =====================================================
 router.post("/", async (req, res) => {
   const client = await getClient();
@@ -63,7 +94,7 @@ router.post("/", async (req, res) => {
         ORDER BY id DESC
         LIMIT 1
         `,
-        [idSuf],
+        [idSuf]
       );
 
       if (!rFind.rowCount) {
@@ -76,28 +107,26 @@ router.post("/", async (req, res) => {
       idComp = Number(rFind.rows[0].id);
     }
 
-    // ✅ Evita duplicados: 1 devengado por comprometido
-    const exists = await client.query(
-      `
-      SELECT id, folio_num, no_devengado
-      FROM devengados
-      WHERE id_comprometido = $1
-      LIMIT 1
-      `,
-      [idComp],
-    );
+    // ✅ Folio: ECA-<mes>-DV-0001 (global por mes)
+    const fechaBase =
+      toNullIfEmpty(b.fecha_devengado ?? b.fecha) ||
+      new Date().toISOString().slice(0, 10);
 
-    if (exists.rowCount) {
-      return res.json({
-        ok: true,
-        already_exists: true,
-        id: exists.rows[0].id,
-        folio_num: exists.rows[0].folio_num,
-        no_devengado: exists.rows[0].no_devengado,
-      });
+    const mes = monthCode(fechaBase);
+    const prefijo = `ECA-${mes}-DV-`;
+
+    // ✅ total de este devengado (parcialidad)
+    const totalDev = toNumOrZero(b.total ?? b.monto_devengado);
+    if (!(totalDev > 0)) {
+      return res.status(400).json({ error: "El total del devengado debe ser mayor a 0" });
     }
 
-    // ✅ Trae datos del comprometido (fuente confiable)
+    await client.query("BEGIN");
+
+    // -----------------------------------------
+    // 1) Bloqueo para saldo: bloquea el comprometido
+    //    (evita que 2 usuarios devenguen el mismo saldo)
+    // -----------------------------------------
     const rComp = await client.query(
       `
       SELECT
@@ -121,15 +150,18 @@ router.post("/", async (req, res) => {
         c.isr,
         c.ieps,
         c.total,
-        c.cantidad_con_letra
+        c.cantidad_con_letra,
+        COALESCE(c.estatus, 'ABIERTO') AS estatus
       FROM comprometidos c
       WHERE c.id = $1
       LIMIT 1
+      FOR UPDATE
       `,
-      [idComp],
+      [idComp]
     );
 
     if (!rComp.rowCount) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Comprometido no encontrado" });
     }
 
@@ -137,30 +169,54 @@ router.post("/", async (req, res) => {
 
     // ✅ Seguridad: que el comprometido corresponda a la misma suficiencia
     if (Number(comp.id_suficiencia) !== Number(idSuf)) {
+      await client.query("ROLLBACK");
       return res.status(400).json({
         error:
           "El id_suficiencia no corresponde al comprometido encontrado. Revisa el flujo.",
       });
     }
 
-    // ✅ Validación: total devengado no puede exceder total comprometido
-    const totalComp = toNumOrZero(comp.total);
-    const totalDev = toNumOrZero(b.total ?? b.monto_devengado);
-    if (totalDev > totalComp) {
+    // ✅ No permitir si está cerrado
+    if (String(comp.estatus || "").toUpperCase() === "CERRADO") {
+      await client.query("ROLLBACK");
       return res.status(400).json({
-        error: `El total devengado (${totalDev}) no puede exceder el comprometido (${totalComp})`,
+        error: "Este comprometido está CERRADO. Ya no admite nuevos devengados.",
       });
     }
 
-    // ✅ Folio: ECA-<mes>-DV-0001
-    const fechaBase =
-      toNullIfEmpty(b.fecha_devengado ?? b.fecha) ||
-      new Date().toISOString().slice(0, 10);
+    // -----------------------------------------
+    // 2) Validación correcta: NO exceder saldo del comprometido
+    //    (solo suma devengados ACTIVO)
+    // -----------------------------------------
+    const totalComp = toNumOrZero(comp.total);
 
-    const mes = monthCode(fechaBase);
-    const prefijo = `ECA-${mes}-DV-`;
+    const rSum = await client.query(
+      `
+      SELECT COALESCE(SUM(total), 0) AS dev_acum
+      FROM devengados
+      WHERE id_comprometido = $1
+        AND COALESCE(estatus, 'ACTIVO') <> 'CANCELADO'
+      `,
+      [idComp]
+    );
 
-    await client.query("BEGIN");
+    const devAcum = Number(rSum.rows[0]?.dev_acum || 0);
+    const saldo = totalComp - devAcum;
+
+    if (totalDev > saldo) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: `El monto (${totalDev}) excede el saldo del comprometido (${saldo}).`,
+        saldo,
+        devengado_acumulado: devAcum,
+        comprometido_total: totalComp,
+      });
+    }
+
+    // -----------------------------------------
+    // 3) Folio consecutivo (bloqueo SOLO para generar folio)
+    //    Si prefieres, se puede optimizar con una secuencia.
+    // -----------------------------------------
     await client.query("LOCK TABLE devengados IN EXCLUSIVE MODE");
 
     const rConsec = await client.query(
@@ -170,7 +226,7 @@ router.post("/", async (req, res) => {
       WHERE no_devengado LIKE $1
         AND DATE_PART('year', fecha) = DATE_PART('year', $2::date)
       `,
-      [`${prefijo}%`, fechaBase],
+      [`${prefijo}%`, fechaBase]
     );
 
     const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
@@ -205,13 +261,16 @@ router.post("/", async (req, res) => {
         isr,
         ieps,
         total,
-        cantidad_con_letra
+        cantidad_con_letra,
+
+        estatus
       )
       VALUES (
         $1,$2,$3,
         $4,$5,$6,$7,
         $8,$9,$10,$11,$12,$13,$14,$15,
-        $16,$17,$18,$19,$20,$21,$22,$23,$24
+        $16,$17,$18,$19,$20,$21,$22,$23,$24,
+        'ACTIVO'
       )
       RETURNING id, folio_num, no_devengado;
     `;
@@ -237,7 +296,7 @@ router.post("/", async (req, res) => {
 
       comp.impuesto_tipo ?? "NONE", // $16
 
-      // ✅ blindaje numeric como en comprometido
+      // ✅ blindaje numeric
       toNumOrNull(b.isr_tasa ?? comp.isr_tasa), // $17
       toNumOrNull(b.ieps_tasa ?? comp.ieps_tasa), // $18
 
@@ -265,7 +324,7 @@ router.post("/", async (req, res) => {
         const renglon = Number(d.renglon ?? d.no ?? (idx + 1));
 
         values.push(
-          `($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`,
+          `($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`
         );
 
         params.push(
@@ -275,7 +334,7 @@ router.post("/", async (req, res) => {
           toNullIfEmpty(d.concepto_partida),
           toNullIfEmpty(d.justificacion),
           toNullIfEmpty(d.descripcion),
-          toNumOrZero(d.importe),
+          toNumOrZero(d.importe)
         );
       }
 
@@ -285,7 +344,7 @@ router.post("/", async (req, res) => {
           (id_devengado, renglon, clave, concepto_partida, justificacion, descripcion, importe)
         VALUES ${values.join(",")}
         `,
-        params,
+        params
       );
     }
 
@@ -298,13 +357,87 @@ router.post("/", async (req, res) => {
       no_devengado: rHead.rows[0].no_devengado,
       id_comprometido: idComp,
       id_suficiencia: idSuf,
+      comprometido_total: totalComp,
+      devengado_acumulado: devAcum + totalDev,
+      saldo_restante: saldo - totalDev,
     });
   } catch (err) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (_e) {}
     console.error("[POST devengado] error:", err);
     return res
       .status(500)
       .json({ error: "Error al guardar devengado", db: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// =====================================================
+// PATCH /api/devengado/:id/cancelar
+// Cancela un devengado (no borra)
+// =====================================================
+router.patch("/:id/cancelar", async (req, res) => {
+  const client = await getClient();
+  try {
+    const idDev = Number(req.params.id || 0);
+    if (!Number.isFinite(idDev) || idDev <= 0) {
+      return res.status(400).json({ error: "ID de devengado inválido" });
+    }
+
+    await client.query("BEGIN");
+
+    // Traer el devengado y bloquearlo
+    const r = await client.query(
+      `
+      SELECT id, id_comprometido, COALESCE(estatus,'ACTIVO') AS estatus
+      FROM devengados
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [idDev]
+    );
+
+    if (!r.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Devengado no encontrado" });
+    }
+
+    const cur = r.rows[0];
+    if (String(cur.estatus).toUpperCase() === "CANCELADO") {
+      await client.query("ROLLBACK");
+      return res.json({ ok: true, already: true, id: idDev });
+    }
+
+    // (Opcional) bloquear comprometido por consistencia
+    await client.query(
+      `
+      SELECT id
+      FROM comprometidos
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [cur.id_comprometido]
+    );
+
+    await client.query(
+      `
+      UPDATE devengados
+      SET estatus = 'CANCELADO'
+      WHERE id = $1
+      `,
+      [idDev]
+    );
+
+    await client.query("COMMIT");
+    return res.json({ ok: true, id: idDev });
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_e) {}
+    console.error("[PATCH devengado cancelar] error:", err);
+    return res.status(500).json({ error: "Error al cancelar devengado", db: err.message });
   } finally {
     client.release();
   }

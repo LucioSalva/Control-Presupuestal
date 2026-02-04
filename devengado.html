@@ -153,13 +153,80 @@
         </button>
       </div>
 
-      <div class="d-flex">
+      <!-- <div class="d-flex">
         <button id="btn-cancelar" class="btn btn-outline-danger btn-sm">
           <i class="bi bi-x-circle me-1"></i>Cancelar Documento
         </button>
-      </div>
+      </div> -->
     </div>
   </div>
+
+  <!-- BUSCAR COMPROMETIDO + RESUMEN + PARCIALIDADES -->
+<div class="container mt-2 mb-3 no-print">
+  <div class="card shadow-sm">
+    <div class="card-body py-2">
+      <div class="d-flex flex-wrap gap-2 align-items-end justify-content-between">
+        <div style="min-width: 320px;">
+          <label class="form-label small mb-1">No. Comprometido</label>
+          <div class="input-group input-group-sm">
+            <input id="txtNoComprometido" type="text" class="form-control"
+              placeholder="Ej. ECA-02-CP-0001">
+            <button id="btnBuscarComprometido" class="btn btn-primary">
+              <i class="bi bi-search me-1"></i>Buscar
+            </button>
+          </div>
+          <div class="small text-muted mt-1">
+            Escribe el folio del Comprometido y carga su saldo/parcialidades.
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3">
+          <div class="text-end">
+            <div class="small text-muted">Comprometido</div>
+            <div class="fw-bold" id="lblTotalComprometido">$0.00</div>
+          </div>
+          <div class="text-end">
+            <div class="small text-muted">Devengado acumulado</div>
+            <div class="fw-bold" id="lblDevAcum">$0.00</div>
+          </div>
+          <div class="text-end">
+            <div class="small text-muted">Saldo</div>
+            <div class="fw-bold" id="lblSaldo">$0.00</div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button id="btnNuevoDevengado" class="btn btn-outline-success btn-sm" disabled>
+            <i class="bi bi-plus-circle me-1"></i>Nuevo devengado (parcialidad)
+          </button>
+        </div>
+      </div>
+
+      <hr class="my-2">
+
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-0">
+          <thead>
+            <tr>
+              <th style="width: 22%;">No. Devengado</th>
+              <th style="width: 18%;">Fecha</th>
+              <th style="width: 20%;" class="text-end">Total</th>
+              <th style="width: 20%;">Estatus</th>
+              <th style="width: 20%;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyParcialidades">
+            <tr>
+              <td colspan="5" class="text-center small text-muted">Sin parcialidades cargadas</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 
   <!-- CONTENEDOR FORMATO -->
   <div class="form-container">
@@ -512,7 +579,7 @@
           <p>¿Deseas guardar este devengado presupuestal?</p>
           <div id="infoLiberacion" class="alert alert-info" style="display: none;">
             <i class="bi bi-info-circle me-2"></i>
-            Se liberará <strong id="montoLiberar">$0.00</strong> del presupuesto comprometido.
+            Quedará un saldo de <strong id="montoLiberar">$0.00</strong> en el Comprometido.
           </div>
         </div>
         <div class="modal-footer">
