@@ -39,10 +39,16 @@ app.set("trust proxy", 1);
 // 1) Helmet: headers de seguridad
 app.use(
   helmet({
-    // Como tú sirves HTML estático desde /public, CSP puede romper cosas si usas inline scripts.
-    // Por eso lo apagamos para no darte broncas ahorita.
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:"],
+        "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "http://127.0.0.1:5502", "http://189.240.17.125:3000/"],
+      },
+    },
   })
 );
 
@@ -102,10 +108,6 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (_req, res) => {
   return res.sendFile(path.join(__dirname, "public", "login.html"));
 });
-app.use("/public", express.static(path.join(__dirname, "..", "public")));
-app.use("/PDF", express.static(path.join(__dirname, "..", "public", "PDF")));
-app.use("/css", express.static(path.join(__dirname, "..", "css")));
-app.use("/js", express.static(path.join(__dirname, "..", "js")));
 
 // =====================================================
 //  AUTH (token de mentiritas) + roles reales en BD
