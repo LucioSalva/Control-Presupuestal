@@ -75,78 +75,68 @@ router.post("/", async (req, res) => {
     // 1️⃣ INSERT CABECERA
     // ================================
     const sqlHead = `
-      WITH n AS (
-        SELECT nextval('suficiencias_folio_seq')::int AS folio_num
-      )
-      INSERT INTO suficiencias (
-        id_usuario,
-        id_dgeneral,
-        id_dauxiliar,
-        id_proyecto,
-        id_fuente,
+  INSERT INTO suficiencias (
+    id_usuario,
+    id_dgeneral,
+    id_dauxiliar,
+    id_proyecto,
+    id_fuente,
 
-        no_suficiencia,
-        fecha,
-        dependencia,
-        departamento,
-        fuente,
-        mes_pago,
-        clave_programatica,
+    fecha,
+    dependencia,
+    departamento,
+    fuente,
+    mes_pago,
+    clave_programatica,
 
-        meta,
-        impuesto_tipo,
-        isr_tasa,
-        ieps_tasa,
-        subtotal,
-        iva,
-        isr,
-        ieps,
+    meta,
+    impuesto_tipo,
+    isr_tasa,
+    ieps_tasa,
+    subtotal,
+    iva,
+    isr,
+    ieps,
 
-        total,
-        cantidad_con_letra,
-        created_at,
-        folio_num
-      )
-      SELECT
-        $1, $2, $3, $4, $5,
-        $6,
-        $7, $8, $9, $10, $11, $12,
-        $13,
-        $14, $15, $16, $17, $18, $19,
-        $20, $21, $22,
-        NOW(),
-        n.folio_num
-      FROM n
-      RETURNING id, folio_num, no_suficiencia;
-    `;
+    total,
+    cantidad_con_letra,
+    created_at
+  )
+  VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10, $11,
+    $12, $13, $14, $15, $16, $17, $18, $19,
+    $20, $21, NOW()
+  )
+  RETURNING id, folio_num, no_suficiencia;
+`;
 
     const headParams = [
-      req.user.id,
-      b.id_dgeneral,
-      b.id_dauxiliar,
-      b.id_proyecto,
-      b.id_fuente,
+  req.user.id,
+  b.id_dgeneral,
+  b.id_dauxiliar,
+  b.id_proyecto,
+  b.id_fuente,
 
-      noSuficiencia,
-      b.fecha,
-      b.dependencia,
-      departamento,
-      b.fuente,
-      b.mes_pago,
-      b.clave_programatica,
+  b.fecha,
+  b.dependencia,
+  departamento,
+  b.fuente,
+  b.mes_pago,
+  b.clave_programatica,
 
-      b.meta,
-      b.impuesto_tipo,
-      b.isr_tasa,
-      b.ieps_tasa,
-      b.subtotal,
-      b.iva,
-      b.isr,
-      b.ieps,
+  b.meta,
+  b.impuesto_tipo,
+  b.isr_tasa,
+  b.ieps_tasa,
+  b.subtotal,
+  b.iva,
+  b.isr,
+  b.ieps,
 
-      b.total,
-      b.cantidad_con_letra,
-    ];
+  b.total,
+  b.cantidad_con_letra,
+];
 
     const rHead = await client.query(sqlHead, headParams);
     const idSuf = rHead.rows[0].id;

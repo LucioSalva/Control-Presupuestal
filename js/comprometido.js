@@ -103,6 +103,53 @@
   }
 
   // ---------------------------
+// SweetAlert2 helpers (reemplazo de alert())
+// ---------------------------
+function hasSwal() {
+  return typeof window !== "undefined" && !!window.Swal;
+}
+
+function uiAlert(message, icon = "info", title = "Aviso") {
+  const msg = String(message ?? "");
+  if (!hasSwal()) return alert(`${title}: ${msg}`);
+
+  return window.Swal.fire({
+    icon,
+    title,
+    text: msg,
+    confirmButtonText: "Aceptar",
+    confirmButtonColor: "#BC955C",
+  });
+}
+
+function uiSuccess(message, title = "Listo") {
+  return uiAlert(message, "success", title);
+}
+
+function uiError(message, title = "Error") {
+  return uiAlert(message, "error", title);
+}
+
+function uiWarn(message, title = "Atención") {
+  return uiAlert(message, "warning", title);
+}
+
+function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancelText = "Cancelar" } = {}) {
+  if (!hasSwal()) return Promise.resolve(confirm(`¿${title}?`));
+
+  return window.Swal.fire({
+    icon: "question",
+    title,
+    html,
+    showCancelButton: true,
+    confirmButtonText: confirmText,
+    cancelButtonText: cancelText,
+    confirmButtonColor: "#BC955C",
+    cancelButtonColor: "#6c757d",
+  }).then((r) => !!r.isConfirmed);
+}
+
+  // ---------------------------
   // Catálogos (para mostrar texto bonito)
   // ---------------------------
   let proyectosById = {}; // { [id]: "0108050103 E - Innovación gubernamental..." }
@@ -368,78 +415,90 @@
   // PDF (placeholder)
   // ---------------------------
   async function generarPDF(_payload) {
-    alert("Aquí conecta tu generador real de PDF (pdf-lib).");
-  }
+  await uiWarn("Aquí conecta tu generador real de PDF (pdf-lib).", "PDF");
+}
 
   // ---------------------------
   // Eventos
   // ---------------------------
   function bindEvents(state) {
-    btnDescargarPdf?.addEventListener("click", (e) => {
-      e.preventDefault();
-      generarPDF(state.payload).catch((err) => {
-        console.error("[COMPROMETIDO][PDF]", err);
-        alert(err?.message || "Error generando PDF");
-      });
+    btnDescargarPdf?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  try {
+    await generarPDF(state.payload);
+  } catch (err) {
+    console.error("[COMPROMETIDO][PDF]", err);
+    await uiError(err?.message || "Error generando PDF", "PDF");
+  }
+});
+
+btnRecargar?.addEventListener("click", async () => {
+  try {
+    const raw = await loadData();
+    state.payload = renderPayload(raw);
+    await uiSuccess("Datos recargados correctamente.", "Recargar");
+  } catch (err) {
+    await uiError(err?.message || "No se pudo recargar", "Recargar");
+  }
+});
+
+const btnGuardar = document.getElementById("btn-guardar");
+btnGuardar?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  try {
+    const ok = await uiConfirm({
+      title: "Guardar Comprometido",
+      html: `
+        <div style="font-size:13px; text-align:left;">
+          ¿Deseas guardar el <b>Comprometido</b> con la información actual?
+        </div>
+      `,
+      confirmText: "Sí, guardar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+
+    if (!state.payload?.id) {
+      await uiWarn("No hay ID de suficiencia para guardar.");
+      return;
+    }
+
+    const body = { id_suficiencia: state.payload.id, ...state.payload };
+
+    const r = await fetchJson(`${API}/api/comprometido`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
     });
 
-    btnRecargar?.addEventListener("click", async () => {
-      try {
-        const raw = await loadData();
-        state.payload = renderPayload(raw);
-      } catch (err) {
-        alert(err?.message || "No se pudo recargar");
-      }
-    });
+    if (r?.id) state.payload.id_comprometido = Number(r.id);
 
-    // Guardar comprometido
-    const btnGuardar = document.getElementById("btn-guardar");
-    btnGuardar?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try {
-        if (!state.payload?.id) {
-          alert("No hay ID de suficiencia para guardar.");
-          return;
-        }
+    if (r?.no_comprometido) {
+      state.payload.no_comprometido = r.no_comprometido;
+      setReadonlyVal("no_comprometido", r.no_comprometido);
+    }
 
-        const body = {
-          id_suficiencia: state.payload.id,
-          ...state.payload,
-        };
+    localStorage.setItem(
+      "cp_last_comprometido",
+      JSON.stringify({
+        id: String(r.id),
+        payload: state.payload,
+        loaded_from: "comprometido",
+        loaded_at: new Date().toISOString(),
+      })
+    );
 
-        const r = await fetchJson(`${API}/api/comprometido`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify(body),
-        });
+    await uiSuccess(`Comprometido guardado: ${r.no_comprometido}`, "Guardado");
+  } catch (err) {
+    console.error("[COMPROMETIDO] save error:", err);
+    await uiError(err?.message || "Error al guardar comprometido");
+  }
+});
 
-        if (r?.id) state.payload.id_comprometido = Number(r.id);
-
-        if (r?.no_comprometido) {
-          state.payload.no_comprometido = r.no_comprometido;
-          setReadonlyVal("no_comprometido", r.no_comprometido);
-        }
-
-        localStorage.setItem(
-          "cp_last_comprometido",
-          JSON.stringify({
-            id: String(r.id),
-            payload: state.payload,
-            loaded_from: "comprometido",
-            loaded_at: new Date().toISOString(),
-          })
-        );
-
-        alert(`Comprometido guardado: ${r.no_comprometido} (folio ${r.folio_num})`);
-      } catch (err) {
-        console.error("[COMPROMETIDO] save error:", err);
-        alert(err?.message || "Error al guardar comprometido");
-      }
-    });
 
     // Ir a Devengado
     const btnVerDevengado = document.getElementById("btn-ver-devengado");
-    btnVerDevengado?.addEventListener("click", (e) => {
+    btnVerDevengado?.addEventListener("click", async (e) => {
       e.preventDefault();
 
       let idRef = Number(state.payload?.id_comprometido || 0);
@@ -452,7 +511,7 @@
       }
 
       if (!idRef || idRef <= 0) {
-        alert("Primero guarda el Comprometido para generar Devengado.");
+        await uiWarn("Primero guarda el Comprometido para generar Devengado.");
         return;
       }
 
@@ -474,24 +533,30 @@
   // INIT
   // ---------------------------
   async function init() {
-    const state = { payload: null };
+  const state = { payload: null };
 
-    try {
-      // 1) carga catálogos para poder pintar labels
-      await loadCatalogos();
-
-      // 2) carga payload
-      const raw = await loadData();
-
-      // 3) render
-      state.payload = renderPayload(raw);
-    } catch (err) {
-      console.error("[COMPROMETIDO]", err);
-      alert(err?.message || "No se pudieron cargar datos");
-    }
-
-    bindEvents(state);
+  if (hasSwal()) {
+    Swal.fire({
+      title: "Cargando...",
+      text: "Preparando comprometido",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
   }
+
+  try {
+    await loadCatalogos();
+    const raw = await loadData();
+    state.payload = renderPayload(raw);
+  } catch (err) {
+    console.error("[COMPROMETIDO]", err);
+    await uiError(err?.message || "No se pudieron cargar datos");
+  } finally {
+    if (hasSwal()) Swal.close();
+  }
+
+  bindEvents(state);
+}
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

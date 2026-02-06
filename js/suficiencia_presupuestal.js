@@ -143,28 +143,60 @@
   // Helpers BUSCADOR
   // ---------------------------
   function normalizeFolioInput(input) {
-    const raw = String(input || "").trim();
-    if (!raw) return "";
+  const raw = String(input || "").trim();
+  if (!raw) return "";
 
-    const m = raw.match(/ECA-\d{4}-\d{2}-SP-(\d{1,6})/i);
-    if (m) {
-      const num = String(m[1]).padStart(4, "0");
-      return `ECA-2026-01-SP-${num}`;
-    }
-
-    if (/^\d{1,6}$/.test(raw)) {
-      const num = raw.padStart(4, "0");
-      return `ECA-2026-01-SP-${num}`;
-    }
-
-    const onlyDigits = raw.replace(/\D/g, "");
-    if (onlyDigits && onlyDigits.length <= 6) {
-      const num = onlyDigits.padStart(4, "0");
-      return `ECA-2026-01-SP-${num}`;
-    }
-
-    return "";
+  // ✅ Caso 1: ya viene completo ECA-YYYY-MM-SP-####
+  const m = raw.match(/ECA-(\d{4})-(\d{2})-SP-(\d{1,6})/i);
+  if (m) {
+    const year = m[1];
+    const month = m[2];
+    const num = String(m[3]).padStart(4, "0");
+    return `ECA-${year}-${month}-SP-${num}`;
   }
+
+  // ✅ Caso 2: si solo escribe 0001 o 1
+  if (/^\d{1,6}$/.test(raw)) {
+    const num = raw.padStart(4, "0");
+
+    // toma año/mes de la fecha del formulario si existe, si no de hoy
+    const f = get("fecha"); // YYYY-MM-DD
+    let year, month;
+
+    if (f && /^\d{4}-\d{2}-\d{2}$/.test(f)) {
+      year = f.slice(0, 4);
+      month = f.slice(5, 7);
+    } else {
+      const d = new Date();
+      year = String(d.getFullYear());
+      month = String(d.getMonth() + 1).padStart(2, "0");
+    }
+
+    return `ECA-${year}-${month}-SP-${num}`;
+  }
+
+  // ✅ Caso 3: si pega algo con números mezclados, extrae el consecutivo
+  const onlyDigits = raw.replace(/\D/g, "");
+  if (onlyDigits && onlyDigits.length <= 6) {
+    const num = onlyDigits.padStart(4, "0");
+
+    const f = get("fecha");
+    let year, month;
+    if (f && /^\d{4}-\d{2}-\d{2}$/.test(f)) {
+      year = f.slice(0, 4);
+      month = f.slice(5, 7);
+    } else {
+      const d = new Date();
+      year = String(d.getFullYear());
+      month = String(d.getMonth() + 1).padStart(2, "0");
+    }
+
+    return `ECA-${year}-${month}-SP-${num}`;
+  }
+
+  return "";
+}
+
 
   async function buscarPorNumero(numero) {
     const raw = String(numero || "").trim();
@@ -1659,110 +1691,376 @@
     console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
   }
 
-  async function generarPDF() {
-    refreshTotales();
+// ========================================
+// PDF (DESDE CERO) — AMARRADO A TU FORM
+// Pegar ANTES de: // ---------------------------
+// Eventos
+// ---------------------------
+// ========================================
 
-    if (!window.PDFLib?.PDFDocument) {
-      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
-    }
+// Formato moneda: $1,234.56
+function formatMoney(num) {
+  const n = Number(num) || 0;
+  return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
-    const fuenteSel = document.querySelector('[name="fuente"]');
-    const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+// Formato fecha: DD/MM/YYYY
+function formatFechaPDF(iso) {
+  if (!iso) return "";
+  const dateStr = String(iso).split("T")[0]; // por si viene con hora
+  const parts = dateStr.split("-");
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return iso;
+}
 
-    const payload = {
-      fecha: get("fecha"),
-      dependencia: get("dependencia"),
-      fuente_texto: fuenteText,
-      mes_pago: get("mes_pago"),
-      subtotal: get("subtotal"),
-      iva: get("iva"),
-      isr: get("isr"),
-      ieps: get("ieps"),
-      total: get("total"),
-      cantidad_con_letra: get("cantidad_con_letra"),
+async function generarPDF() {
+  refreshTotales();
 
-      meta: get("meta"),
-
-      clave_programatica: get("clave_programatica"),
-      detalle: buildDetalle(),
-      folio_oficial_suficiencia: get("no_suficiencia") || "",
-    };
-
-    const templateBytes = await fetchPdfTemplateBytesSuf();
-    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
-    const form = pdfDoc.getForm();
-
-    const setTextSafe = (fieldName, value) => {
-      try {
-        const f = form.getTextField(fieldName);
-        f.setText(String(value ?? ""));
-      } catch {}
-    };
-
-    const safeN = (x) => {
-      const n = Number(x);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    function splitFechaParts(iso) {
-      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
-      const [y, m, d] = iso.split("-");
-      return { d, m, y };
-    }
-
-    setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
-    setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
-    setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
-
-    setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente_texto || ""));
-    setTextSafe("NOMBRE F.F", String(payload.fuente_texto || ""));
-
-    const { d, m, y } = splitFechaParts(payload.fecha);
-    setTextSafe("fechadia", d);
-    setTextSafe("fechames", m);
-    setTextSafe("fechayear", y);
-
-    const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
-    const totalTxt = safeN(payload.total).toFixed(2);
-    const meses = [
-      "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
-      "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE",
-    ];
-    for (const mes of meses) {
-      setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
-    }
-
-    const detalle = payload.detalle || [];
-    setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
-    setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
-    setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
-    setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
-    setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
-    setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
-
-    setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
-    setTextSafe("IVA", safeN(payload.iva).toFixed(2));
-    setTextSafe("ISR", safeN(payload.isr).toFixed(2));
-    setTextSafe("IEPS", safeN(payload.ieps).toFixed(2));
-    setTextSafe("total", safeN(payload.total).toFixed(2));
-    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
-    setTextSafe("Meta", payload.meta || "");
-
-    form.flatten();
-
-    const outBytes = await pdfDoc.save();
-    const blob = new Blob([outBytes], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-
-    const folio = (get("no_suficiencia") || "0000").replace(/\s+/g, "_");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `SUFICIENCIA_${folio}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  if (!window.PDFLib?.PDFDocument) {
+    throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
   }
+
+  const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+  // ✅ Documento (Carta horizontal)
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([792, 612]);
+  const { width, height } = page.getSize();
+
+  // Fuentes
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  // Colores
+  const black = rgb(0, 0, 0);
+  const grayBg = rgb(0.9, 0.9, 0.9);
+
+  // Tamaños
+  const fs = { title: 9, subtitle: 7, label: 7, normal: 7, small: 6, tiny: 5 };
+
+  // Márgenes
+  const margin = { left: 30, right: 30, top: 25 };
+  const contentWidth = width - margin.left - margin.right;
+
+  // ===========================
+  // Datos desde tu FORM
+  // ===========================
+  const fuenteSelect = document.querySelector('[name="fuente"]');
+  const fuenteText = fuenteSelect?.selectedOptions?.[0]?.textContent?.trim() || "";
+  const fuenteValue = fuenteSelect?.value || "";
+
+  // ✅ Tu folio real
+  const folio = get("no_suficiencia") || "0000";
+
+  const payload = {
+    folio,
+    fecha: get("fecha"),
+    dependencia: get("dependencia"),
+    dependencia_aux: get("dependencia_aux") || "",
+    clave_programatica: get("clave_programatica"),
+    fuente: fuenteText,
+    fuente_id: fuenteValue,
+    mes_pago: get("mes_pago"),
+    meta: get("meta"),
+    subtotal: safeNumber(get("subtotal")),
+    iva: safeNumber(get("iva")),
+    isr: safeNumber(get("isr")),
+    ieps: safeNumber(get("ieps")),
+    // ✅ Si manejas pensión total en form, lo dejamos (si no existe, safeNumber lo deja en 0)
+    pension_total: safeNumber(get("pension_total")),
+    total: safeNumber(get("total")),
+    cantidad_con_letra: get("cantidad_con_letra"),
+    detalle: buildDetalle(),
+  };
+
+  // ===========================
+  // Layout helper
+  // ===========================
+  let y = height - margin.top;
+
+  const drawCentered = (text, yPos, size, bold = false) => {
+    const f = bold ? fontBold : fontRegular;
+    const tw = f.widthOfTextAtSize(text, size);
+    page.drawText(text, { x: margin.left + (contentWidth - tw) / 2, y: yPos, size, font: f, color: black });
+  };
+
+  const drawLabelLine = (label, value, xStart, yPos, labelW, valueW) => {
+    page.drawText(label, { x: xStart, y: yPos, size: fs.label, font: fontBold, color: black });
+    page.drawLine({
+      start: { x: xStart + labelW, y: yPos - 2 },
+      end: { x: xStart + labelW + valueW, y: yPos - 2 },
+      thickness: 0.5,
+      color: black,
+    });
+    page.drawText(String(value || ""), { x: xStart + labelW + 2, y: yPos, size: fs.normal, font: fontRegular, color: black });
+  };
+
+  // ===========================
+  // ENCABEZADO
+  // ===========================
+  drawCentered("H. AYUNTAMIENTO CONSTITUCIONAL DE ECATEPEC DE MORELOS 2025-2027", y, fs.title, true); y -= 12;
+  drawCentered("2025. BICENTENARIO DE LA VIDA MUNICIPAL DEL ESTADO DE MÉXICO", y, fs.subtitle, false); y -= 10;
+  drawCentered("TESORERÍA MUNICIPAL", y, fs.subtitle, true); y -= 10;
+  drawCentered("SUBDIRECCIÓN DE CONTROL Y REGISTRO PRESUPUESTAL", y, fs.subtitle, true); y -= 14;
+
+  // Caja título
+  const titleBox = "SOLICITUD DE SUFICIENCIA PRESUPUESTAL";
+  const titleBoxW = fontBold.widthOfTextAtSize(titleBox, fs.subtitle) + 20;
+  const titleBoxX = margin.left + (contentWidth - titleBoxW) / 2;
+
+  page.drawRectangle({ x: titleBoxX, y: y - 12, width: titleBoxW, height: 14, borderColor: black, borderWidth: 0.5 });
+  page.drawText(titleBox, { x: titleBoxX + 10, y: y - 9, size: fs.subtitle, font: fontBold, color: black });
+  y -= 22;
+
+  // ===========================
+  // DATOS GENERALES
+  // ===========================
+  drawLabelLine("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia, margin.left, y, 155, 280);
+  drawLabelLine("FECHA DE ELABORACIÓN:", formatFechaPDF(payload.fecha), margin.left + 480, y, 105, 100);
+  y -= 16;
+
+  drawLabelLine("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica, margin.left, y, 195, 520);
+  y -= 16;
+
+  // ✅ Aquí imprimimos ID de fuente y el texto, como tu formato
+  drawLabelLine("FUENTE DE FINANCIAMIENTO:", payload.fuente_id, margin.left, y, 130, 585);
+  y -= 16;
+
+  drawLabelLine("NOMBRE F.F. :", payload.fuente, margin.left, y, 65, 650);
+  y -= 20;
+
+  // ===========================
+  // PROGRAMACIÓN DE PAGO (12 meses)
+  // ===========================
+  const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+  const progLabelW = 75;
+  const mesW = (contentWidth - progLabelW) / 12;
+  const progH = 22;
+
+  page.drawRectangle({ x: margin.left, y: y - progH, width: progLabelW, height: progH, borderColor: black, borderWidth: 0.5, color: grayBg });
+  page.drawText("PROGRAMACIÓN DE", { x: margin.left + 3, y: y - 9, size: fs.tiny, font: fontBold, color: black });
+  page.drawText("PAGO:", { x: margin.left + 3, y: y - 16, size: fs.tiny, font: fontBold, color: black });
+
+  for (let i = 0; i < 12; i++) {
+    const mx = margin.left + progLabelW + (i * mesW);
+    page.drawRectangle({ x: mx, y: y - progH, width: mesW, height: progH, borderColor: black, borderWidth: 0.5 });
+
+    const mesText = meses[i];
+    const mesTW = fontBold.widthOfTextAtSize(mesText, fs.tiny);
+    page.drawText(mesText, { x: mx + (mesW - mesTW) / 2, y: y - 9, size: fs.tiny, font: fontBold, color: black });
+
+    if (payload.mes_pago && String(payload.mes_pago).trim().toUpperCase() === mesText) {
+      const totalStr = formatMoney(payload.total);
+      const totalTW = fontRegular.widthOfTextAtSize(totalStr, fs.tiny);
+      page.drawText(totalStr, { x: mx + (mesW - totalTW) / 2, y: y - 18, size: fs.tiny, font: fontRegular, color: black });
+    }
+  }
+  y -= progH + 5;
+
+  // ===========================
+  // TABLA DETALLE
+  // ===========================
+  const detalle = Array.isArray(payload.detalle) ? payload.detalle : [];
+  const totalTableW = contentWidth;
+
+  const colWidths = [
+    Math.floor(totalTableW * 0.04),  // NO.
+    Math.floor(totalTableW * 0.06),  // CLAVE
+    Math.floor(totalTableW * 0.15),  // CONCEPTO
+    Math.floor(totalTableW * 0.25),  // JUSTIFICACIÓN
+    Math.floor(totalTableW * 0.35),  // DESCRIPCIÓN
+    totalTableW - Math.floor(totalTableW * 0.04) - Math.floor(totalTableW * 0.06) - Math.floor(totalTableW * 0.15) - Math.floor(totalTableW * 0.25) - Math.floor(totalTableW * 0.35),
+  ];
+  const colHeaders = ["NO.", "CLAVE", "CONCEPTO DE PARTIDA", "JUSTIFICACIÓN", "DESCRIPCIÓN", "IMPORTE SOLICITADO"];
+  const detRowH = 14;
+
+  let xPos = margin.left;
+  for (let i = 0; i < colHeaders.length; i++) {
+    page.drawRectangle({ x: xPos, y: y - detRowH, width: colWidths[i], height: detRowH, borderColor: black, borderWidth: 0.5, color: grayBg });
+    const hText = colHeaders[i];
+    const hTW = fontBold.widthOfTextAtSize(hText, fs.tiny);
+    page.drawText(hText, { x: xPos + (colWidths[i] - hTW) / 2, y: y - 10, size: fs.tiny, font: fontBold, color: black });
+    xPos += colWidths[i];
+  }
+  y -= detRowH;
+
+  const minRows = 8;
+  const rowsToDraw = Math.max(detalle.length, minRows);
+
+  for (let r = 0; r < rowsToDraw; r++) {
+    const row = detalle[r] || {};
+    xPos = margin.left;
+
+    const values = [
+      row.renglon || (detalle[r] ? r + 1 : ""),
+      row.clave || "",
+      row.concepto_partida || "",
+      row.justificacion || "",
+      row.descripcion || "",
+      row.importe ? formatMoney(row.importe) : ""
+    ];
+
+    for (let c = 0; c < colWidths.length; c++) {
+      page.drawRectangle({ x: xPos, y: y - detRowH, width: colWidths[c], height: detRowH, borderColor: black, borderWidth: 0.5 });
+
+      let text = String(values[c] || "");
+      const maxChars = Math.floor(colWidths[c] / 3.5);
+      if (text.length > maxChars) text = text.substring(0, maxChars - 2) + "..";
+
+      let textX = xPos + 2;
+      if (c === 0 || c === 1) textX = xPos + (colWidths[c] - fontRegular.widthOfTextAtSize(text, fs.small)) / 2;
+      if (c === 5) textX = xPos + colWidths[c] - fontRegular.widthOfTextAtSize(text, fs.small) - 3;
+
+      page.drawText(text, { x: textX, y: y - 10, size: fs.small, font: fontRegular, color: black });
+      xPos += colWidths[c];
+    }
+
+    y -= detRowH;
+  }
+
+  y -= 5;
+
+  // ===========================
+  // META + TOTALES
+  // ===========================
+  const metaLabelW = 35;
+  const totalsW = 130;
+  const metaValueW = contentWidth - metaLabelW - totalsW - 10;
+  const totalsH = 50;
+
+  page.drawRectangle({ x: margin.left, y: y - totalsH, width: metaLabelW, height: totalsH, borderColor: black, borderWidth: 0.5, color: grayBg });
+  page.drawText("META:", { x: margin.left + 5, y: y - 28, size: fs.label, font: fontBold, color: black });
+
+  page.drawRectangle({ x: margin.left + metaLabelW, y: y - totalsH, width: metaValueW, height: totalsH, borderColor: black, borderWidth: 0.5 });
+  let metaText = payload.meta || "";
+  if (metaText.length > 120) metaText = metaText.substring(0, 117) + "...";
+  page.drawText(metaText, { x: margin.left + metaLabelW + 3, y: y - 28, size: fs.small, font: fontRegular, color: black });
+
+  const totalsX = margin.left + metaLabelW + metaValueW + 10;
+  const totalsLabelW = 55;
+  const totalsValueW = totalsW - totalsLabelW;
+
+  // ✅ Si usas IEPS/pensión, aquí los mostramos sin romper formato:
+  const totals = [
+    { label: "SUBTOTAL:", value: formatMoney(payload.subtotal) },
+    { label: "IVA:", value: formatMoney(payload.iva) },
+    { label: "ISR:", value: formatMoney(payload.isr) },
+    { label: "TOTAL:", value: formatMoney(payload.total) },
+  ];
+  const totalRowH = totalsH / 4;
+
+  for (let t = 0; t < totals.length; t++) {
+    const ty = y - (t * totalRowH);
+
+    page.drawRectangle({ x: totalsX, y: ty - totalRowH, width: totalsLabelW, height: totalRowH, borderColor: black, borderWidth: 0.5, color: grayBg });
+    page.drawText(totals[t].label, { x: totalsX + 3, y: ty - 9, size: fs.small, font: fontBold, color: black });
+
+    page.drawRectangle({ x: totalsX + totalsLabelW, y: ty - totalRowH, width: totalsValueW, height: totalRowH, borderColor: black, borderWidth: 0.5 });
+    const valTW = fontBold.widthOfTextAtSize(totals[t].value, fs.small);
+    page.drawText(totals[t].value, { x: totalsX + totalsLabelW + totalsValueW - valTW - 3, y: ty - 9, size: fs.small, font: fontBold, color: black });
+  }
+
+  y -= totalsH + 5;
+
+  // ===========================
+  // CANTIDAD CON LETRA
+  // ===========================
+  const cantLabelW = 85;
+  page.drawRectangle({ x: margin.left, y: y - 14, width: cantLabelW, height: 14, borderColor: black, borderWidth: 0.5, color: grayBg });
+  page.drawText("CANTIDAD CON LETRA:", { x: margin.left + 3, y: y - 10, size: fs.small, font: fontBold, color: black });
+
+  page.drawRectangle({ x: margin.left + cantLabelW, y: y - 14, width: contentWidth - cantLabelW, height: 14, borderColor: black, borderWidth: 0.5 });
+  const cantLetra = String(payload.cantidad_con_letra || "").toUpperCase();
+  page.drawText(cantLetra, { x: margin.left + cantLabelW + 3, y: y - 10, size: fs.small, font: fontBold, color: black });
+
+  y -= 20;
+
+  // ===========================
+  // LEYENDA LEGAL
+  // ===========================
+  const leyendas = [
+    "La presente suficiencia presupuestal únicamente acredita la disponibilidad de recursos en la(s) clave(s) indicada(s), sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación, adquisición, pago o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.",
+    "Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa correspondiente, siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación del uso de los recursos.",
+    "El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y Municipal, incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los Lineamientos Generales para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y complementaria aplicable.",
+    "El recurso deberá ejercerse en el mismo mes de emisión de esta suficiencia; en caso contrario, perderá validez y deberá tramitarse nuevamente con fecha del mes en curso."
+  ];
+
+  for (const ley of leyendas) {
+    const words = ley.split(" ");
+    let line = "";
+    const maxLineW = contentWidth - 10;
+
+    for (const word of words) {
+      const testLine = line + (line ? " " : "") + word;
+      if (fontRegular.widthOfTextAtSize(testLine, fs.tiny) > maxLineW) {
+        page.drawText(line, { x: margin.left + 2, y: y, size: fs.tiny, font: fontRegular, color: black });
+        y -= 7;
+        line = word;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line) {
+      page.drawText(line, { x: margin.left + 2, y: y, size: fs.tiny, font: fontRegular, color: black });
+      y -= 10;
+    }
+  }
+
+  y -= 5;
+
+  // ===========================
+  // FIRMAS (si aún no las tienes en tu HTML, se verán con "-")
+  // ===========================
+  const firmaW = contentWidth / 3;
+  const firmaHeaderH = 14;
+  const firmaAreaH = 12;
+  const firmaBodyH = 45;
+
+  // Si luego agregas inputs/ids de firmas, aquí ya está listo:
+  const firmasData = [
+    { titulo: "COORDINACIÓN ADMINISTRATIVA DEL ÁREA SOLICITANTE", area: "-", nombre: "" },
+    { titulo: "*ÁREA SOLICITANTE", area: "-", nombre: "" },
+    { titulo: "DIRECCIÓN SOLICITANTE", area: "-", nombre: "" },
+  ];
+
+  for (let i = 0; i < 3; i++) {
+    const fx = margin.left + (firmaW * i);
+    const firma = firmasData[i];
+
+    page.drawRectangle({ x: fx, y: y - firmaHeaderH, width: firmaW, height: firmaHeaderH, borderColor: black, borderWidth: 0.5, color: grayBg });
+    const fTW = fontBold.widthOfTextAtSize(firma.titulo, fs.tiny);
+    page.drawText(firma.titulo, { x: fx + (firmaW - fTW) / 2, y: y - 10, size: fs.tiny, font: fontBold, color: black });
+
+    page.drawRectangle({ x: fx, y: y - firmaHeaderH - firmaAreaH, width: firmaW, height: firmaAreaH, borderColor: black, borderWidth: 0.5 });
+    const areaText = String(firma.area || "-");
+    const areaTW = fontBold.widthOfTextAtSize(areaText, fs.tiny);
+    page.drawText(areaText, { x: fx + (firmaW - areaTW) / 2, y: y - firmaHeaderH - 9, size: fs.tiny, font: fontBold, color: black });
+
+    page.drawRectangle({ x: fx, y: y - firmaHeaderH - firmaAreaH - firmaBodyH, width: firmaW, height: firmaBodyH, borderColor: black, borderWidth: 0.5 });
+
+    if (firma.nombre) {
+      const nombreText = String(firma.nombre).slice(0, 40);
+      const nombreTW = fontBold.widthOfTextAtSize(nombreText, fs.tiny);
+      page.drawText(nombreText, { x: fx + (firmaW - nombreTW) / 2, y: y - firmaHeaderH - firmaAreaH - firmaBodyH + 5, size: fs.tiny, font: fontBold, color: black });
+    }
+  }
+
+  // ===========================
+  // GUARDAR / DESCARGAR
+  // ===========================
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([pdfBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+
+  const folioFileName = String(payload.folio || "0000").replace(/\//g, "-").replace(/\s+/g, "_");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `SUFICIENCIA_${folioFileName}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
 
   // ---------------------------
   // Eventos

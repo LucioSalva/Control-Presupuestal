@@ -52,12 +52,14 @@ router.get("/projects", async (_req, res) => {
 router.get("/detalles", async (req, res) => {
   try {
     const project = String(req.query.project || "").trim();
+    const mes = String(req.query.mes || "").trim(); // YYYY-MM opcional
     if (!project) return res.json([]);
 
     const r = await query(
       `SELECT id,
               id_proyecto AS "idProyecto",
               partida,
+              mes,
               presupuesto,
               fecha_cuando_se_gasto,
               en_que_se_gasto,
@@ -69,8 +71,9 @@ router.get("/detalles", async (req, res) => {
               fecha_registro
          FROM presupuesto_detalle
         WHERE id_proyecto = $1
-        ORDER BY partida`,
-      [project]
+          AND ($2 = '' OR mes = $2)
+        ORDER BY partida, mes`,
+      [project, mes]
     );
 
     res.json(r.rows);
@@ -111,45 +114,41 @@ router.post("/detalles", async (req, res) => {
       await client.query("BEGIN");
 
       const sql = `
-        INSERT INTO presupuesto_detalle (
-          fecha_registro,
-          id_dgeneral,
-          id_dauxiliar,
-          id_fuente,
-          id_proyecto,
-          partida,
-          presupuesto,
-          total_gastado,
-          total_reconducido,
-          saldo_disponible
-        )
-        VALUES (
-          NOW(),
-          $1,$2,$3,$4,$5,$6,
-          0,0,
-          $6
-        )
-        ON CONFLICT (
-          id_dgeneral,
-          id_dauxiliar,
-          id_fuente,
-          id_proyecto,
-          partida
-        )
-        DO UPDATE SET
-          presupuesto      = presupuesto_detalle.presupuesto + EXCLUDED.presupuesto,
-          saldo_disponible = presupuesto_detalle.saldo_disponible + EXCLUDED.presupuesto
-        RETURNING *;
-      `;
+  INSERT INTO presupuesto_detalle (
+    fecha_registro,
+    id_dgeneral,
+    id_dauxiliar,
+    id_fuente,
+    id_proyecto,
+    partida,
+    mes,
+    presupuesto,
+    total_gastado,
+    total_reconducido,
+    saldo_disponible
+  )
+  VALUES (
+    NOW(),
+    $1,$2,$3,$4,$5,$6,$7,
+    0,0,
+    $7
+  )
+  ON CONFLICT (id_proyecto, partida, mes)
+  DO UPDATE SET
+    presupuesto      = presupuesto_detalle.presupuesto + EXCLUDED.presupuesto,
+    saldo_disponible = presupuesto_detalle.saldo_disponible + EXCLUDED.presupuesto
+  RETURNING *;
+`;
 
       const params = [
-        keys.id_dgeneral,
-        keys.id_dauxiliar,
-        keys.id_fuente,
-        keys.id_proyecto,
-        partida,
-        Number(presupuesto),
-      ];
+  keys.id_dgeneral,
+  keys.id_dauxiliar,
+  keys.id_fuente,
+  keys.id_proyecto,
+  partida,
+  mes,
+  Number(presupuesto),
+];
 
       const { rows } = await client.query(sql, params);
       await client.query("COMMIT");

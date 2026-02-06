@@ -755,7 +755,6 @@ function saveLS() {
 //  FORMULARIOS PRINCIPALES
 // =====================================================
 
-// Formulario: agregar/actualizar partida
 document
   .getElementById("form-partida")
   ?.addEventListener("submit", async (ev) => {
@@ -763,10 +762,31 @@ document
     const clave = document.getElementById("p-partida").value.trim();
     const presupuesto = parseFloat(document.getElementById("p-monto").value);
     const mes = document.getElementById("p-mes").value;
-    const project = (document.getElementById("proj-code")?.value || "").trim();
+    // 1) intenta tomarlo del input (si existe)
+let project = (document.getElementById("proj-code")?.value || "").trim();
 
-    if (!project)
-      return banner("Captura el ID de proyecto antes de registrar", "warning");
+// 2) si está vacío, lo toma del localStorage (llaves del proyecto)
+if (!project) {
+  const keys =
+    STATE.projectKeys ||
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem(PROJECT_KEYS_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    })();
+
+  project = String(keys.id_proyecto || keys.idProyecto || "").trim();
+}
+
+// 3) si aún no hay project, entonces sí avisa pero ya con mensaje correcto
+if (!project) {
+  return banner(
+    "No hay proyecto seleccionado aún. Primero crea/elige el proyecto desde <strong>Suficiencia</strong>.",
+    "warning"
+  );
+}
     if (!clave || isNaN(presupuesto) || !mes)
       return banner("Captura partida, presupuesto y mes válidos", "warning");
 
@@ -814,17 +834,16 @@ document
         })();
 
       if (
-        !Number.isInteger(keys.id_dgeneral) ||
-        !Number.isInteger(keys.id_dauxiliar) ||
-        !Number.isInteger(keys.id_fuente)
-      ) {
-        banner(
-          "Este proyecto no tiene claves de dependencia/fuente.<br>" +
-            "Vuelve a crearlo desde <strong>Crear proyecto</strong>.",
-          "danger"
-        );
-        return;
-      }
+  !Number.isInteger(keys.id_dgeneral) ||
+  !Number.isInteger(keys.id_dauxiliar) ||
+  !Number.isInteger(keys.id_fuente)
+) {
+  banner(
+    "Primero genera/guarda la <strong>Suficiencia</strong> del proyecto para que se carguen las claves (DG/DA/Fuente) y después captura partidas aquí.",
+    "danger"
+  );
+  return;
+}
 
       const payload = {
         project,
