@@ -38,7 +38,7 @@ app.set("trust proxy", 1);
 //  MIDDLEWARE BASE (SEGURIDAD)
 // =====================================================
 
-// 1) Helmet: headers de seguridad
+// 1 Helmet: headers de seguridad
 app.use(
   helmet({
     contentSecurityPolicy: {
