@@ -1,0 +1,13 @@
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#page {
+  max-width: 70px;
+}
+
+.table td, .table th {
+  vertical-align: middle;
+}

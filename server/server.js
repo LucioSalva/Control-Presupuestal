@@ -19,6 +19,8 @@ import presupuestoRouter from "./routes/presupuesto.routes.js";
 import comprometidoRouter from "./routes/comprometido.routes.js";
 import devengadoRouter from "./routes/devengado.routes.js";
 import metasRouter from "./routes/metas.routes.js";
+import partidasRouter from "./routes/partidas.routes.js";
+
 
 dotenv.config();
 
@@ -227,9 +229,10 @@ app.use("/api/devengado", authRequired, devengadoRouter);
 
 app.use("/api", presupuestoRouter);
 
-app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite);
 app.use("/api/catalogos", authRequired, catalogosRoutes);
 app.use("/api/catalogos/metas", authRequired, metasRouter);
+app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite, partidasRouter);
+
 
 // =====================================================
 //  HEALTH
