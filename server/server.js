@@ -39,9 +39,13 @@ app.set("trust proxy", 1);
 //  MIDDLEWARE BASE (SEGURIDAD)
 // =====================================================
 
+<<<<<<< HEAD
 // 1) Helmet: headers de seguridad
 const isProd = process.env.NODE_ENV === "production";
 
+=======
+// 1 Helmet: headers de seguridad
+>>>>>>> 77915ff937457f1834fca392cfee5bcf87a8b201
 app.use(
   helmet({
     contentSecurityPolicy: isProd
