@@ -3,104 +3,126 @@ import { query } from "../db.js";
 
 const router = Router();
 
-/**
- * Espera tabla: public.partidas
- * Columnas usadas: id (serial), clave (varchar), partida (varchar/text)
- *
- * Si tu columna se llama distinto (ej. "partidas" en plural),
- * cambia en SELECT/INSERT/UPDATE esa columna.
- */
-
-// GET /api/catalogos/partidas
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   try {
-    const sql = `
-      SELECT id, clave, partida
-      FROM public.partidas
-      ORDER BY clave::text ASC, id ASC
-    `;
-    const r = await query(sql);
-    return res.json(r.rows);
+    const userId = Number(req.user?.id);
+    const idDg = Number(req.user?.id_dgeneral);
+    const idDa = Number(req.user?.id_dauxiliar);
+
+    if (!userId) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const k = await query(
+      `
+      SELECT
+        (SELECT TRIM(clave) FROM public.dgeneral WHERE id = $1) AS dg,
+        (SELECT TRIM(clave) FROM public.dauxiliar WHERE id = $2) AS da
+      `,
+      [idDg, idDa]
+    );
+
+    const dg = k.rows?.[0]?.dg;
+    const da = k.rows?.[0]?.da;
+
+    if (!dg || !da) {
+      return res.status(400).json({ error: "Usuario sin DG/DA" });
+    }
+
+    const r = await query(
+      `
+      SELECT
+        p.clave AS clave,
+        COALESCE(p.descripcion, 'SIN DESCRIPCIÓN') AS partida,
+        COALESCE(pp.monto, 0)::numeric(18,2) AS monto,
+        (pp.id_usuario IS NOT NULL) AS capturada
+      FROM public.partidas_permitidas per
+      JOIN public.partidas p
+        ON TRIM(p.clave) = TRIM(per.partida_clave)
+      LEFT JOIN public.partidas_presupuesto pp
+        ON pp.id_usuario = $1
+       AND TRIM(pp.partida_clave) = TRIM(p.clave)
+       AND pp.ejercicio = EXTRACT(YEAR FROM now())
+      WHERE TRIM(per.dgeneral_clave) = $2
+        AND TRIM(per.dauxiliar_clave) = $3
+      ORDER BY p.clave::text ASC
+      `,
+      [userId, dg, da]
+    );
+
+    // ✅ IMPORTANTE: regresamos dg/da y rows
+    return res.json({ dg, da, rows: r.rows });
   } catch (e) {
     console.error("[PARTIDAS][GET] Error:", e);
-    return res.status(500).json({ error: "Error al listar partidas" });
+    return res.status(500).json({ error: "Error al cargar partidas" });
   }
-});
+}); // ✅ AQUÍ se cerraba y te faltaba
 
-// POST /api/catalogos/partidas   (solo GOD/ADMIN por tu middleware blockPartidasWrite)
-router.post("/", async (req, res) => {
+router.post("/monto", async (req, res) => {
   try {
+    const userId = Number(req.user?.id);
     const clave = String(req.body?.clave || "").trim();
-    const partida = String(req.body?.partida || "").trim();
+    const monto = Number(req.body?.monto);
 
-    if (!clave || !partida) {
-      return res.status(400).json({ error: "clave y partida son requeridos" });
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+    if (!clave) return res.status(400).json({ error: "clave requerida" });
+    if (!Number.isFinite(monto) || monto < 0) {
+      return res.status(400).json({ error: "monto inválido" });
     }
 
-    const sql = `
-      INSERT INTO public.partidas (clave, partida)
-      VALUES ($1, $2)
-      RETURNING id, clave, partida
-    `;
-    const r = await query(sql, [clave, partida]);
-    return res.status(201).json(r.rows[0]);
-  } catch (e) {
-    // si tienes UNIQUE(clave) podría caer aquí
-    console.error("[PARTIDAS][POST] Error:", e);
-    return res.status(500).json({ error: "Error al crear partida" });
-  }
-});
+    const keys = await query(
+      `
+      SELECT
+        (SELECT TRIM(clave) FROM public.dgeneral WHERE id = $1 LIMIT 1) AS dg,
+        (SELECT TRIM(clave) FROM public.dauxiliar WHERE id = $2 LIMIT 1) AS da
+      `,
+      [Number(req.user?.id_dgeneral), Number(req.user?.id_dauxiliar)]
+    );
 
-// PUT /api/catalogos/partidas/:id
-router.put("/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const clave = String(req.body?.clave || "").trim();
-    const partida = String(req.body?.partida || "").trim();
+    const dg = String(keys.rows?.[0]?.dg || "").trim();
+    const da = String(keys.rows?.[0]?.da || "").trim();
 
-    if (!Number.isFinite(id) || id <= 0) {
-      return res.status(400).json({ error: "id inválido" });
+    const allowed = await query(
+      `
+      SELECT 1
+      FROM public.partidas_permitidas
+      WHERE TRIM(dgeneral_clave) = $1
+        AND TRIM(dauxiliar_clave) = $2
+        AND TRIM(partida_clave) = $3
+      LIMIT 1
+      `,
+      [dg, da, clave]
+    );
+
+    if (allowed.rowCount === 0) {
+      return res.status(403).json({ error: "Partida no permitida para tu área" });
     }
-    if (!clave || !partida) {
-      return res.status(400).json({ error: "clave y partida son requeridos" });
+
+    const r = await query(
+      `
+      INSERT INTO public.partidas_presupuesto (id_usuario, partida_clave, monto, ejercicio)
+      VALUES ($1, $2, $3, EXTRACT(YEAR FROM now()))
+      ON CONFLICT (id_usuario, partida_clave, ejercicio)
+      DO NOTHING
+      RETURNING id_usuario, partida_clave AS clave, monto;
+      `,
+      [userId, clave, Number(monto.toFixed(2))]
+    );
+
+    // ✅ si ya existía (bloqueo de edición en el año)
+    if (r.rowCount === 0) {
+      return res.status(409).json({
+        error:
+          "Esta partida ya fue capturada en el ejercicio actual y no puede modificarse.",
+      });
     }
 
-    const sql = `
-      UPDATE public.partidas
-      SET clave = $1,
-          partida = $2
-      WHERE id = $3
-      RETURNING id, clave, partida
-    `;
-    const r = await query(sql, [clave, partida, id]);
-    if (r.rowCount === 0) return res.status(404).json({ error: "No encontrada" });
     return res.json(r.rows[0]);
   } catch (e) {
-    console.error("[PARTIDAS][PUT] Error:", e);
-    return res.status(500).json({ error: "Error al actualizar partida" });
-  }
-});
-
-// DELETE /api/catalogos/partidas/:id
-router.delete("/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id) || id <= 0) {
-      return res.status(400).json({ error: "id inválido" });
-    }
-
-    const sql = `
-      DELETE FROM public.partidas
-      WHERE id = $1
-      RETURNING id
-    `;
-    const r = await query(sql, [id]);
-    if (r.rowCount === 0) return res.status(404).json({ error: "No encontrada" });
-
-    return res.json({ ok: true });
-  } catch (e) {
-    console.error("[PARTIDAS][DEL] Error:", e);
-    return res.status(500).json({ error: "Error al eliminar partida" });
+    console.error("[PARTIDAS][POST monto] Error:", e);
+    return res.status(500).json({ error: "Error al guardar monto" });
   }
 });
 

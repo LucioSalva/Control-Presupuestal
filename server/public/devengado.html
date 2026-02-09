@@ -34,8 +34,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
   <!-- Tus CSS -->
-  <link rel="stylesheet" href="css/devengado.css">
-  <link rel="stylesheet" href="css/nabvar.css">
+  <link rel="stylesheet" href="/css/devengado.css">
+  <link rel="stylesheet" href="/css/nabvar.css">
 
   <style>
     .alerta-cancelado {
@@ -84,7 +84,7 @@
       </a>
 
       <div class="logo-container">
-        <img src="/public/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="navbar-logo">
+        <img src="/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="navbar-logo">
       </div>
 
       <div class="ms-auto d-flex gap-2 align-items-center">
@@ -121,8 +121,8 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="index.html">
-            <i class="bi bi-house me-1"></i>Presupuesto
+          <a class="nav-link" href="partidas.html">
+            <i class="bi bi-list-check me-1"></i>Partidas
           </a>
         </li>
       </ul>
@@ -162,77 +162,76 @@
   </div>
 
   <!-- BUSCAR COMPROMETIDO + RESUMEN + PARCIALIDADES -->
-<div class="container mt-2 mb-3 no-print">
-  <div class="card shadow-sm">
-    <div class="card-body py-2">
-      <div class="d-flex flex-wrap gap-2 align-items-end justify-content-between">
-        <div style="min-width: 320px;">
-          <label class="form-label small mb-1">No. Comprometido</label>
-          <div class="input-group input-group-sm">
-            <input id="txtNoComprometido" type="text" class="form-control"
-              placeholder="Ej. ECA-02-CP-0001">
-            <button id="btnBuscarComprometido" class="btn btn-primary">
-              <i class="bi bi-search me-1"></i>Buscar
+  <div class="container mt-2 mb-3 no-print">
+    <div class="card shadow-sm">
+      <div class="card-body py-2">
+        <div class="d-flex flex-wrap gap-2 align-items-end justify-content-between">
+          <div style="min-width: 320px;">
+            <label class="form-label small mb-1">No. Comprometido</label>
+            <div class="input-group input-group-sm">
+              <input id="txtNoComprometido" type="text" class="form-control" placeholder="Ej. ECA-02-CP-0001">
+              <button id="btnBuscarComprometido" class="btn btn-primary">
+                <i class="bi bi-search me-1"></i>Buscar
+              </button>
+            </div>
+            <div class="small text-muted mt-1">
+              Escribe el folio del Comprometido y carga su saldo/parcialidades.
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap gap-3">
+            <div class="text-end">
+              <div class="small text-muted">Comprometido</div>
+              <div class="fw-bold" id="lblTotalComprometido">$0.00</div>
+            </div>
+            <div class="text-end">
+              <div class="small text-muted">Devengado acumulado</div>
+              <div class="fw-bold" id="lblDevAcum">$0.00</div>
+            </div>
+            <div class="text-end">
+              <div class="small text-muted">Saldo</div>
+              <div class="fw-bold" id="lblSaldo">$0.00</div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button id="btnNuevoDevengado" class="btn btn-outline-success btn-sm" disabled>
+              <i class="bi bi-plus-circle me-1"></i>Nuevo devengado (parcialidad)
             </button>
           </div>
-          <div class="small text-muted mt-1">
-            Escribe el folio del Comprometido y carga su saldo/parcialidades.
-          </div>
         </div>
 
-        <div class="d-flex flex-wrap gap-3">
-          <div class="text-end">
-            <div class="small text-muted">Comprometido</div>
-            <div class="fw-bold" id="lblTotalComprometido">$0.00</div>
-          </div>
-          <div class="text-end">
-            <div class="small text-muted">Devengado acumulado</div>
-            <div class="fw-bold" id="lblDevAcum">$0.00</div>
-          </div>
-          <div class="text-end">
-            <div class="small text-muted">Saldo</div>
-            <div class="fw-bold" id="lblSaldo">$0.00</div>
-          </div>
+        <hr class="my-2">
+
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0">
+            <thead>
+              <tr>
+                <th style="width: 22%;">No. Devengado</th>
+                <th style="width: 18%;">Fecha</th>
+                <th style="width: 20%;" class="text-end">Total</th>
+                <th style="width: 20%;">Estatus</th>
+                <th style="width: 20%;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyParcialidades">
+              <tr>
+                <td colspan="5" class="text-center small text-muted">Sin parcialidades cargadas</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <div class="d-flex gap-2">
-          <button id="btnNuevoDevengado" class="btn btn-outline-success btn-sm" disabled>
-            <i class="bi bi-plus-circle me-1"></i>Nuevo devengado (parcialidad)
-          </button>
-        </div>
       </div>
-
-      <hr class="my-2">
-
-      <div class="table-responsive">
-        <table class="table table-sm table-bordered mb-0">
-          <thead>
-            <tr>
-              <th style="width: 22%;">No. Devengado</th>
-              <th style="width: 18%;">Fecha</th>
-              <th style="width: 20%;" class="text-end">Total</th>
-              <th style="width: 20%;">Estatus</th>
-              <th style="width: 20%;">Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tbodyParcialidades">
-            <tr>
-              <td colspan="5" class="text-center small text-muted">Sin parcialidades cargadas</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
     </div>
   </div>
-</div>
 
 
   <!-- CONTENEDOR FORMATO -->
   <div class="form-container">
     <div class="row mb-3">
       <div class="col-3 text-center">
-        <img src="/public/img/ayuntamiento-de-ecatepec.webp" alt="" style="max-height: 70px;">
+        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="" style="max-height: 70px;">
       </div>
       <div class="col-6">
         <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
@@ -593,14 +592,14 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js"></script>
+  <script src="/js/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-  <script src="js/session-guard.js"></script>
-  <script type="module" src="js/devengado.js"></script>
+  <script src="/js/session-guard.js"></script>
+  <script type="module" src="/js/devengado.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="js/user-info.js"></script>
+  <script src="/js/user-info.js"></script>
 
 </body>
 

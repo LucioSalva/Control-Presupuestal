@@ -20,6 +20,7 @@ import comprometidoRouter from "./routes/comprometido.routes.js";
 import devengadoRouter from "./routes/devengado.routes.js";
 import metasRouter from "./routes/metas.routes.js";
 import partidasRouter from "./routes/partidas.routes.js";
+import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
 
 
 dotenv.config();
@@ -39,20 +40,26 @@ app.set("trust proxy", 1);
 // =====================================================
 
 // 1) Helmet: headers de seguridad
+const isProd = process.env.NODE_ENV === "production";
+
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      useDefaults: true,
-      directives: {
-        "default-src": ["'self'"],
-        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        "style-src": ["'self'", "'unsafe-inline'"],
-        "img-src": ["'self'", "data:"],
-        "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000", "http://127.0.0.1:5502", "http://189.240.17.125:3000/"],
-      },
-    },
+    contentSecurityPolicy: isProd
+      ? {
+          useDefaults: true,
+          directives: {
+            "default-src": ["'self'"],
+            "script-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'", "'unsafe-eval'"],
+            "style-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
+            "img-src": ["'self'", "data:", "https:"],
+            "font-src": ["'self'", "https://cdn.jsdelivr.net", "data:"],
+            "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000"],
+          },
+        }
+      : false, // ✅ LOCAL: deja cargar CDNs y todo
   })
 );
+
 
 // 2) Body size limit: evita payloads enormes
 app.use(express.json({ limit: "1mb" }));
@@ -197,9 +204,6 @@ function requireGodOrAdmin(req, res, next) {
   next();
 }
 
-/**
- * ✅ Bloquea escritura en catálogo PARTIDAS
- */
 function blockPartidasWrite(req, res, next) {
   const method = String(req.method || "").toUpperCase();
   const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
@@ -229,9 +233,9 @@ app.use("/api/devengado", authRequired, devengadoRouter);
 
 app.use("/api", presupuestoRouter);
 
-app.use("/api/catalogos", authRequired, catalogosRoutes);
-app.use("/api/catalogos/metas", authRequired, metasRouter);
 app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite, partidasRouter);
+app.use("/api/catalogos/metas", authRequired, metasRouter);
+app.use("/api/catalogos", authRequired, catalogosRoutes);
 
 
 // =====================================================
@@ -252,7 +256,18 @@ app.use((req, res) => {
 // =====================================================
 //  ARRANQUE
 // =====================================================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("API escuchando en http://localhost:" + PORT);
-});
+(async () => {
+  try {
+    if (process.env.SEED === "true") {
+      await seedPartidasPermitidas();
+    }
+  } catch (e) {
+    console.error("[SEED] Error:", e);
+  }
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log("API escuchando en http://localhost:" + PORT);
+  });
+})();
+
