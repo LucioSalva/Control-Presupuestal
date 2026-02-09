@@ -39,13 +39,9 @@ app.set("trust proxy", 1);
 //  MIDDLEWARE BASE (SEGURIDAD)
 // =====================================================
 
-<<<<<<< HEAD
+
 // 1) Helmet: headers de seguridad
 const isProd = process.env.NODE_ENV === "production";
-
-=======
-// 1 Helmet: headers de seguridad
->>>>>>> 77915ff937457f1834fca392cfee5bcf87a8b201
 app.use(
   helmet({
     contentSecurityPolicy: isProd
@@ -212,6 +208,8 @@ function blockPartidasWrite(req, res, next) {
   const method = String(req.method || "").toUpperCase();
   const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
   if (!isWrite) return next();
+
+  if (req.path === "/monto") return next();
 
   if (!isGodOrAdmin(req)) {
     return res.status(403).json({

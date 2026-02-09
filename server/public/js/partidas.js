@@ -54,6 +54,16 @@
     return data;
   }
 
+  function moneyFormatMX(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "$0.00";
+  return x.toLocaleString("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: 2,
+  });
+}
+
   function money2(n) {
     const x = Number(n);
     if (!Number.isFinite(x)) return "0.00";
@@ -129,15 +139,18 @@
               <td><span class="badge text-bg-dark">${clave}</span></td>
               <td>${desc}</td>
               <td class="text-end">
-                <input
-                  class="form-control text-end js-monto"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value="${money2(monto)}"
-                  ${r.capturada ? "disabled" : ""}
-                />
-              </td>
+  <input
+    class="form-control text-end js-monto"
+    type="number"
+    step="0.01"
+    min="0"
+    value="${money2(monto)}"
+    ${r.capturada ? "disabled" : ""}
+  />
+  <small class="text-muted">
+    ${moneyFormatMX(monto)}
+  </small>
+</td>
               <td class="text-end">
                 <button class="btn btn-outline-primary btn-sm js-save-row" title="Guardar fila">
                   <i class="bi bi-save"></i>
