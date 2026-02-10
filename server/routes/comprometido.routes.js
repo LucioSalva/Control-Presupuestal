@@ -30,10 +30,6 @@ function getMonthCode(dateStr) {
   return String(now.getMonth() + 1).padStart(2, "0");
 }
 
-// =====================================================
-// POST /api/comprometido
-// Crea cabecera + detalle (1 comprometido por suficiencia)
-// =====================================================
 router.post("/", async (req, res) => {
   const client = await getClient();
   try {
@@ -87,9 +83,6 @@ router.post("/", async (req, res) => {
     const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
     const noComprometido = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
 
-    // 1) INSERT CABECERA
-    // Nota: si tu tabla ya tiene estatus/fecha_cierre/monto_liberado,
-    // se recomienda iniciar estatus='ABIERTO' desde DB o por defecto.
     const sqlHead = `
       INSERT INTO comprometidos (
         id_suficiencia,
@@ -161,7 +154,6 @@ router.post("/", async (req, res) => {
     const rHead = await client.query(sqlHead, headParams);
     const idComp = Number(rHead.rows[0].id);
 
-    // 2) INSERT DETALLE
     const detalle = Array.isArray(b.detalle) ? b.detalle : [];
     if (detalle.length > 0) {
       const values = [];
@@ -231,7 +223,6 @@ router.get("/buscar", async (req, res) => {
 
     if (!r.rowCount) return res.status(404).json({ error: "Comprometido no encontrado" });
 
-    // Traer detalle
     const rDet = await query(
       `
       SELECT renglon, clave, concepto_partida, justificacion, descripcion, importe
@@ -253,10 +244,6 @@ router.get("/buscar", async (req, res) => {
   }
 });
 
-// =====================================================
-// GET /api/comprometido/por-suficiencia/:id
-// (lo dejé igual)
-// =====================================================
 router.get("/por-suficiencia/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -305,10 +292,6 @@ router.get("/por-suficiencia/:id", async (req, res) => {
   }
 });
 
-// =====================================================
-// GET /api/comprometido/:id/resumen
-// Tablero: total, devengado, saldo, estatus
-// =====================================================
 router.get("/:id/resumen", async (req, res) => {
   const idComp = Number(req.params.id || 0);
   if (!Number.isFinite(idComp) || idComp <= 0) {
@@ -368,10 +351,6 @@ router.get("/:id/resumen", async (req, res) => {
   }
 });
 
-// =====================================================
-// POST /api/comprometido/:id/cerrar
-// Cierra comprometido y libera sobrante (solo al cerrar)
-// =====================================================
 router.post("/:id/cerrar", async (req, res) => {
   const client = await getClient();
   try {
@@ -382,7 +361,6 @@ router.post("/:id/cerrar", async (req, res) => {
 
     await client.query("BEGIN");
 
-    // 1) Bloquear comprometido
     const rComp = await client.query(
       `
       SELECT
@@ -412,7 +390,6 @@ router.post("/:id/cerrar", async (req, res) => {
 
     const totalComp = toNumOrZero(comp.total);
 
-    // 2) Sumar devengados activos
     const rSum = await client.query(
       `
       SELECT COALESCE(SUM(total), 0) AS dev_acum
@@ -436,11 +413,6 @@ router.post("/:id/cerrar", async (req, res) => {
       });
     }
 
-    // 3) Cerrar y guardar liberación
-    // Nota: esto requiere columnas:
-    // - estatus
-    // - fecha_cierre
-    // - monto_liberado
     await client.query(
       `
       UPDATE comprometidos
@@ -452,13 +424,6 @@ router.post("/:id/cerrar", async (req, res) => {
       `,
       [idComp, saldo]
     );
-
-    // ✅ Aquí es donde "regresa a la partida"
-    // Como no me pasaste tabla/campo de "disponible" por partida,
-    // lo dejamos registrado en comprometidos.monto_liberado.
-    // Luego en reportes se suma como liberación.
-    // Si tú tienes una tabla tipo "presupuesto_partidas" con "disponible",
-    // aquí metemos el UPDATE exacto en el siguiente paso.
 
     await client.query("COMMIT");
 

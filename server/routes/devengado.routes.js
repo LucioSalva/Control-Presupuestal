@@ -1,11 +1,10 @@
-// server/routes/devengado.routes.js
 import express from "express";
 import { getClient } from "../db.js";
 
 const router = express.Router();
 
 // ---------------------------
-// Helpers (blindaje contra "" en numeric)
+// Helpers 
 // ---------------------------
 function toNullIfEmpty(v) {
   const s = String(v ?? "").trim();
@@ -34,10 +33,6 @@ function monthCode(dateStr) {
   return String(now.getMonth() + 1).padStart(2, "0");
 }
 
-// =====================================================
-// GET /api/devengado/por-comprometido/:id
-// Lista parcialidades (devengados) de ese comprometido
-// =====================================================
 router.get("/por-comprometido/:id", async (req, res) => {
   const client = await getClient();
   try {
@@ -65,25 +60,16 @@ router.get("/por-comprometido/:id", async (req, res) => {
   }
 });
 
-// =====================================================
-// POST /api/devengado
-// Crea UN devengado (parcialidad) ligado a un comprometido
-// - devengados (cabecera)
-// - devengado_detalle (detalle)
-// =====================================================
 router.post("/", async (req, res) => {
   const client = await getClient();
 
   try {
     const b = req.body || {};
 
-    // ✅ ID suficiencia (en tu flujo, es el que SIEMPRE tienes)
     const idSuf = Number(b.id_suficiencia ?? b.id ?? 0);
     if (!Number.isFinite(idSuf) || idSuf <= 0) {
       return res.status(400).json({ error: "Falta id_suficiencia válido" });
     }
-
-    // ✅ id_comprometido: si no viene, lo resolvemos por id_suficiencia
     let idComp = Number(b.id_comprometido ?? 0);
     if (!Number.isFinite(idComp) || idComp <= 0) {
       const rFind = await client.query(
@@ -107,7 +93,6 @@ router.post("/", async (req, res) => {
       idComp = Number(rFind.rows[0].id);
     }
 
-    // ✅ Folio: ECA-<mes>-DV-0001 (global por mes)
     const fechaBase =
       toNullIfEmpty(b.fecha_devengado ?? b.fecha) ||
       new Date().toISOString().slice(0, 10);
@@ -115,7 +100,6 @@ router.post("/", async (req, res) => {
     const mes = monthCode(fechaBase);
     const prefijo = `ECA-${mes}-DV-`;
 
-    // ✅ total de este devengado (parcialidad)
     const totalDev = toNumOrZero(b.total ?? b.monto_devengado);
     if (!(totalDev > 0)) {
       return res.status(400).json({ error: "El total del devengado debe ser mayor a 0" });
@@ -123,10 +107,6 @@ router.post("/", async (req, res) => {
 
     await client.query("BEGIN");
 
-    // -----------------------------------------
-    // 1) Bloqueo para saldo: bloquea el comprometido
-    //    (evita que 2 usuarios devenguen el mismo saldo)
-    // -----------------------------------------
     const rComp = await client.query(
       `
       SELECT
@@ -167,7 +147,6 @@ router.post("/", async (req, res) => {
 
     const comp = rComp.rows[0];
 
-    // ✅ Seguridad: que el comprometido corresponda a la misma suficiencia
     if (Number(comp.id_suficiencia) !== Number(idSuf)) {
       await client.query("ROLLBACK");
       return res.status(400).json({
@@ -176,7 +155,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // ✅ No permitir si está cerrado
     if (String(comp.estatus || "").toUpperCase() === "CERRADO") {
       await client.query("ROLLBACK");
       return res.status(400).json({
@@ -184,10 +162,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // -----------------------------------------
-    // 2) Validación correcta: NO exceder saldo del comprometido
-    //    (solo suma devengados ACTIVO)
-    // -----------------------------------------
     const totalComp = toNumOrZero(comp.total);
 
     const rSum = await client.query(
@@ -213,10 +187,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // -----------------------------------------
-    // 3) Folio consecutivo (bloqueo SOLO para generar folio)
-    //    Si prefieres, se puede optimizar con una secuencia.
-    // -----------------------------------------
     await client.query("LOCK TABLE devengados IN EXCLUSIVE MODE");
 
     const rConsec = await client.query(
@@ -232,7 +202,6 @@ router.post("/", async (req, res) => {
     const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
     const noDevengado = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
 
-    // ✅ Inserta CABECERA
     const sqlHead = `
       INSERT INTO devengados (
         id_comprometido,
@@ -296,7 +265,6 @@ router.post("/", async (req, res) => {
 
       comp.impuesto_tipo ?? "NONE", // $16
 
-      // ✅ blindaje numeric
       toNumOrNull(b.isr_tasa ?? comp.isr_tasa), // $17
       toNumOrNull(b.ieps_tasa ?? comp.ieps_tasa), // $18
 
@@ -312,7 +280,6 @@ router.post("/", async (req, res) => {
     const rHead = await client.query(sqlHead, headParams);
     const idDev = Number(rHead.rows[0].id);
 
-    // ✅ Inserta DETALLE (importe editable)
     const detalle = Array.isArray(b.detalle) ? b.detalle : [];
     if (detalle.length) {
       const values = [];
@@ -374,10 +341,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// =====================================================
-// PATCH /api/devengado/:id/cancelar
-// Cancela un devengado (no borra)
-// =====================================================
 router.patch("/:id/cancelar", async (req, res) => {
   const client = await getClient();
   try {
@@ -388,7 +351,6 @@ router.patch("/:id/cancelar", async (req, res) => {
 
     await client.query("BEGIN");
 
-    // Traer el devengado y bloquearlo
     const r = await client.query(
       `
       SELECT id, id_comprometido, COALESCE(estatus,'ACTIVO') AS estatus
@@ -410,7 +372,6 @@ router.patch("/:id/cancelar", async (req, res) => {
       return res.json({ ok: true, already: true, id: idDev });
     }
 
-    // (Opcional) bloquear comprometido por consistencia
     await client.query(
       `
       SELECT id

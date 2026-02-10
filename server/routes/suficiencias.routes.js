@@ -21,7 +21,7 @@ function pad6(v) {
 }
 
 /* =====================================================
-   GET /api/suficiencias/next-folio
+  GET /api/suficiencias/next-folio
    ===================================================== */
 router.get("/next-folio", async (req, res) => {
   try {
@@ -36,7 +36,7 @@ router.get("/next-folio", async (req, res) => {
 });
 
 /* =====================================================
-   ✅ POST /api/suficiencias  (CABECERA + DETALLE)
+  POST /api/suficiencias  (CABECERA + DETALLE)
    ===================================================== */
 router.post("/", async (req, res) => {
   const client = await getClient();
@@ -52,7 +52,6 @@ router.post("/", async (req, res) => {
     const tipo = "SP";
     const prefijo = `ECA-${mes}-${tipo}-`;
 
-    // ✅ alineación: "departamento" en DB viene del front "dependencia_aux"
     const departamento = b.departamento ?? b.dependencia_aux ?? null;
 
     await client.query("BEGIN");
@@ -72,7 +71,7 @@ router.post("/", async (req, res) => {
     const noSuficiencia = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
 
     // ================================
-    // 1️⃣ INSERT CABECERA
+    // INSERT CABECERA
     // ================================
     const sqlHead = `
   INSERT INTO suficiencias (
@@ -142,7 +141,7 @@ router.post("/", async (req, res) => {
     const idSuf = rHead.rows[0].id;
 
     // ================================
-    // 2️⃣ INSERT DETALLE
+    // INSERT DETALLE
     // ================================
     if (Array.isArray(b.detalle) && b.detalle.length > 0) {
       const values = [];
@@ -243,8 +242,6 @@ router.get("/buscar", async (req, res) => {
     });
   }
 });
-
-
 
 router.get("/:id", async (req, res) => {
   try {
