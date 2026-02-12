@@ -1,7 +1,9 @@
-.logo-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+main .logo-container,
+#contenido .logo-container,
+.partidas-page .logo-container{
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
 #page {

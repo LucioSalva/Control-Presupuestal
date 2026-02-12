@@ -1,14 +1,32 @@
-/* =========================
-   BASE
-   ========================= */
-body {
-  font-size: 12px;
-  background-color: #f5f5f5;
+/* ======================================================
+   🌐 BASE GLOBAL
+   ====================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-/* =========================
-   NAVBAR PRINCIPAL
-   ========================= */
+html {
+  font-size: 12px;
+}
+
+body {
+  margin: 0;
+  background-color: #f5f5f5;
+  padding-top: 100px; /* 2 navbars fijos */
+  font-size: 1rem;
+}
+
+img,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ======================================================
+   🧭 NAVBARS
+   ====================================================== */
 .navbar {
   background: #BC955C;
   position: fixed;
@@ -17,7 +35,6 @@ body {
   right: 0;
   min-height: 50px;
   z-index: 1030;
-  width: 100%;
 }
 
 .navbar-light {
@@ -31,32 +48,8 @@ body {
   border-bottom: 1px solid #dee2e6;
 }
 
-.navbar-light .nav-link {
-  color: #495057 !important;
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
-  margin: 0 0.25rem;
-}
-
-.navbar-light .nav-link.active {
-  background-color: #BC955C;
-  color: #ffffff !important;
-}
-
-.navbar-light .nav-link:hover {
-  background-color: #e9ecef;
-  color: #BC955C !important;
-}
-
-.navbar-light .nav-link.active:hover {
-  background-color: #5a1629;
-  color: #ffffff !important;
-}
-
-/* Logo central en navbar */
 .navbar-logo {
   height: 40px;
-  max-width: 100%;
   object-fit: contain;
 }
 
@@ -65,441 +58,213 @@ body {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  z-index: 1;
 }
 
-.navbar .container-fluid {
-  position: relative;
-  min-height: 50px;
-}
-
-/* =========================
-   BUSCADOR EN NAVBAR
-   ========================= */
+/* ======================================================
+   🔍 SEARCH NAV
+   ====================================================== */
 .nav-search {
   position: relative;
   display: flex;
   align-items: center;
   width: 44px;
-  padding: 0.25rem 0.4rem;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 4px;
+  background: rgba(255,255,255,.1);
   border-radius: 999px;
+  transition: all .35s ease;
   overflow: hidden;
-  transition: width 0.35s ease, background 0.35s ease;
 }
 
 .nav-search:hover,
 .nav-search:focus-within {
-  width: 240px;
-  background: rgba(255, 255, 255, 0.18);
+  width: 220px;
 }
 
 .nav-search__btn {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border: none;
-  background: transparent;
-  color: #ffffff;
-  padding: 0;
-  transform: translate(-50%, -50%);
-  transition: left 0.35s ease, transform 0.35s ease;
-}
-
-.nav-search:hover .nav-search__btn,
-.nav-search:focus-within .nav-search__btn {
-  left: 0.6rem;
-  transform: translate(0, -50%);
+  background: none;
+  color: #fff;
 }
 
 .nav-search__input {
-  border: none;
-  box-shadow: none !important;
-  background: transparent !important;
-  color: #ffffff !important;
-  padding: 0;
   width: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
   opacity: 0;
-  pointer-events: none;
-  transition: width 0.35s ease, padding 0.35s ease, opacity 0.2s ease;
-  caret-color: #ffffff;
+  transition: all .35s ease;
 }
 
 .nav-search:hover .nav-search__input,
 .nav-search:focus-within .nav-search__input {
   width: 180px;
-  padding: 0 0.5rem 0 2.2rem;
   opacity: 1;
-  pointer-events: auto;
+  padding-left: 8px;
 }
 
-.nav-search__input::placeholder {
-  color: rgba(255, 255, 255, 0.7) !important;
-}
-
-/* =========================
-   FORMULARIO (SUFICIENCIA)
-   ========================= */
+/* ======================================================
+   📄 FORM CONTAINER
+   ====================================================== */
 .form-container {
-  max-width: 1000px;
-  margin: 20px auto;
-  background: #ffffff;
-  padding: 20px 30px;
-  border-radius: 6px;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+  width: min(1000px, calc(100% - 24px));
+  margin: 16px auto;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 0 6px rgba(0,0,0,.1);
 }
 
 .form-title {
   text-align: center;
   font-weight: 800;
   text-transform: uppercase;
-  font-size: 14px;
-  letter-spacing: 0.3px;
 }
 
 .sub-title {
   text-align: center;
-  font-size: 12px;
   font-weight: 600;
 }
 
-/* Tablas del formato */
-.table-bordered td,
-.table-bordered th {
-  border: 1px solid #000 !important;
-}
-
-.table-header {
-  background-color: #e9ecef;
-  font-weight: 800;
-  text-align: center;
-}
-
-/* ✅ Centrado vertical para todas las tablas */
-.table td,
-.table th {
-  vertical-align: middle !important;
-}
-
-/* =========================
-   INPUTS "COMO TEXTO"
-   ========================= */
-.form-container .as-text,
-.form-container .as-text:read-only,
-.form-container .ro,
-.form-container .ro:read-only {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
-  color: #000 !important;
-  opacity: 1 !important;
-  cursor: default !important;
-}
-
-.form-container .as-text:focus,
-.form-container .ro:focus {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-/* Texto institucional */
-.td-text {
-  font-weight: 800 !important;
-  letter-spacing: 0.25px;
-  line-height: 1.15 !important;
-}
-
-.form-container input.as-text,
-.form-container input.ro {
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-/* Centrado horizontal para texto */
-.form-container input.as-text:not(.text-end),
-.form-container input.ro:not(.text-end) {
-  text-align: center;
-}
-
-/* Para folio */
-.ro-folio {
-  font-size: 14px;
-  font-weight: 900 !important;
-  letter-spacing: 1px;
-}
-
-/* Bloqueo visual: no selección ni click */
-.input-no-click {
-  pointer-events: none !important;
-  user-select: none !important;
-}
-
-/* En date, quita el icono/calendario (Chrome/Edge) */
-input[type="date"].as-text::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  display: none;
-}
-input[type="date"].as-text::-webkit-inner-spin-button {
-  display: none;
-}
-
-/* =========================
-   CAMPOS EDITABLES
-   ========================= */
-.form-container input.form-control:not(.as-text):not(.ro),
-.form-container select.form-select:not(.as-text) {
-  border: 1px solid #b9b9b9;
-}
-
-.form-container input.form-control:not(.as-text):focus,
-.form-container select.form-select:not(.as-text):focus {
-  box-shadow: none;
-  border-color: #BC955C;
-}
-
-/* =========================
-   ✅ TABLA FORMATO (la que se rompía)
-   ========================= */
-.table.formato {
-  table-layout: fixed; /* estable */
+/* ======================================================
+   📊 TABLAS
+   ====================================================== */
+.table-wrap {
   width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table.formato {
+  width: 100%;
+  min-width: 860px;
+  table-layout: fixed;
 }
 
 .table.formato th,
 .table.formato td {
-  padding: 6px 8px;
+  vertical-align: middle !important;
+  padding: 12px !important;
+  line-height: 1.25;
 }
 
-/* ✅ IMPORTANTÍSIMO: evita letra-por-letra */
 .table.formato th {
+  background: #e9ecef;
+  font-weight: 800;
   white-space: normal;
-  word-break: keep-all;     /* NO rompe palabras en letras */
-  overflow-wrap: normal;    /* NO uses 'anywhere' */
-  hyphens: none;
+  word-break: keep-all;
 }
 
-/* ✅ selects e inputs full */
-.table.formato select,
-.table.formato input {
+.table.formato input,
+.table.formato select {
   width: 100%;
+  min-width: 0;
 }
 
-/* =========================
-   IMPRESIÓN
-   ========================= */
-@media print {
-  body { background-color: #ffffff; }
-  .no-print { display: none !important; }
-
-  .form-container {
-    box-shadow: none;
-    border-radius: 0;
-    margin: 0;
-    width: 100%;
-    max-width: 100%;
-    padding: 0;
-  }
+/* ======================================================
+   🧷 ACTION BAR
+   ====================================================== */
+.cp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.08);
 }
 
-/* =========================
-   RESPONSIVE NAVBAR
-   ========================= */
-@media (max-width: 992px) {
-  body { padding-top: 140px; }
+.cp-actions .btn {
+  min-height: 42px;
+  padding: 10px 14px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+/* ======================================================
+   📱 MÓVILES 320–480
+   ====================================================== */
+@media (max-width: 480px) {
+  html { font-size: 11px; }
+  body { padding-top: 120px; }
 
   .logo-container {
     position: static;
     transform: none;
     text-align: center;
-    margin: 5px 0;
-    order: 3;
+  }
+
+  .nav-search,
+  .nav-search:hover {
     width: 100%;
   }
 
-  .navbar .container-fluid {
+  .cp-actions {
     flex-direction: column;
-    min-height: auto;
   }
 
-  .navbar-brand { order: 1; }
-  .nav-search { order: 2; margin: 5px 0; }
-  .ms-auto { order: 4; margin-left: 0 !important; margin-top: 5px; }
+  .cp-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
 
-  .navbar-light { top: 100px; }
-}
-/* =========================
-   ✅ FORMATO: que respire
-   ========================= */
-.table.formato th,
-.table.formato td {
-  padding: 12px 12px !important;   /* más aire */
-  line-height: 1.25 !important;    /* texto más legible */
+  .table.formato th,
+  .table.formato td {
+    padding: 10px !important;
+  }
 }
 
-/* Altura mínima por fila (evita que se vea comprimido) */
-.table.formato tr {
-  height: 62px;
-}
-
-/* Los headers largos se leen mejor */
-.table.formato th.table-header {
-  font-size: 12px;
-  letter-spacing: 0.2px;
-}
-
-/* Inputs/selects con altura uniforme */
-.table.formato .form-control,
-.table.formato .form-select {
-  min-height: 36px;
-}
-
-/* En el td grande, evita que el select se vea pegado al borde */
-.table.formato td {
-  padding-left: 14px !important;
-  padding-right: 14px !important;
-}
-
-
-/* =========================
-   FIX: NO usar flex dentro de TDs del formato
-   ========================= */
-.table.formato td .as-text,
-.table.formato td .ro {
-  display: block !important;
-  width: 100% !important;
-  height: auto !important;
-  padding: 0 !important;
-  margin: 0 !important;
-
-  /* por si heredó flex */
-  align-items: initial !important;
-  justify-content: initial !important;
-}
-
-/* Alineación “normal” en tabla */
-.table.formato th,
-.table.formato td {
-  vertical-align: middle !important;
-  padding: 12px 12px !important;
-}
-
-/* Columnas fijas (solo esto) */
-.table.formato {
-  table-layout: fixed;
-  width: 100%;
-}
-.table.formato col.c-lbl:nth-child(1){ width: 24%; }
-.table.formato col.c-val:nth-child(2){ width: 26%; }
-.table.formato col.c-lbl:nth-child(3){ width: 24%; }
-.table.formato col.c-val:nth-child(4){ width: 26%; }
-
-/* Select e inputs en ancho completo sin romper */
-.table.formato select,
-.table.formato input {
-  width: 100%;
-  min-width: 0;
-}
-
-
-/* =========================
-   ACTION BAR (BOTONES)
-   ========================= */
-
-.cp-actions{
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-
-  background: #ffffff;
-  border: 1px solid rgba(0,0,0,.08);
-  border-radius: 14px;
-  padding: 14px 14px;
-  box-shadow: 0 10px 26px rgba(0,0,0,.08);
-}
-
-.cp-actions__left,
-.cp-actions__right{
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-/* Botones: misma altura y look institucional */
-.cp-actions .btn{
-  border-radius: 12px !important;
-  padding: 10px 14px !important;
-  font-weight: 700;
-  letter-spacing: .2px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  transition: transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
-}
-
-/* Hover pro (sin exagerar) */
-.cp-actions .btn:hover{
-  transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(0,0,0,.12);
-}
-
-/* Ajuste fino colores (institucional) */
-.cp-actions .btn-success{
-  box-shadow: 0 10px 18px rgba(25,135,84,.18);
-}
-
-.cp-actions .btn-outline-primary{
-  border-width: 2px;
-}
-
-.cp-actions .btn-outline-danger{
-  border-width: 2px;
-}
-
-/* Botón secundario (instructivo) más serio */
-.cp-actions .btn-secondary{
-  background: #6c757d;
-  border-color: #6c757d;
-}
-.cp-actions .btn-secondary:hover{
-  background: #5c636a;
-  border-color: #5c636a;
-}
-
-/* =========================
-   PANEL BUSCAR integrado
-   ========================= */
-.cp-searchcard{
-  border-radius: 14px;
-  border: 1px solid rgba(0,0,0,.08);
-  overflow: hidden;
-}
-
-/* Nav pills más institucional */
-#buscarTabs .nav-link{
-  border-radius: 999px;
-  font-weight: 700;
-}
-#buscarTabs .nav-link.active{
-  background: #BC955C;
-}
-
-/* Responsive: apila bonito */
-@media (max-width: 992px){
-  .cp-actions{
+/* ======================================================
+   📱📟 TABLETS 600–768
+   ====================================================== */
+@media (min-width: 600px) and (max-width: 768px) {
+  body { padding-top: 120px; }
+  .cp-actions {
     justify-content: flex-start;
   }
-  .cp-actions__left,
-  .cp-actions__right{
+}
+
+/* ======================================================
+   💻 LAPTOPS 1024–1280
+   ====================================================== */
+@media (min-width: 1024px) and (max-width: 1280px) {
+  .form-container {
+    width: min(1050px, calc(100% - 48px));
+  }
+}
+
+/* ======================================================
+   🖥️ DESKTOP 1366+
+   ====================================================== */
+@media (min-width: 1366px) {
+  html { font-size: 13px; }
+
+  .form-container {
+    width: min(1200px, calc(100% - 64px));
+  }
+
+  .form-title {
+    font-size: 15px;
+  }
+}
+
+/* ======================================================
+   🖨️ PRINT
+   ====================================================== */
+@media print {
+  body {
+    padding-top: 0;
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .form-container {
+    box-shadow: none;
+    border-radius: 0;
     width: 100%;
+    padding: 0;
   }
 }

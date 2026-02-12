@@ -1,0 +1,83 @@
+:root {
+  --cp-gold: #bc955c;
+  --cp-gold-dark: #bc955c; /* mismo color, sin contraste */
+  --cp-text: #495057;
+}
+
+/* CONTENEDOR DE TABS */
+.cp-tabs-nav {
+  background: #ffffff !important;
+  border-bottom: 2px solid var(--cp-gold);
+  padding: 0;
+}
+
+/* UL */
+.cp-tabs-nav .navbar-nav.cp-tabs {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* LI */
+.cp-tabs-nav .nav-item {
+  margin: 0 !important;
+}
+
+/* TAB NORMAL */
+.cp-tabs-nav .nav-link {
+  border-radius: 0 !important;
+  background: #ffffff !important;
+  color: var(--cp-text) !important;
+
+  padding: 12px 20px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+
+  border: none !important;
+  border-right: 1px solid #e0e0e0 !important;
+
+  box-shadow: none !important;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+/* ÚLTIMA sin borde */
+.cp-tabs-nav .nav-item:last-child .nav-link {
+  border-right: none !important;
+}
+
+/* HOVER */
+.cp-tabs-nav .nav-link:hover {
+  background: #f5f5f5 !important;
+  color: var(--cp-gold) !important;
+}
+
+/* ✅ ACTIVA (LA BUENA) */
+.cp-tabs-nav .nav-link.active {
+  background: var(--cp-gold) !important;
+  color: #ffffff !important;
+
+  border-right: 1px solid var(--cp-gold) !important;
+  box-shadow: none !important;
+}
+
+/* ICONOS */
+.cp-tabs-nav .nav-link i {
+  font-size: 15px;
+}
+
+/* 📱 MÓVIL: scroll horizontal limpio */
+@media (max-width: 480px) {
+  .cp-tabs-nav .navbar-nav.cp-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .cp-tabs-nav .nav-link {
+    padding: 12px 16px !important;
+    font-size: 13px !important;
+  }
+}
