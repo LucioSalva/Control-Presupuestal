@@ -339,7 +339,7 @@
   }
 
   // ---------------------------
-  // ✅ Catálogo de partidas (solo capturadas)
+  // Catálogo de partidas (solo capturadas)
   // ---------------------------
   async function loadPartidasCatalog() {
     const data = await fetchJson(`${API}/api/catalogos/partidas`, {
@@ -407,7 +407,7 @@
 
         <td style="width: 20%;">
           <input type="text"
-            class="form-control form-control-sm ro"
+            class="form-control form-control-sm cp-readonly"
             name="r${i}_concepto"
             placeholder="Nombre de la Partida"
             readonly>

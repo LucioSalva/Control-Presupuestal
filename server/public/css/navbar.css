@@ -81,3 +81,47 @@
     font-size: 13px !important;
   }
 }
+
+/* ==========================
+   NAVBAR PRINCIPAL (ARRIBA)
+   ========================== */
+.cp-main-nav {
+  background: var(--cp-gold) !important;
+}
+
+.cp-main-nav .navbar-brand {
+  color: #000 !important; /* si lo quieres negro como en tu captura */
+  font-weight: 700;
+}
+
+.cp-main-nav #userInfo {
+  color: #fff !important; /* tu span text-white */
+}
+
+/* Contenedor del logo centrado */
+.cp-main-nav .logo-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Tamaño del logo para que NO se desborde */
+.cp-main-nav .cp-logo,
+.cp-main-nav .navbar-logo {
+  height: 46px;        /* ajusta si quieres 40/50 */
+  width: auto;
+  max-width: 260px;
+  object-fit: contain;
+  display: block;
+}
+
+/* En pantallas chicas baja un poco */
+@media (max-width: 768px) {
+  .cp-main-nav .cp-logo,
+  .cp-main-nav .navbar-logo {
+    height: 36px;
+    max-width: 180px;
+  }
+}

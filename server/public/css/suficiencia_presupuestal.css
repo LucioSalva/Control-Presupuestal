@@ -268,3 +268,31 @@ svg {
     padding: 0;
   }
 }
+
+.cp-readonly[readonly]{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+
+  font-weight: 800;              /* MÁS GRUESO */
+  font-size: 14px;               /* un poco más grande */
+  letter-spacing: 0.5px;         /* más elegante */
+  color: #000;
+
+  text-align: center;            /* CENTRADO */
+
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+
+  pointer-events: none;
+}
+
+/* Quita icono del date */
+.cp-readonly[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.cp-readonly[type="date"] {
+  appearance: none;
+}
