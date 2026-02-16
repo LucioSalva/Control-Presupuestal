@@ -2,7 +2,6 @@
   const MAX_ROWS = 20;
   const START_ROWS = 3;
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
-  const SUF_PDF_TEMPLATE_URL = "/public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
   const DEBUG_PDF_FIELDS = false;
 
   // ---------------------------
@@ -11,10 +10,10 @@
   const btnGuardar = document.getElementById("btn-guardar");
   const btnSi = document.getElementById("btn-si-seguro");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
-  const btnVerComprometido = document.getElementById("btn-ver-comprometido");
-  const btnVerDevengado = document.getElementById("btn-ver-devengado");
+ 
   const DG_DA_PROYECTOS_FILTERS = window.DG_DA_PROYECTOS_FILTERS || {};
   const DG_DA_FUENTES_FILTERS = window.DG_DA_FUENTES_FILTERS || {};
+
   const btnAddRow = document.getElementById("btn-add-row");
   const btnRemoveRow = document.getElementById("btn-remove-row");
   const detalleBody = document.getElementById("detalleBody");
@@ -23,24 +22,24 @@
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
   // ---------------------------
-  // BUSCADOR (MODAL)
+  // BUSCADOR
   // ---------------------------
   const btnAbrirBuscarSuf = document.getElementById("btnAbrirBuscarSuf");
   const modalBuscarEl = document.getElementById("modalBuscarSuf");
   const modalBuscar = modalBuscarEl ? new bootstrap.Modal(modalBuscarEl) : null;
-
   const txtNumeroSuf = document.getElementById("txtNumeroSuf");
   const btnBuscarNumero = document.getElementById("btnBuscarNumero");
 
   let lastSavedId = null;
 
-  let dgeneralInfo = null; // {id, clave, dependencia}
-  let dauxiliarInfo = null; // {id, clave, dependencia}
-  let proyectosById = {}; // { [id]: {id, clave, conac, descripcion} }
+  let dgeneralInfo = null;
+  let dauxiliarInfo = null;
+  let proyectosById = {};
 
   // ✅ Partidas (solo capturadas)
-  let partidasRows = []; // [{clave, partida(desc), monto, capturada}]
-  let partidasMap = {}; // { "5151": "DESCRIPCIÓN" }
+  let partidasRows = [];
+  let partidasMap = {};
+  let fuentesMap = {};
 
   // ---------------------------
   // AUTH
@@ -129,15 +128,9 @@
     });
   }
 
-  function uiSuccess(message, title = "Listo") {
-    return uiAlert(message, "success", title);
-  }
-  function uiError(message, title = "Error") {
-    return uiAlert(message, "error", title);
-  }
-  function uiWarn(message, title = "Atención") {
-    return uiAlert(message, "warning", title);
-  }
+  const uiSuccess = (m, t = "Listo") => uiAlert(m, "success", t);
+  const uiError = (m, t = "Error") => uiAlert(m, "error", t);
+  const uiWarn = (m, t = "Atención") => uiAlert(m, "warning", t);
 
   // ---------------------------
   // Folio buscador helpers
@@ -156,7 +149,6 @@
 
     if (/^\d{1,6}$/.test(raw)) {
       const num = raw.padStart(4, "0");
-
       const f = get("fecha");
       let year, month;
 
@@ -168,16 +160,15 @@
         year = String(d.getFullYear());
         month = String(d.getMonth() + 1).padStart(2, "0");
       }
-
       return `ECA-${year}-${month}-SP-${num}`;
     }
 
     const onlyDigits = raw.replace(/\D/g, "");
     if (onlyDigits && onlyDigits.length <= 6) {
       const num = onlyDigits.padStart(4, "0");
-
       const f = get("fecha");
       let year, month;
+
       if (f && /^\d{4}-\d{2}-\d{2}$/.test(f)) {
         year = f.slice(0, 4);
         month = f.slice(5, 7);
@@ -186,7 +177,6 @@
         year = String(d.getFullYear());
         month = String(d.getMonth() + 1).padStart(2, "0");
       }
-
       return `ECA-${year}-${month}-SP-${num}`;
     }
 
@@ -203,14 +193,13 @@
       return;
     }
 
-    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(folio)}`;
+    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(
+      folio,
+    )}`;
     const json = await fetchJson(url, { headers: { ...authHeaders() } });
     renderResultadosBusqueda(json?.data || []);
   }
 
-  // ===========================
-  // RESULTADOS BUSCADOR
-  // ===========================
   async function renderResultadosBusqueda(rows) {
     if (!rows || !rows.length) {
       await uiWarn("No encontrada (o no corresponde a tu área).");
@@ -270,25 +259,6 @@
       },
     });
   }
-  function renderFuentes(fuentes) {
-  const select = document.querySelector('select[name="fuente"]');
-  select.innerHTML = `<option value="">-- Selecciona --</option>`;
-
-  const allowedSet = getAllowedFuenteSet();
-
-  fuentes.forEach(f => {
-    const clave = String(f.clave);
-
-    if (allowedSet && !allowedSet.has(clave)) return;
-
-    const option = document.createElement("option");
-    option.value = clave;
-    option.textContent = `${f.clave} - ${f.descripcion}`;
-
-    select.appendChild(option);
-  });
-}
-
 
   // ---------------------------
   // Fecha automática (hoy) + readonly
@@ -327,7 +297,7 @@
   }
 
   // ---------------------------
-  // Folio
+  // Folio UI
   // ---------------------------
   function initFolioUI() {
     setVal("no_suficiencia", "");
@@ -347,7 +317,6 @@
     });
 
     const rows = Array.isArray(data?.rows) ? data.rows : [];
-
     partidasRows = rows.filter((r) => r && r.capturada === true);
 
     partidasMap = {};
@@ -359,7 +328,7 @@
   }
 
   // ---------------------------
-  // ✅ UI partidas select
+  // UI partidas select
   // ---------------------------
   function buildPartidasOptionsHtml(selectedClave = "") {
     const cur = String(selectedClave || "").trim();
@@ -396,7 +365,7 @@
     return `
       <tr data-row="${i}">
         <td style="width: 5%;">
-          <input type="text" class="form-control form-control-sm ro text-center" value="${i}" readonly>
+          <input type="text" class="form-control form-control-sm cp-readonly text-center" value="${i}" readonly>
         </td>
 
         <td style="width: 12%;">
@@ -422,9 +391,12 @@
         </td>
 
         <td style="width: 10%;">
-          <input type="number" step="0.01" min="0"
+          <input type="text"
             class="form-control form-control-sm text-end sp-importe"
-            name="r${i}_importe" value="0">
+            name="r${i}_importe"
+            value="$ 0.00"
+            inputmode="decimal"
+            autocomplete="off">
         </td>
       </tr>
     `;
@@ -440,6 +412,7 @@
     }
 
     detalleBody.insertAdjacentHTML("beforeend", rowTemplate(next));
+    attachMoneyInputs(detalleBody);
     refreshTotales();
   }
 
@@ -498,11 +471,11 @@
     for (let i = 1; i <= n; i++) {
       rows.push({
         renglon: i,
-        clave: get(`r${i}_clave`), // ✅ select
+        clave: get(`r${i}_clave`),
         concepto_partida: get(`r${i}_concepto`),
         justificacion: get(`r${i}_justificacion`),
         descripcion: get(`r${i}_descripcion`),
-        importe: safeNumber(get(`r${i}_importe`)),
+        importe: moneyParse(get(`r${i}_importe`)),
       });
     }
     return rows;
@@ -512,48 +485,66 @@
     return (detalle || []).reduce((acc, r) => acc + safeNumber(r?.importe), 0);
   }
 
-  function useIVA() {
-    return !!document.querySelector('[name="imp_iva"]')?.checked;
-  }
-  function useISR() {
-    return !!document.querySelector('[name="imp_isr"]')?.checked;
-  }
-  function useIEPS() {
-    return !!document.querySelector('[name="imp_ieps"]')?.checked;
-  }
-  function usePension() {
-    return !!document.querySelector('[name="imp_pension"]')?.checked;
+  // ✅ detecta check por name O id
+  function isCheckedAny(selector) {
+    return !!document.querySelector(selector)?.checked;
   }
 
+  function useIVA() {
+    return isCheckedAny('[name="imp_iva"], #imp_iva');
+  }
+  function useISR() {
+    return isCheckedAny('[name="imp_isr"], #imp_isr');
+  }
+  function useIEPS() {
+    return isCheckedAny('[name="imp_ieps"], #imp_ieps');
+  }
+  function usePension() {
+    return isCheckedAny('[name="imp_pension"], #imp_pension');
+  }
+
+  // ✅ percent robusto (acepta "10", "10%", "10.5", "10,5")
   function clampPercent(val) {
-    let n = Number(val);
+    const raw = String(val ?? "").replace(",", ".");
+    const clean = raw.replace(/[^0-9.]/g, "");
+    let n = Number(clean);
+
     if (!Number.isFinite(n)) n = 0;
     if (n < 0) n = 0;
     if (n > 100) n = 100;
     return n;
   }
 
-  function getPensionPercents() {
-    const out = [];
-    for (let k = 1; k <= 5; k++) {
-      const el = document.querySelector(`[name="pension${k}_tasa"]`);
-      if (!el) continue;
-      const v = clampPercent(el.value);
-      out.push({ k, percent: v, rate: v / 100 });
+  // ✅ lee tasa por name o id, y si NO existe, avisa en consola
+  function getRateValue(selectors, debugLabel) {
+    const el = document.querySelector(selectors);
+    if (!el) {
+      // Si ISR/IEPS no salen, es porque tu HTML no tiene estos inputs.
+      console.warn(`[SP] Falta input de tasa: ${debugLabel} (${selectors})`);
+      return 0;
     }
-    return out;
+    return clampPercent(el.value || 0) / 100;
   }
 
   function getIsrRate() {
-    const el = document.querySelector('[name="isr_tasa"]');
-    const val = clampPercent(el?.value || 0);
-    return val / 100;
+    return getRateValue('[name="isr_tasa"], #isr_tasa', "ISR");
   }
 
   function getIepsRate() {
-    const el = document.querySelector('[name="ieps_tasa"]');
-    const val = clampPercent(el?.value || 0);
-    return val / 100;
+    return getRateValue('[name="ieps_tasa"], #ieps_tasa', "IEPS");
+  }
+
+  function getPensionPercents() {
+    const inputs = Array.from(
+      document.querySelectorAll('[name^="pension"][name$="_tasa"]'),
+    ).slice(0, 5);
+
+    return inputs
+      .map((el, idx) => {
+        const v = clampPercent(el.value);
+        return { k: idx + 1, percent: v, rate: v / 100 };
+      })
+      .filter((p) => p.percent > 0);
   }
 
   function getImpuestoTipo() {
@@ -585,17 +576,51 @@
 
     const total = subtotal + iva + isr + ieps - pension_total;
 
-    setVal("subtotal", subtotal.toFixed(2));
-    setVal("iva", iva.toFixed(2));
-    setVal("isr", isr.toFixed(2));
-    setVal("ieps", ieps.toFixed(2));
-    setVal("pension_total", pension_total.toFixed(2));
-    setVal("total", total.toFixed(2));
-    setVal("cantidad_pago", total.toFixed(2));
+    setVal("subtotal", moneyFormat(subtotal));
+    setVal("iva", moneyFormat(iva));
+    setVal("isr", moneyFormat(isr));
+    setVal("ieps", moneyFormat(ieps));
+    setVal("pension_total", moneyFormat(pension_total));
+    setVal("total", moneyFormat(total));
+    setVal("cantidad_pago", moneyFormat(total));
     setVal("cantidad_con_letra", numeroALetrasMX(total));
+    formatMoneyFields();
   }
 
-  // ✅ Cuando el usuario cambie la partida (select), llena concepto
+  async function askPercentSwal(title, defaultValue = 10) {
+    if (!hasSwal()) {
+      const v = prompt(`${title} (0 a 100)`, String(defaultValue));
+      return clampPercent(v);
+    }
+
+    const { value } = await Swal.fire({
+      title,
+      input: "text",
+      inputValue: String(defaultValue),
+      inputPlaceholder: "Ej. 10",
+      showCancelButton: true,
+      confirmButtonText: "Aceptar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#BC955C",
+      inputValidator: (val) => {
+        const n = clampPercent(val);
+        if (!Number.isFinite(n) || n <= 0)
+          return "Escribe un porcentaje válido (1 a 100).";
+        return null;
+      },
+    });
+
+    if (value == null) return null; // canceló
+    return clampPercent(value);
+  }
+
+  function setRateValue(selectors, percent) {
+    const el = document.querySelector(selectors);
+    if (!el) return;
+    el.value = String(percent);
+  }
+
+  // Cuando cambie la partida (select), llena concepto
   document.addEventListener("change", (e) => {
     if (!e.target || !e.target.classList.contains("sp-clave")) return;
 
@@ -612,11 +637,10 @@
     e.target.classList.toggle("is-valid", !!concepto);
     e.target.classList.toggle("is-invalid", !concepto);
 
-    // por si quieres recalcular algo dependiente
     refreshTotales();
   });
 
-  // ✅ Cuando cambie importe recalcula
+  // Cuando cambie importe recalcula (ya traes formateo y blur)
   document.addEventListener("input", (e) => {
     if (e.target && e.target.classList.contains("sp-importe")) {
       refreshTotales();
@@ -771,7 +795,6 @@
     setVal("dependencia", depGenNombre);
     setVal("dependencia_aux", depAuxNombre);
 
-    // ✅ AUTOLLENAR FIRMA DIRECCIÓN SOLICITANTE DESDE DGENERAL
     const inputDireccionFirma = document.querySelector(
       '[name="firma_direccion_solicitante"]',
     );
@@ -858,13 +881,41 @@
       headers: { ...authHeaders() },
     });
 
+    const rows = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.rows)
+        ? data.rows
+        : [];
+
+    fuentesMap = {};
+    rows.forEach((x) => {
+      const id = String(x.id ?? "").trim();
+      if (!id) return;
+
+      const clave = String(x.clave ?? "").trim();
+      const fuente = String(x.fuente ?? "").trim();
+      fuentesMap[id] = { clave, fuente };
+    });
+
     setOptions(
       "fuente",
-      data,
+      rows,
       (x) => x.id,
       (x) =>
         `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`,
     );
+
+    // Mapa para PDF: id -> {clave, fuente}
+    window.fuentesMap = window.fuentesMap || {};
+    window.fuentesMap = {};
+    (data || []).forEach((x) => {
+      const id = String(x.id ?? "").trim();
+      if (!id) return;
+      window.fuentesMap[id] = {
+        clave: String(x.clave ?? "").trim(),
+        fuente: String(x.fuente ?? "").trim(),
+      };
+    });
   }
 
   function bindFuenteToHidden() {
@@ -911,9 +962,6 @@
   // =====================================================
   // CANDADOS DG/DA -> PROYECTOS permitidos
   // =====================================================
-  // 🚨 PEGA AQUÍ TU OBJETO DG_DA_PROYECTOS_FILTERS TAL CUAL LO TIENES
-  // const DG_DA_PROYECTOS_FILTERS = { ... };
-
   function _norm(v) {
     return String(v || "")
       .trim()
@@ -946,7 +994,6 @@
     const allowed = DG_DA_FUENTES_FILTERS[key];
 
     if (!allowed) return null;
-
     return new Set(allowed.map(String));
   }
 
@@ -959,7 +1006,6 @@
 
     const allowed = getAllowedProyectoSet(); // Set o null
 
-    // allowed === null => sin candado (no debería pasar ya, pero lo dejamos)
     const rows =
       allowed === null
         ? all
@@ -975,7 +1021,6 @@
     sel.innerHTML = `<option value="">-- Selecciona un proyecto --</option>`;
 
     if (!rows.length) {
-      // ✅ si no tiene permitido nada por DG/DA, lo mostramos
       const opt = document.createElement("option");
       opt.value = "";
       opt.textContent = "— Sin proyectos permitidos para tu DG/DA —";
@@ -1043,18 +1088,20 @@
     updateClaveProgramatica();
     syncMetaFromProyecto();
 
-    // --- Fuente ---
     if (data.id_fuente != null) {
       setVal("fuente", String(data.id_fuente));
       setVal("id_fuente", String(data.id_fuente));
     }
 
-    setVal("subtotal", safeNumber(data.subtotal).toFixed(2));
-    setVal("iva", safeNumber(data.iva).toFixed(2));
-    setVal("isr", safeNumber(data.isr).toFixed(2));
-    setVal("ieps", safeNumber(data.ieps).toFixed(2));
-    setVal("total", safeNumber(data.total).toFixed(2));
-    setVal("cantidad_pago", safeNumber(data.total).toFixed(2));
+    setVal("subtotal", moneyFormat(safeNumber(data.subtotal)));
+    setVal("iva", moneyFormat(safeNumber(data.iva)));
+    setVal("isr", moneyFormat(safeNumber(data.isr)));
+    setVal("ieps", moneyFormat(safeNumber(data.ieps)));
+    setVal("pension_total", moneyFormat(safeNumber(data.pension_total)));
+    setVal("total", moneyFormat(safeNumber(data.total)));
+    setVal("cantidad_pago", moneyFormat(safeNumber(data.total)));
+
+    formatMoneyFields();
     setVal("cantidad_con_letra", data.cantidad_con_letra || "");
 
     const detalle = Array.isArray(data.detalle) ? data.detalle : [];
@@ -1064,7 +1111,6 @@
         const i = idx + 1;
         detalleBody.insertAdjacentHTML("beforeend", rowTemplate(i));
 
-        // ✅ si la clave NO está en capturadas, la agregamos solo para visualizar
         const sel = document.querySelector(`[name="r${i}_clave"]`);
         const clave = String(row.clave || "").trim();
         if (sel) {
@@ -1084,26 +1130,17 @@
         );
         setVal(`r${i}_justificacion`, row.justificacion || "");
         setVal(`r${i}_descripcion`, row.descripcion || "");
-        setVal(`r${i}_importe`, safeNumber(row.importe));
+        setVal(`r${i}_importe`, moneyFormat(safeNumber(row.importe)));
       });
 
       if (!detalle.length) initRows();
     }
 
+    attachMoneyInputs(detalleBody);
     refreshTotales();
+    formatMoneyFields();
 
     lastSavedId = Number(data.id);
-
-    if (btnVerComprometido) {
-      btnVerComprometido.disabled = false;
-      btnVerComprometido.dataset.id = String(lastSavedId);
-      btnVerComprometido.classList.remove("disabled");
-    }
-    if (btnVerDevengado) {
-      btnVerDevengado.disabled = false;
-      btnVerDevengado.dataset.id = String(lastSavedId);
-      btnVerDevengado.classList.remove("disabled");
-    }
 
     modalBuscar?.hide?.();
     await uiSuccess("Suficiencia cargada correctamente.");
@@ -1127,7 +1164,7 @@
     const meta = get("meta") || null;
     const departamento = get("dependencia_aux") || null;
 
-    const subtotal = safeNumber(get("subtotal"));
+    const subtotal = moneyParse(get("subtotal"));
 
     const p1 = clampPercent(get("pension1_tasa")) / 100;
     const p2 = clampPercent(get("pension2_tasa")) / 100;
@@ -1161,16 +1198,16 @@
       isr_tasa: get("isr_tasa") || null,
       ieps_tasa: get("ieps_tasa") || null,
 
-      subtotal: safeNumber(get("subtotal")),
-      iva: safeNumber(get("iva")),
-      isr: safeNumber(get("isr")),
-      ieps: safeNumber(get("ieps")),
-      total: safeNumber(get("total")),
+      subtotal: moneyParse(get("subtotal")),
+      iva: moneyParse(get("iva")),
+      isr: moneyParse(get("isr")),
+      ieps: moneyParse(get("ieps")),
+      total: moneyParse(get("total")),
+      pension_total: moneyParse(get("pension_total")),
       cantidad_con_letra: get("cantidad_con_letra") || "",
 
       detalle: buildDetalle(),
 
-      pension_total: safeNumber(get("pension_total")),
       pension1_tasa: get("pension1_tasa") || null,
       pension2_tasa: get("pension2_tasa") || null,
       pension3_tasa: get("pension3_tasa") || null,
@@ -1215,26 +1252,155 @@
     else if (saved.folio_num != null)
       setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
 
-    if (btnVerComprometido) {
-      btnVerComprometido.disabled = false;
-      btnVerComprometido.dataset.id = String(lastSavedId);
-      btnVerComprometido.classList.remove("disabled");
-    }
-    if (btnVerDevengado) {
-      btnVerDevengado.disabled = false;
-      btnVerDevengado.dataset.id = String(lastSavedId);
-      btnVerDevengado.classList.remove("disabled");
-    }
+    
 
     await uiSuccess("Guardado correctamente.");
     return saved;
   }
 
+  // =====================================================
+  // EVENTOS DE IMPUESTOS / TASAS / PENSIONES
+  // =====================================================
+  function bindTaxEvents() {
+    const listen = (sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        el.addEventListener("change", refreshTotales);
+        el.addEventListener("input", refreshTotales);
+      });
+    };
+
+    // checkboxes
+    listen('[name="imp_iva"], #imp_iva');
+    listen('[name="imp_isr"], #imp_isr');
+    listen('[name="imp_ieps"], #imp_ieps');
+    listen('[name="imp_pension"], #imp_pension');
+
+    // tasas
+    listen('[name="isr_tasa"], #isr_tasa');
+    listen('[name="ieps_tasa"], #ieps_tasa');
+    listen('[name^="pension"][name$="_tasa"]');
+  }
+
+// ---------------------------
+  // PDF SUFICIENCIA (pdf-lib)
   // ---------------------------
-  // PDF SUFICIENCIA
-  // ---------------------------
-  // 🚨 PEGA AQUÍ TU FUNCIÓN generarPDF() TAL CUAL LA TIENES (SIN CAMBIOS)
-  // async function generarPDF() { ... }
+  async function fetchPdfTemplateBytesSuf() {
+    const r = await fetch(SUF_PDF_TEMPLATE_URL);
+    if (!r.ok) throw new Error(`No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`);
+    return await r.arrayBuffer();
+  }
+
+  async function debugListPdfFields() {
+    const bytes = await fetchPdfTemplateBytesSuf();
+    const pdfDoc = await PDFLib.PDFDocument.load(bytes);
+    const form = pdfDoc.getForm();
+    console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
+  }
+
+  async function generarPDF() {
+    refreshTotales();
+
+    if (!window.PDFLib?.PDFDocument) {
+      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
+    }
+
+    const fuenteSel = document.querySelector('[name="fuente"]');
+    const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+
+    const payload = {
+      fecha: get("fecha"),
+      dependencia: get("dependencia"),
+      fuente_texto: fuenteText,
+      mes_pago: get("mes_pago"),
+      subtotal: get("subtotal"),
+      iva: get("iva"),
+      isr: get("isr"),
+      ieps: get("ieps"),
+      total: get("total"),
+      cantidad_con_letra: get("cantidad_con_letra"),
+
+      meta: get("meta"),
+
+      clave_programatica: get("clave_programatica"),
+      detalle: buildDetalle(),
+      folio_oficial_suficiencia: get("no_suficiencia") || "",
+    };
+
+    const templateBytes = await fetchPdfTemplateBytesSuf();
+    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
+    const form = pdfDoc.getForm();
+
+    const setTextSafe = (fieldName, value) => {
+      try {
+        const f = form.getTextField(fieldName);
+        f.setText(String(value ?? ""));
+      } catch {}
+    };
+
+    const safeN = (x) => {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    function splitFechaParts(iso) {
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
+      const [y, m, d] = iso.split("-");
+      return { d, m, y };
+    }
+
+    setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
+    setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+    setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+
+    setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente_texto || ""));
+    setTextSafe("NOMBRE F.F", String(payload.fuente_texto || ""));
+
+    const { d, m, y } = splitFechaParts(payload.fecha);
+    setTextSafe("fechadia", d);
+    setTextSafe("fechames", m);
+    setTextSafe("fechayear", y);
+
+    const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
+    const totalTxt = safeN(payload.total).toFixed(2);
+    const meses = [
+      "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+      "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE",
+    ];
+    for (const mes of meses) {
+      setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
+    }
+
+    const detalle = payload.detalle || [];
+    setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
+    setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
+    setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
+    setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
+    setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
+    setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
+
+    setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
+    setTextSafe("IVA", safeN(payload.iva).toFixed(2));
+    setTextSafe("ISR", safeN(payload.isr).toFixed(2));
+    setTextSafe("IEPS", safeN(payload.ieps).toFixed(2));
+    setTextSafe("total", safeN(payload.total).toFixed(2));
+    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
+    setTextSafe("Meta", payload.meta || "");
+
+    form.flatten();
+
+    const outBytes = await pdfDoc.save();
+    const blob = new Blob([outBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+
+    const folio = (get("no_suficiencia") || "0000").replace(/\s+/g, "_");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `SUFICIENCIA_${folio}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
 
   // ---------------------------
   // Eventos
@@ -1299,6 +1465,47 @@
       }
     });
 
+    document.addEventListener("change", async (e) => {
+      const t = e.target;
+      if (!t) return;
+
+      if (t.matches('[name="imp_isr"], #imp_isr') && t.checked) {
+        const tasaEl = document.querySelector('[name="isr_tasa"], #isr_tasa');
+        const current = clampPercent(tasaEl?.value || 0);
+        if (!current) {
+          const pct = await askPercentSwal(
+            "¿Qué porcentaje de ISR aplicarás?",
+            10,
+          );
+          if (pct == null) {
+            t.checked = false;
+            refreshTotales();
+            return;
+          }
+          setRateValue('[name="isr_tasa"], #isr_tasa', pct);
+        }
+        refreshTotales();
+      }
+
+      if (t.matches('[name="imp_ieps"], #imp_ieps') && t.checked) {
+        const tasaEl = document.querySelector('[name="ieps_tasa"], #ieps_tasa');
+        const current = clampPercent(tasaEl?.value || 0);
+        if (!current) {
+          const pct = await askPercentSwal(
+            "¿Qué porcentaje de IEPS aplicarás?",
+            8,
+          );
+          if (pct == null) {
+            t.checked = false;
+            refreshTotales();
+            return;
+          }
+          setRateValue('[name="ieps_tasa"], #ieps_tasa', pct);
+        }
+        refreshTotales();
+      }
+    });
+
     document
       .querySelector('[name="id_proyecto"]')
       ?.addEventListener("change", () => {
@@ -1307,15 +1514,275 @@
         refreshTotales();
       });
 
-    // (si tu archivo original trae bindTaxEvents y bindPensionEvents, aquí los llamas igual)
-    if (typeof bindTaxEvents === "function") bindTaxEvents();
-    if (typeof bindPensionEvents === "function") bindPensionEvents();
+    bindTaxEvents();
 
-    if (DEBUG_PDF_FIELDS && typeof debugListPdfFields === "function") {
-      debugListPdfFields().catch((err) =>
-        console.warn("[PDF debug] ", err.message),
-      );
+    // ==============================
+    //  PENSIÓN: habilitar botón + y crear inputs dinámicos
+    // ==============================
+    const chkPension = document.getElementById("imp_pension");
+    const btnAddPension = document.getElementById("btnAddPension");
+    const pensionList = document.getElementById("pensionList");
+
+    function ensurePensionListVisible() {
+      if (!pensionList) return;
+      pensionList.classList.remove("d-none");
     }
+
+    function countPensiones() {
+      return document.querySelectorAll('[name^="pension"][name$="_tasa"]')
+        .length;
+    }
+
+    function createPensionRow(k, value = "") {
+      const row = document.createElement("div");
+      row.className = "d-flex align-items-center gap-2 mb-2";
+
+      row.innerHTML = `
+    <div class="text-muted" style="font-size:12px; width:110px;">Pensión ${k} (%)</div>
+    <input type="number"
+      class="form-control form-control-sm text-end"
+      style="width:120px"
+      name="pension${k}_tasa"
+      id="pension${k}_tasa"
+      placeholder="Ej. 10"
+      min="0" max="100" step="0.01"
+      value="${value}">
+    <button type="button" class="btn btn-outline-danger btn-sm" data-remove-pension="${k}" title="Quitar">
+      <i class="bi bi-trash"></i>
+    </button>`;
+      return row;
+    }
+
+    chkPension?.addEventListener("change", async () => {
+      if (!btnAddPension || !pensionList) return;
+
+      btnAddPension.disabled = !chkPension.checked;
+
+      if (!chkPension.checked) {
+        pensionList.replaceChildren();
+        pensionList.classList.add("d-none");
+        refreshTotales();
+        return;
+      }
+
+      ensurePensionListVisible();
+
+      if (countPensiones() === 0) {
+        const pct = await askPercentSwal("Porcentaje de Pensión 1", 10);
+        if (pct == null) {
+          chkPension.checked = false;
+          btnAddPension.disabled = true;
+          pensionList.classList.add("d-none");
+          refreshTotales();
+          return;
+        }
+        pensionList.appendChild(createPensionRow(1, pct));
+        refreshTotales();
+      }
+    });
+
+    btnAddPension?.addEventListener("click", async () => {
+      if (!chkPension?.checked) return;
+
+      const c = countPensiones();
+      if (c >= 5) {
+        uiWarn("Máximo 5 pensiones.");
+        return;
+      }
+
+      const k = c + 1;
+      const pct = await askPercentSwal(`Porcentaje de Pensión ${k}`, 10);
+      if (pct == null) return;
+
+      ensurePensionListVisible();
+      pensionList.appendChild(createPensionRow(k, pct));
+      refreshTotales();
+    });
+
+    pensionList?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-remove-pension]");
+      if (!btn) return;
+
+      btn.closest("div")?.remove();
+
+      const rows = Array.from(pensionList.querySelectorAll("div"));
+      rows.forEach((r, idx) => {
+        const k = idx + 1;
+        r.querySelector(".text-muted").textContent = `Pensión ${k} (%)`;
+        const input = r.querySelector("input");
+        if (input) {
+          input.name = `pension${k}_tasa`;
+          input.id = `pension${k}_tasa`;
+        }
+        r.querySelector("[data-remove-pension]")?.setAttribute(
+          "data-remove-pension",
+          String(k),
+        );
+      });
+
+      if (countPensiones() === 0) {
+        chkPension.checked = false;
+        btnAddPension.disabled = true;
+        pensionList.classList.add("d-none");
+      }
+
+      refreshTotales();
+    });
+
+    pensionList?.addEventListener("input", refreshTotales);
+
+    // ==============================
+    //  BOTONES INFO (SweetAlert2)
+    // ==============================
+    const btnInfoPension = document.getElementById("btnInfoPension");
+    const btnInfoImpuestos = document.getElementById("infoImpuestos");
+
+    btnInfoPension?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!hasSwal()) return alert("Info: Usa SweetAlert2 (Swal).");
+
+      Swal.fire({
+        icon: "info",
+        title: "Pensión alimenticia",
+        html: `
+      <div style="text-align:left; font-size:13px;">
+        <p class="mb-2">
+          La <b>Pensión</b> se calcula como un porcentaje del <b>SUBTOTAL</b>.
+        </p>
+        <ul class="mb-2">
+          <li>Puedes agregar hasta <b>5 pensiones</b>.</li>
+          <li>Cada pensión es un % independiente (ej. 10%, 5%, etc.).</li>
+          <li>El sistema suma todas las pensiones y las muestra en <b>PENSIÓN</b>.</li>
+          <li>El <b>TOTAL</b> = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN</li>
+        </ul>
+        <p class="mb-0 text-muted">
+          Tip: Si no ves cambios, revisa que hayas capturado porcentajes mayores a 0.
+        </p>
+      </div>
+    `,
+        confirmButtonText: "Entendido",
+        confirmButtonColor: "#BC955C",
+      });
+    });
+
+    btnInfoImpuestos?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!hasSwal()) return alert("Info: Usa SweetAlert2 (Swal).");
+
+      Swal.fire({
+        icon: "info",
+        title: "Impuestos (IVA / ISR / IEPS)",
+        html: `
+      <div style="text-align:left; font-size:13px;">
+        <p class="mb-2"><b>IVA</b> se calcula al 16% del SUBTOTAL.</p>
+        <p class="mb-2"><b>ISR</b> y <b>IEPS</b> se calculan usando la tasa que captures (ej. 10 y 8).</p>
+        <hr class="my-2">
+        <p class="mb-1"><b>Fórmula:</b></p>
+        <p class="mb-0">
+          TOTAL = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN
+        </p>
+      </div>
+    `,
+        confirmButtonText: "Ok",
+        confirmButtonColor: "#BC955C",
+      });
+    });
+    const btnInfoDir = document.getElementById("infoDireccionSolicitante");
+
+    btnInfoDir?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!hasSwal()) return;
+
+      Swal.fire({
+        icon: "info",
+        title: "Dirección solicitante",
+        text: "Este campo se autollenará con la Dependencia General (DG) del usuario.",
+        confirmButtonText: "Ok",
+        confirmButtonColor: "#BC955C",
+      });
+    });
+  }
+
+  // ==============================
+  //  MONEDA MXN
+  // ==============================
+  const MXN = new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  function moneyParse(str) {
+    const clean = String(str ?? "").replace(/[^0-9.-]/g, "");
+    const n = parseFloat(clean);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function moneyFormat(n) {
+    const num = Number.isFinite(+n) ? +n : 0;
+    return MXN.format(num);
+  }
+
+  function moneySanitizeTyping(str) {
+    let s = String(str ?? "");
+    s = s.replace(/[^\d.-]/g, "");
+    s = s.replace(/(?!^)-/g, "");
+    const parts = s.split(".");
+    if (parts.length > 2) s = parts[0] + "." + parts.slice(1).join("");
+    if (s.includes(".")) {
+      const [a, b] = s.split(".");
+      s = a + "." + b.slice(0, 2);
+    }
+    return s;
+  }
+
+  function attachMoneyInputs(root = document) {
+    root.querySelectorAll(".sp-importe").forEach((input) => {
+      if (input.dataset.moneyReady === "1") return;
+      input.dataset.moneyReady = "1";
+
+      input.value = moneyFormat(moneyParse(input.value));
+
+      input.addEventListener("focus", () => {
+        const n = moneyParse(input.value);
+        input.value = n ? String(n.toFixed(2)) : "";
+        setTimeout(() => input.select(), 0);
+      });
+
+      input.addEventListener("input", () => {
+        input.value = moneySanitizeTyping(input.value);
+      });
+
+      input.addEventListener("blur", () => {
+        const n = moneyParse(input.value);
+        input.value = moneyFormat(n);
+        refreshTotales(); // ✅ asegura recalculo al salir
+      });
+
+      input.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData("text");
+        input.value = moneySanitizeTyping(text);
+      });
+    });
+  }
+
+  function formatMoneyFields() {
+    const names = [
+      "subtotal",
+      "iva",
+      "isr",
+      "ieps",
+      "pension_total",
+      "total",
+      "cantidad_pago",
+    ];
+    names.forEach((nm) => {
+      const el = document.querySelector(`[name="${nm}"]`);
+      if (!el) return;
+      el.value = moneyFormat(moneyParse(el.value));
+    });
   }
 
   // ---------------------------
@@ -1331,7 +1798,6 @@
     lockCantidadPago();
     initFolioUI();
 
-    // ✅ Carga partidas ANTES de dibujar filas (para que el select ya traiga opciones)
     try {
       await loadPartidasCatalog();
     } catch (e) {
@@ -1340,6 +1806,7 @@
 
     initRows();
     refreshPartidaSelects();
+    attachMoneyInputs(detalleBody);
     bindEvents();
 
     try {
@@ -1352,11 +1819,7 @@
     try {
       applyProyectoFilters();
     } catch (e) {
-      console.warn(
-        "[SP] applyProyectoFilters falló, mostrando todos los proyectos:",
-        e?.message,
-      );
-      // fallback: deja el select con todos
+      console.warn("[SP] applyProyectoFilters falló:", e?.message);
       const sel = document.querySelector('[name="id_proyecto"]');
       if (sel) {
         const all = Object.values(proyectosById || {});
