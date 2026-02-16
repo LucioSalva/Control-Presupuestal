@@ -9,7 +9,9 @@
   const btnRecargar = document.getElementById("btn-recargar");
   const detalleBody = document.getElementById("detalleBody");
 
-  const tipoDocumento = window.location.pathname.includes("devengado") ? "DV" : "CP";
+  const tipoDocumento = window.location.pathname.includes("devengado")
+    ? "DV"
+    : "CP";
 
   // ---------------------------
   // AUTH
@@ -94,7 +96,6 @@
   function formatFolio(raw) {
     const str = String(raw ?? "").trim();
     if (!str) return "";
-    // Si viene estilo ECA-01-SP-0004, cambia SP por CP/DV dependiendo pantalla
     if (str.includes("-")) {
       return str.replace(/-(SP|CP|DV)-/, `-${tipoDocumento}-`);
     }
@@ -102,66 +103,177 @@
     return str;
   }
 
+  function normalizeSufFolio(input) {
+    const raw = String(input || "").trim();
+    if (!raw) return "";
+
+    const m = raw.match(/ECA-(\d{4})-(\d{2})-SP-(\d{1,6})/i);
+    if (m) return `ECA-${m[1]}-${m[2]}-SP-${String(m[3]).padStart(4, "0")}`;
+
+    const m2 = raw.match(/ECA-(\d{2})-SP-(\d{1,6})/i);
+    if (m2) return `ECA-${m2[1]}-SP-${String(m2[2]).padStart(4, "0")}`;
+
+    if (/^\d{1,6}$/.test(raw)) return raw;
+
+    return raw;
+  }
+
+  async function buscarSuficienciaPorFolio(folioInput) {
+    const numero = normalizeSufFolio(folioInput);
+    if (!numero) {
+      await uiWarn("Escribe el folio de la Suficiencia (ej. ECA-02-SP-0001).");
+      return null;
+    }
+
+    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(numero)}`;
+    const res = await fetchJson(url, { headers: { ...authHeaders() } });
+    const rows = res?.data || [];
+
+    if (!rows.length) {
+      await uiWarn("No encontrada (o no corresponde a tu área).");
+      return null;
+    }
+
+    if (rows.length === 1) return Number(rows[0].id);
+
+    // múltiples -> elegir
+    if (!hasSwal()) {
+      await uiWarn("Hay varias coincidencias, activa SweetAlert2 para elegir.");
+      return null;
+    }
+
+    const listHtml = `
+    <div class="list-group text-start">
+      ${rows
+        .map((r) => {
+          const folio = r.no_suficiencia || "—";
+          const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
+          return `
+          <button type="button" class="list-group-item list-group-item-action" data-id="${r.id}">
+            <div class="fw-semibold">${folio}</div>
+            <small class="text-muted">${fecha}</small>
+          </button>`;
+        })
+        .join("")}
+    </div>
+  `;
+
+    const pick = await new Promise((resolve) => {
+      Swal.fire({
+        title: "Selecciona una Suficiencia",
+        html: listHtml,
+        icon: "info",
+        showConfirmButton: false,
+        showCancelButton: true,
+        cancelButtonText: "Cancelar",
+        didOpen: () => {
+          const c = Swal.getHtmlContainer();
+          c?.querySelectorAll("button[data-id]")?.forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const id = Number(btn.dataset.id);
+              Swal.close();
+              resolve(id);
+            });
+          });
+        },
+      }).then(() => resolve(null));
+    });
+
+    return pick;
+  }
+
+  async function cargarSuficienciaEnComprometido(id) {
+    const data = await fetchJson(`${API}/api/suficiencias/${id}`, {
+      headers: { ...authHeaders() },
+    });
+
+    if (!data?.id) {
+      await uiError("No se pudo cargar la suficiencia.");
+      return null;
+    }
+
+    localStorage.setItem(
+      "cp_last_suficiencia",
+      JSON.stringify({
+        id: String(data.id),
+        payload: data,
+        loaded_from: "buscar",
+        loaded_at: new Date().toISOString(),
+      }),
+    );
+
+    return data;
+  }
+
   // ---------------------------
-// SweetAlert2 helpers (reemplazo de alert())
-// ---------------------------
-function hasSwal() {
-  return typeof window !== "undefined" && !!window.Swal;
-}
+  // SweetAlert2 helpers (reemplazo de alert())
+  // ---------------------------
+  function hasSwal() {
+    return typeof window !== "undefined" && !!window.Swal;
+  }
 
-function uiAlert(message, icon = "info", title = "Aviso") {
-  const msg = String(message ?? "");
-  if (!hasSwal()) return alert(`${title}: ${msg}`);
+  function uiAlert(message, icon = "info", title = "Aviso") {
+    const msg = String(message ?? "");
+    if (!hasSwal()) return alert(`${title}: ${msg}`);
 
-  return window.Swal.fire({
-    icon,
-    title,
-    text: msg,
-    confirmButtonText: "Aceptar",
-    confirmButtonColor: "#BC955C",
-  });
-}
+    return window.Swal.fire({
+      icon,
+      title,
+      text: msg,
+      confirmButtonText: "Aceptar",
+      confirmButtonColor: "#BC955C",
+    });
+  }
 
-function uiSuccess(message, title = "Listo") {
-  return uiAlert(message, "success", title);
-}
+  function uiSuccess(message, title = "Listo") {
+    return uiAlert(message, "success", title);
+  }
 
-function uiError(message, title = "Error") {
-  return uiAlert(message, "error", title);
-}
+  function uiError(message, title = "Error") {
+    return uiAlert(message, "error", title);
+  }
 
-function uiWarn(message, title = "Atención") {
-  return uiAlert(message, "warning", title);
-}
+  function uiWarn(message, title = "Atención") {
+    return uiAlert(message, "warning", title);
+  }
 
-function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancelText = "Cancelar" } = {}) {
-  if (!hasSwal()) return Promise.resolve(confirm(`¿${title}?`));
+  function uiConfirm({
+    title = "Confirmar",
+    html = "",
+    confirmText = "Sí",
+    cancelText = "Cancelar",
+  } = {}) {
+    if (!hasSwal()) return Promise.resolve(confirm(`¿${title}?`));
 
-  return window.Swal.fire({
-    icon: "question",
-    title,
-    html,
-    showCancelButton: true,
-    confirmButtonText: confirmText,
-    cancelButtonText: cancelText,
-    confirmButtonColor: "#BC955C",
-    cancelButtonColor: "#6c757d",
-  }).then((r) => !!r.isConfirmed);
-}
+    return window.Swal.fire({
+      icon: "question",
+      title,
+      html,
+      showCancelButton: true,
+      confirmButtonText: confirmText,
+      cancelButtonText: cancelText,
+      confirmButtonColor: "#BC955C",
+      cancelButtonColor: "#6c757d",
+    }).then((r) => !!r.isConfirmed);
+  }
 
   // ---------------------------
   // Catálogos (para mostrar texto bonito)
   // ---------------------------
   let proyectosById = {}; // { [id]: "0108050103 E - Innovación gubernamental..." }
-  let fuentesById = {};   // { [id]: "110101 - INGRESOS PROPIOS..." }
+  let fuentesById = {}; // { [id]: "110101 - INGRESOS PROPIOS..." }
 
   async function loadCatalogos() {
     // Ojo: tus endpoints ya existen porque en suficiencia los usas:
     // /api/catalogos/proyectos
     // /api/catalogos/fuentes
     const [proys, fuents] = await Promise.all([
-      fetchJson(`${API}/api/catalogos/proyectos`, { headers: { ...authHeaders() } }),
-      fetchJson(`${API}/api/catalogos/fuentes`,   { headers: { ...authHeaders() } }),
+      fetchJson(`${API}/api/catalogos/proyectos`, {
+        headers: { ...authHeaders() },
+      }),
+      fetchJson(`${API}/api/catalogos/fuentes`, {
+        headers: { ...authHeaders() },
+      }),
     ]);
 
     proyectosById = {};
@@ -171,7 +283,7 @@ function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancel
 
       const clave = String(p.clave ?? "").trim();
       const conac = String(p.conac ?? "").trim();
-      const desc  = String(p.descripcion ?? "").trim();
+      const desc = String(p.descripcion ?? "").trim();
 
       const claveConac = conac ? `${clave} ${conac}` : clave;
       const label = `${claveConac} - ${desc}`.trim();
@@ -192,12 +304,12 @@ function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancel
 
   function getProyectoLabel(idProyecto) {
     const id = Number(idProyecto);
-    return Number.isFinite(id) ? (proyectosById[id] || "") : "";
+    return Number.isFinite(id) ? proyectosById[id] || "" : "";
   }
 
   function getFuenteLabel(idFuente) {
     const id = Number(idFuente);
-    return Number.isFinite(id) ? (fuentesById[id] || "") : "";
+    return Number.isFinite(id) ? fuentesById[id] || "" : "";
   }
 
   // ---------------------------
@@ -250,7 +362,7 @@ function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancel
               readonly value="${importe}">
           </td>
         </tr>
-        `
+        `,
       );
     });
   }
@@ -326,9 +438,12 @@ function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancel
 
     if (id) {
       try {
-        const data = await fetchJson(`${API}/api/comprometido/por-suficiencia/${id}`, {
-          headers: { ...authHeaders() },
-        });
+        const data = await fetchJson(
+          `${API}/api/comprometido/por-suficiencia/${id}`,
+          {
+            headers: { ...authHeaders() },
+          },
+        );
 
         const payload = data && data.data ? data.data : data;
 
@@ -340,23 +455,28 @@ function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancel
             payload,
             loaded_from: "api",
             loaded_at: new Date().toISOString(),
-          })
+          }),
         );
 
         return payload;
       } catch (e) {
-        console.warn("[COMPROMETIDO] API falló, usando LocalStorage:", e.message);
+        console.warn(
+          "[COMPROMETIDO] API falló, usando LocalStorage:",
+          e.message,
+        );
       }
     }
 
     const raw = localStorage.getItem("cp_last_suficiencia");
     if (!raw) {
-      throw new Error("No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX");
+      return null; // ✅ no truena, deja usar el buscador
     }
 
-    const obj = JSON.parse(raw);
-    if (!obj || !obj.payload) throw new Error("cp_last_suficiencia no contiene payload válido.");
-
+    let obj = null;
+    try {
+      obj = JSON.parse(raw);
+    } catch {}
+    if (!obj || !obj.payload) return null;
     return obj.payload;
   }
 
@@ -389,10 +509,16 @@ function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancel
     // clave programática + descripción
     setTextById("claveProgramaticaClave", payload.clave_programatica || "");
     // si quieres que debajo aparezca la descripción del proyecto como en suficiencia:
-    setTextById("claveProgramaticaTexto", proyLabel ? proyLabel.split(" - ").slice(1).join(" - ") : "—");
+    setTextById(
+      "claveProgramaticaTexto",
+      proyLabel ? proyLabel.split(" - ").slice(1).join(" - ") : "—",
+    );
 
     setReadonlyVal("mes_pago", payload.mes_pago || "");
-    setReadonlyVal("cantidad_pago", safeNumber(payload.cantidad_pago).toFixed(2));
+    setReadonlyVal(
+      "cantidad_pago",
+      safeNumber(payload.cantidad_pago).toFixed(2),
+    );
 
     setReadonlyVal("meta", payload.meta || "");
     setReadonlyVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
@@ -415,86 +541,115 @@ function uiConfirm({ title = "Confirmar", html = "", confirmText = "Sí", cancel
   // PDF (placeholder)
   // ---------------------------
   async function generarPDF(_payload) {
-  await uiWarn("Aquí conecta tu generador real de PDF (pdf-lib).", "PDF");
-}
+    await uiWarn("Aquí conecta tu generador real de PDF (pdf-lib).", "PDF");
+  }
 
   // ---------------------------
   // Eventos
   // ---------------------------
   function bindEvents(state) {
+    const btnBuscarSuf = document.getElementById("btnBuscarSuf");
+    const txtNumeroSuf = document.getElementById("txtNumeroSuf");
+
+    btnBuscarSuf?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        const id = await buscarSuficienciaPorFolio(txtNumeroSuf?.value || "");
+        if (!id) return;
+
+        const raw = await cargarSuficienciaEnComprometido(id);
+        if (!raw) return;
+
+        state.payload = renderPayload(raw);
+        await uiSuccess("Suficiencia cargada correctamente.", "Buscar");
+      } catch (err) {
+        console.error("[COMPROMETIDO] buscar suf error:", err);
+        await uiError(err?.message || "Error al buscar suficiencia", "Buscar");
+      }
+    });
+
+    txtNumeroSuf?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        btnBuscarSuf?.click();
+      }
+    });
+
     btnDescargarPdf?.addEventListener("click", async (e) => {
-  e.preventDefault();
-  try {
-    await generarPDF(state.payload);
-  } catch (err) {
-    console.error("[COMPROMETIDO][PDF]", err);
-    await uiError(err?.message || "Error generando PDF", "PDF");
-  }
-});
+      e.preventDefault();
+      try {
+        await generarPDF(state.payload);
+      } catch (err) {
+        console.error("[COMPROMETIDO][PDF]", err);
+        await uiError(err?.message || "Error generando PDF", "PDF");
+      }
+    });
 
-btnRecargar?.addEventListener("click", async () => {
-  try {
-    const raw = await loadData();
-    state.payload = renderPayload(raw);
-    await uiSuccess("Datos recargados correctamente.", "Recargar");
-  } catch (err) {
-    await uiError(err?.message || "No se pudo recargar", "Recargar");
-  }
-});
+    btnRecargar?.addEventListener("click", async () => {
+      try {
+        const raw = await loadData();
+        state.payload = renderPayload(raw);
+        await uiSuccess("Datos recargados correctamente.", "Recargar");
+      } catch (err) {
+        await uiError(err?.message || "No se pudo recargar", "Recargar");
+      }
+    });
 
-const btnGuardar = document.getElementById("btn-guardar");
-btnGuardar?.addEventListener("click", async (e) => {
-  e.preventDefault();
-  try {
-    const ok = await uiConfirm({
-      title: "Guardar Comprometido",
-      html: `
+    const btnGuardar = document.getElementById("btn-guardar");
+    btnGuardar?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        const ok = await uiConfirm({
+          title: "Guardar Comprometido",
+          html: `
         <div style="font-size:13px; text-align:left;">
           ¿Deseas guardar el <b>Comprometido</b> con la información actual?
         </div>
       `,
-      confirmText: "Sí, guardar",
-      cancelText: "Cancelar",
+          confirmText: "Sí, guardar",
+          cancelText: "Cancelar",
+        });
+        if (!ok) return;
+
+        if (!state.payload?.id) {
+          await uiWarn("No hay ID de suficiencia para guardar.");
+          return;
+        }
+
+        const body = { id_suficiencia: state.payload.id, ...state.payload };
+
+        const r = await fetchJson(`${API}/api/comprometido`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(body),
+        });
+
+        if (r?.id) state.payload.id_comprometido = Number(r.id);
+
+        if (r?.no_comprometido) {
+          state.payload.no_comprometido = r.no_comprometido;
+          setReadonlyVal("no_comprometido", r.no_comprometido);
+        }
+
+        localStorage.setItem(
+          "cp_last_comprometido",
+          JSON.stringify({
+            id: String(r.id),
+            payload: state.payload,
+            loaded_from: "comprometido",
+            loaded_at: new Date().toISOString(),
+          }),
+        );
+
+        await uiSuccess(
+          `Comprometido guardado: ${r.no_comprometido}`,
+          "Guardado",
+        );
+      } catch (err) {
+        console.error("[COMPROMETIDO] save error:", err);
+        await uiError(err?.message || "Error al guardar comprometido");
+      }
     });
-    if (!ok) return;
-
-    if (!state.payload?.id) {
-      await uiWarn("No hay ID de suficiencia para guardar.");
-      return;
-    }
-
-    const body = { id_suficiencia: state.payload.id, ...state.payload };
-
-    const r = await fetchJson(`${API}/api/comprometido`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify(body),
-    });
-
-    if (r?.id) state.payload.id_comprometido = Number(r.id);
-
-    if (r?.no_comprometido) {
-      state.payload.no_comprometido = r.no_comprometido;
-      setReadonlyVal("no_comprometido", r.no_comprometido);
-    }
-
-    localStorage.setItem(
-      "cp_last_comprometido",
-      JSON.stringify({
-        id: String(r.id),
-        payload: state.payload,
-        loaded_from: "comprometido",
-        loaded_at: new Date().toISOString(),
-      })
-    );
-
-    await uiSuccess(`Comprometido guardado: ${r.no_comprometido}`, "Guardado");
-  } catch (err) {
-    console.error("[COMPROMETIDO] save error:", err);
-    await uiError(err?.message || "Error al guardar comprometido");
-  }
-});
-
 
     // Ir a Devengado
     const btnVerDevengado = document.getElementById("btn-ver-devengado");
@@ -522,7 +677,7 @@ btnGuardar?.addEventListener("click", async (e) => {
           payload: state.payload,
           loaded_from: "comprometido",
           loaded_at: new Date().toISOString(),
-        })
+        }),
       );
 
       window.location.href = `devengado.html?id=${encodeURIComponent(String(idRef))}`;
@@ -533,30 +688,38 @@ btnGuardar?.addEventListener("click", async (e) => {
   // INIT
   // ---------------------------
   async function init() {
-  const state = { payload: null };
+    const state = { payload: null };
 
-  if (hasSwal()) {
-    Swal.fire({
-      title: "Cargando...",
-      text: "Preparando comprometido",
-      allowOutsideClick: false,
-      didOpen: () => Swal.showLoading(),
-    });
-  }
+    const hasInitial = !!getQueryId() || !!localStorage.getItem("cp_last_suficiencia");
 
-  try {
-    await loadCatalogos();
-    const raw = await loadData();
-    state.payload = renderPayload(raw);
-  } catch (err) {
-    console.error("[COMPROMETIDO]", err);
-    await uiError(err?.message || "No se pudieron cargar datos");
-  } finally {
-    if (hasSwal()) Swal.close();
-  }
-
-  bindEvents(state);
+if (hasSwal() && hasInitial) {
+  Swal.fire({
+    title: "Cargando...",
+    text: "Preparando comprometido",
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading(),
+  });
 }
+
+
+    try {
+      await loadCatalogos();
+      const raw = await loadData();
+
+      if (!raw) {
+        state.payload = null;
+      } else {
+        state.payload = renderPayload(raw);
+      }
+    } catch (err) {
+      console.error("[COMPROMETIDO]", err);
+      await uiError(err?.message || "No se pudieron cargar datos");
+    } finally {
+      if (hasSwal() && hasInitial) Swal.close();
+    }
+
+    bindEvents(state);
+  }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

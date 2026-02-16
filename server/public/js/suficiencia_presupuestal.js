@@ -1142,6 +1142,16 @@
 
     lastSavedId = Number(data.id);
 
+    localStorage.setItem("cp_last_suf_id", String(lastSavedId));
+sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
+
+const aComp = document.getElementById("linkComprometido");
+if (aComp) aComp.href = `comprometido.html?id=${lastSavedId}`;
+
+const aDev = document.getElementById("linkDevengado");
+if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
+
+
     modalBuscar?.hide?.();
     await uiSuccess("Suficiencia cargada correctamente.");
   }
@@ -1246,6 +1256,16 @@
       throw new Error("El servidor no devolvió el ID del registro.");
 
     lastSavedId = Number(saved.id);
+    
+localStorage.setItem("cp_last_suf_id", String(lastSavedId));
+sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
+
+const aComp = document.getElementById("linkComprometido");
+if (aComp) aComp.href = `comprometido.html?id=${lastSavedId}`;
+
+const aDev = document.getElementById("linkDevengado");
+if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
+
 
     if (saved.no_suficiencia)
       setVal("no_suficiencia", String(saved.no_suficiencia));

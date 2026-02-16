@@ -63,18 +63,18 @@
     <div class="container-fluid">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0 cp-tabs">
         <li class="nav-item">
-          <a class="nav-link active" href="suficiencia_presupuestal.html">
+          <a class="nav-link" href="suficiencia_presupuestal.html">
             <i class="bi bi-file-earmark-text me-1"></i>Suficiencia
             Presupuestal
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="comprometido.html">
+          <a class="nav-link active" href="comprometido.html" id="linkComprometido">
             <i class="bi bi-lock me-1"></i>Comprometido
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="devengado.html">
+          <a class="nav-link" href="devengado.html" id="linkDevengado">
             <i class="bi bi-check2-square me-1"></i>Devengado
           </a>
         </li>
@@ -93,25 +93,44 @@
   </nav>
 
   <div class="container mt-5 mb-2 no-print">
-    <div class="d-flex gap-2 justify-content-start mt-3">
-      <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
-        <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
-      </button>
+    <div class="cp-actions mt-3">
 
-      <button id="btn-guardar" class="btn btn-success btn-sm">
-        <i class="bi bi-save me-1"></i>Guardar Comprometido
-      </button>
+      <!-- IZQUIERDA: botones -->
+      <div class="cp-actions__left">
+        <button id="btn-guardar" class="btn btn-success btn-sm">
+          <i class="bi bi-save me-1"></i>Guardar Comprometido
+        </button>
 
+        <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
+        </button>
 
-      <button id="btn-ver-devengado" type="button" class="btn btn-outline-primary btn-sm"
-        title="Generar / Ver Devengado">
-        <i class="bi bi-check-circle me-1"></i>
-        Ir a Devengado
-      </button>
+        <button id="btn-ver-devengado" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Ir a Devengado
+        </button>
 
-      <button id="btn-recargar" class="btn btn-secondary btn-sm">
-        <i class="bi bi-arrow-repeat me-1"></i>Recargar datos
-      </button>
+        <button id="btn-recargar" class="btn btn-secondary btn-sm">
+          <i class="bi bi-arrow-clockwise me-1"></i>Recargar datos
+        </button>
+      </div>
+
+      <!-- DERECHA: buscador -->
+      <div class="cp-actions__right">
+        <div class="input-group input-group-sm cp-search">
+          <span class="input-group-text bg-white">
+            <i class="bi bi-search"></i>
+          </span>
+          <input id="txtFolioSuf" type="text" class="form-control" placeholder="Ej. ECA-02-SP-0001"
+            autocomplete="off" />
+          <button id="btnBuscarSuf" class="btn btn-outline-primary" type="button">
+            Buscar suficiencia
+          </button>
+        </div>
+        <div class="small text-muted mt-1">
+          Escribe el folio de la Suficiencia y carga sus datos.
+        </div>
+      </div>
+
     </div>
   </div>
 

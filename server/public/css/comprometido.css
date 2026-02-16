@@ -365,3 +365,63 @@ td .text-end.ro{justify-content:flex-end!important;}
 
   .form-title{font-size:15px;}
 }
+
+/* ======================================================
+   ACTION BAR (igual que Suficiencia)
+   ====================================================== */
+.cp-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:12px;
+
+  padding:14px;
+  background:#fff;
+  border-radius:14px;
+  box-shadow:0 10px 26px rgba(0,0,0,.08);
+}
+
+.cp-actions__left{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+.cp-actions__right{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+  min-width:280px;
+}
+
+.cp-actions .btn{
+  min-height:42px;
+  padding:10px 14px;
+  font-weight:700;
+  border-radius:12px;
+}
+
+/* buscador compacto */
+.cp-search{
+  width:min(520px, 100%);
+}
+
+.cp-search .form-control{
+  min-width:220px;
+}
+
+@media (max-width: 768px){
+  .cp-actions{
+    align-items:stretch;
+  }
+  .cp-actions__right{
+    align-items:stretch;
+    width:100%;
+  }
+  .cp-search{
+    width:100%;
+  }
+}
