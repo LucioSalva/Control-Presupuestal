@@ -2,7 +2,9 @@
   const MAX_ROWS = 20;
   const START_ROWS = 3;
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
-  const DEBUG_PDF_FIELDS = false;
+  const DEBUG_PDF_FIELDS = true;
+const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
+
 
   // ---------------------------
   // DOM
@@ -1301,126 +1303,211 @@ if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
     listen('[name^="pension"][name$="_tasa"]');
   }
 
-// ---------------------------
-  // PDF SUFICIENCIA (pdf-lib)
-  // ---------------------------
-  async function fetchPdfTemplateBytesSuf() {
-    const r = await fetch(SUF_PDF_TEMPLATE_URL);
-    if (!r.ok) throw new Error(`No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`);
-    return await r.arrayBuffer();
+  // ==============================
+  //  MONEDA MXN
+  // ==============================
+  const MXN = new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  function moneyParse(str) {
+    const clean = String(str ?? "").replace(/[^0-9.-]/g, "");
+    const n = parseFloat(clean);
+    return Number.isFinite(n) ? n : 0;
   }
 
-  async function debugListPdfFields() {
-    const bytes = await fetchPdfTemplateBytesSuf();
-    const pdfDoc = await PDFLib.PDFDocument.load(bytes);
-    const form = pdfDoc.getForm();
-    console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
+  function moneyFormat(n) {
+    const num = Number.isFinite(+n) ? +n : 0;
+    return MXN.format(num);
   }
 
-  async function generarPDF() {
-    refreshTotales();
-
-    if (!window.PDFLib?.PDFDocument) {
-      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
+  function moneySanitizeTyping(str) {
+    let s = String(str ?? "");
+    s = s.replace(/[^\d.-]/g, "");
+    s = s.replace(/(?!^)-/g, "");
+    const parts = s.split(".");
+    if (parts.length > 2) s = parts[0] + "." + parts.slice(1).join("");
+    if (s.includes(".")) {
+      const [a, b] = s.split(".");
+      s = a + "." + b.slice(0, 2);
     }
+    return s;
+  }
 
-    const fuenteSel = document.querySelector('[name="fuente"]');
-    const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+  function attachMoneyInputs(root = document) {
+    root.querySelectorAll(".sp-importe").forEach((input) => {
+      if (input.dataset.moneyReady === "1") return;
+      input.dataset.moneyReady = "1";
 
-    const payload = {
-      fecha: get("fecha"),
-      dependencia: get("dependencia"),
-      fuente_texto: fuenteText,
-      mes_pago: get("mes_pago"),
-      subtotal: get("subtotal"),
-      iva: get("iva"),
-      isr: get("isr"),
-      ieps: get("ieps"),
-      total: get("total"),
-      cantidad_con_letra: get("cantidad_con_letra"),
+      input.value = moneyFormat(moneyParse(input.value));
 
-      meta: get("meta"),
+      input.addEventListener("focus", () => {
+        const n = moneyParse(input.value);
+        input.value = n ? String(n.toFixed(2)) : "";
+        setTimeout(() => input.select(), 0);
+      });
 
-      clave_programatica: get("clave_programatica"),
-      detalle: buildDetalle(),
-      folio_oficial_suficiencia: get("no_suficiencia") || "",
-    };
+      input.addEventListener("input", () => {
+        input.value = moneySanitizeTyping(input.value);
+      });
 
-    const templateBytes = await fetchPdfTemplateBytesSuf();
-    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
-    const form = pdfDoc.getForm();
+      input.addEventListener("blur", () => {
+        const n = moneyParse(input.value);
+        input.value = moneyFormat(n);
+        refreshTotales();
+      });
 
-    const setTextSafe = (fieldName, value) => {
-      try {
-        const f = form.getTextField(fieldName);
-        f.setText(String(value ?? ""));
-      } catch {}
-    };
+      input.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData("text");
+        input.value = moneySanitizeTyping(text);
+      });
+    });
+  }
 
-    const safeN = (x) => {
-      const n = Number(x);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    function splitFechaParts(iso) {
-      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
-      const [y, m, d] = iso.split("-");
-      return { d, m, y };
-    }
-
-    setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
-    setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
-    setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
-
-    setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente_texto || ""));
-    setTextSafe("NOMBRE F.F", String(payload.fuente_texto || ""));
-
-    const { d, m, y } = splitFechaParts(payload.fecha);
-    setTextSafe("fechadia", d);
-    setTextSafe("fechames", m);
-    setTextSafe("fechayear", y);
-
-    const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
-    const totalTxt = safeN(payload.total).toFixed(2);
-    const meses = [
-      "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
-      "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE",
+  function formatMoneyFields() {
+    const names = [
+      "subtotal",
+      "iva",
+      "isr",
+      "ieps",
+      "pension_total",
+      "total",
+      "cantidad_pago",
     ];
-    for (const mes of meses) {
-      setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
-    }
-
-    const detalle = payload.detalle || [];
-    setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
-    setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
-    setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
-    setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
-    setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
-    setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
-
-    setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
-    setTextSafe("IVA", safeN(payload.iva).toFixed(2));
-    setTextSafe("ISR", safeN(payload.isr).toFixed(2));
-    setTextSafe("IEPS", safeN(payload.ieps).toFixed(2));
-    setTextSafe("total", safeN(payload.total).toFixed(2));
-    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
-    setTextSafe("Meta", payload.meta || "");
-
-    form.flatten();
-
-    const outBytes = await pdfDoc.save();
-    const blob = new Blob([outBytes], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-
-    const folio = (get("no_suficiencia") || "0000").replace(/\s+/g, "_");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `SUFICIENCIA_${folio}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    names.forEach((nm) => {
+      const el = document.querySelector(`[name="${nm}"]`);
+      if (!el) return;
+      el.value = moneyFormat(moneyParse(el.value));
+    });
   }
+
+  // ---------------------------
+// PDF SUFICIENCIA (pdf-lib)
+// ---------------------------
+async function fetchPdfTemplateBytesSuf() {
+  const r = await fetch(SUF_PDF_TEMPLATE_URL);
+  if (!r.ok) {
+    throw new Error(`No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`);
+  }
+  return await r.arrayBuffer();
+}
+
+async function debugListPdfFields() {
+  const bytes = await fetchPdfTemplateBytesSuf();
+  const pdfDoc = await PDFLib.PDFDocument.load(bytes);
+  const form = pdfDoc.getForm();
+  console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
+}
+
+async function generarPDF() {
+  refreshTotales();
+
+  if (!window.PDFLib?.PDFDocument) {
+    throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
+  }
+
+  const payload = {
+    fecha: get("fecha"),
+    dependencia: get("dependencia"),
+    fuente: get("fuente"),
+    mes_pago: get("mes_pago"),
+    subtotal: moneyParse(get("subtotal")),
+    iva: moneyParse(get("iva")),
+    isr: moneyParse(get("isr")),
+    ieps: moneyParse(get("ieps")),
+    pension_total: moneyParse(get("pension_total")),
+    total: moneyParse(get("total")),
+    cantidad_con_letra: get("cantidad_con_letra"),
+    meta: get("meta"),
+    clave_programatica: get("clave_programatica"),
+    detalle: buildDetalle(),
+    folio_num: get("no_suficiencia"),
+  };
+
+  const templateBytes = await fetchPdfTemplateBytesSuf();
+  const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
+  const form = pdfDoc.getForm();
+
+  const setTextSafe = (fieldName, value) => {
+    try {
+      const f = form.getTextField(fieldName);
+      f.setText(String(value ?? ""));
+    } catch {}
+  };
+
+  const safeN = (x) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  function splitFechaParts(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
+    const [y, m, d] = iso.split("-");
+    return { d, m, y };
+  }
+
+  // CABECERA
+  setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
+  setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+  setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+
+  const fuenteSel = document.querySelector('[name="fuente"]');
+  const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+
+  setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente || ""));
+  setTextSafe("NOMBRE F.F", String(fuenteText || ""));
+
+  const { d, m, y } = splitFechaParts(payload.fecha);
+  setTextSafe("fechadia", d);
+  setTextSafe("fechames", m);
+  setTextSafe("fechayear", y);
+
+  // PROGRAMACIÓN DE PAGO
+  const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
+  const totalTxt = safeN(payload.total).toFixed(2);
+  const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+  for (const mes of meses) {
+    setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
+  }
+
+  // DETALLE
+  const detalle = payload.detalle || [];
+  setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
+  setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
+  setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
+  setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
+  setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
+  setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
+
+  // TOTALES
+  setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
+  setTextSafe("IVA", safeN(payload.iva).toFixed(2));
+  setTextSafe("ISR", safeN(payload.isr).toFixed(2));
+  setTextSafe("IEPS", safeN(payload.ieps).toFixed(2));
+  setTextSafe("PENSION", safeN(payload.pension_total).toFixed(2));
+  setTextSafe("total", safeN(payload.total).toFixed(2));
+  setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
+  setTextSafe("Meta", payload.meta || "");
+
+  form.flatten();
+
+  const outBytes = await pdfDoc.save();
+  const blob = new Blob([outBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+
+  const folio = String(payload.folio_num || "").replace(/\D/g, "").padStart(6, "0") || "000000";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `SUFICIENCIA_${folio}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
 
   // ---------------------------
   // Eventos
@@ -1723,88 +1810,6 @@ if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
     });
   }
 
-  // ==============================
-  //  MONEDA MXN
-  // ==============================
-  const MXN = new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  function moneyParse(str) {
-    const clean = String(str ?? "").replace(/[^0-9.-]/g, "");
-    const n = parseFloat(clean);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function moneyFormat(n) {
-    const num = Number.isFinite(+n) ? +n : 0;
-    return MXN.format(num);
-  }
-
-  function moneySanitizeTyping(str) {
-    let s = String(str ?? "");
-    s = s.replace(/[^\d.-]/g, "");
-    s = s.replace(/(?!^)-/g, "");
-    const parts = s.split(".");
-    if (parts.length > 2) s = parts[0] + "." + parts.slice(1).join("");
-    if (s.includes(".")) {
-      const [a, b] = s.split(".");
-      s = a + "." + b.slice(0, 2);
-    }
-    return s;
-  }
-
-  function attachMoneyInputs(root = document) {
-    root.querySelectorAll(".sp-importe").forEach((input) => {
-      if (input.dataset.moneyReady === "1") return;
-      input.dataset.moneyReady = "1";
-
-      input.value = moneyFormat(moneyParse(input.value));
-
-      input.addEventListener("focus", () => {
-        const n = moneyParse(input.value);
-        input.value = n ? String(n.toFixed(2)) : "";
-        setTimeout(() => input.select(), 0);
-      });
-
-      input.addEventListener("input", () => {
-        input.value = moneySanitizeTyping(input.value);
-      });
-
-      input.addEventListener("blur", () => {
-        const n = moneyParse(input.value);
-        input.value = moneyFormat(n);
-        refreshTotales(); // ✅ asegura recalculo al salir
-      });
-
-      input.addEventListener("paste", (e) => {
-        e.preventDefault();
-        const text = (e.clipboardData || window.clipboardData).getData("text");
-        input.value = moneySanitizeTyping(text);
-      });
-    });
-  }
-
-  function formatMoneyFields() {
-    const names = [
-      "subtotal",
-      "iva",
-      "isr",
-      "ieps",
-      "pension_total",
-      "total",
-      "cantidad_pago",
-    ];
-    names.forEach((nm) => {
-      const el = document.querySelector(`[name="${nm}"]`);
-      if (!el) return;
-      el.value = moneyFormat(moneyParse(el.value));
-    });
-  }
-
   // ---------------------------
   // INIT
   // ---------------------------
@@ -1817,6 +1822,14 @@ if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
     setFechaHoy();
     lockCantidadPago();
     initFolioUI();
+
+    if (DEBUG_PDF_FIELDS) {
+    try {
+      await debugListPdfFields();
+    } catch (e) {
+      console.warn("[PDF] No pude listar campos:", e?.message || e);
+    }
+  }
 
     try {
       await loadPartidasCatalog();
