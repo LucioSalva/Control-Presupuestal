@@ -108,12 +108,36 @@
     if (!raw) return "";
 
     const m = raw.match(/ECA-(\d{4})-(\d{2})-SP-(\d{1,6})/i);
-    if (m) return `ECA-${m[1]}-${m[2]}-SP-${String(m[3]).padStart(4, "0")}`;
+    if (m) {
+      const year = m[1];
+      const month = m[2];
+      const num = String(m[3]).padStart(4, "0");
+      return `ECA-${year}-${month}-SP-${num}`;
+    }
 
+    // Compatibilidad con formato viejo: ECA-02-SP-0001 (sin anio)
     const m2 = raw.match(/ECA-(\d{2})-SP-(\d{1,6})/i);
-    if (m2) return `ECA-${m2[1]}-SP-${String(m2[2]).padStart(4, "0")}`;
+    if (m2) {
+      const year = String(new Date().getFullYear());
+      const month = m2[1];
+      const num = String(m2[2]).padStart(4, "0");
+      return `ECA-${year}-${month}-SP-${num}`;
+    }
 
-    if (/^\d{1,6}$/.test(raw)) return raw;
+    if (/^\d{1,6}$/.test(raw)) {
+      const year = String(new Date().getFullYear());
+      const month = String(new Date().getMonth() + 1).padStart(2, "0");
+      const num = raw.padStart(4, "0");
+      return `ECA-${year}-${month}-SP-${num}`;
+    }
+
+    const onlyDigits = raw.replace(/\D/g, "");
+    if (onlyDigits && onlyDigits.length <= 6) {
+      const year = String(new Date().getFullYear());
+      const month = String(new Date().getMonth() + 1).padStart(2, "0");
+      const num = onlyDigits.padStart(4, "0");
+      return `ECA-${year}-${month}-SP-${num}`;
+    }
 
     return raw;
   }
@@ -121,7 +145,9 @@
   async function buscarSuficienciaPorFolio(folioInput) {
     const numero = normalizeSufFolio(folioInput);
     if (!numero) {
-      await uiWarn("Escribe el folio de la Suficiencia (ej. ECA-02-SP-0001).");
+      await uiWarn(
+        "Escribe el folio de la Suficiencia (ej. ECA-2026-02-SP-0001 o solo 0001).",
+      );
       return null;
     }
 
@@ -549,7 +575,9 @@
   // ---------------------------
   function bindEvents(state) {
     const btnBuscarSuf = document.getElementById("btnBuscarSuf");
-    const txtNumeroSuf = document.getElementById("txtNumeroSuf");
+    const txtNumeroSuf =
+      document.getElementById("txtFolioSuf") ||
+      document.getElementById("txtNumeroSuf");
 
     btnBuscarSuf?.addEventListener("click", async (e) => {
       e.preventDefault();

@@ -2,61 +2,80 @@ import { Router } from "express";
 import { query } from "../db.js";
 
 const router = Router();
+const PARTIDAS_ALLOWED_DG = "L00";
+const PARTIDAS_ALLOWED_DA = "117";
+
+function normalizeKey(v) {
+  return String(v || "").trim().toUpperCase();
+}
+
+function hasPartidasAccess(dg, da) {
+  return (
+    normalizeKey(dg) === PARTIDAS_ALLOWED_DG &&
+    normalizeKey(da) === PARTIDAS_ALLOWED_DA
+  );
+}
+
+async function getUserDGDA(req) {
+  const idDg = Number(req.user?.id_dgeneral);
+  const idDa = Number(req.user?.id_dauxiliar);
+
+  const k = await query(
+    `
+    SELECT
+      (SELECT TRIM(clave) FROM public.dgeneral WHERE id = $1) AS dg,
+      (SELECT TRIM(clave) FROM public.dauxiliar WHERE id = $2) AS da
+    `,
+    [idDg, idDa]
+  );
+
+  return {
+    dg: String(k.rows?.[0]?.dg || "").trim(),
+    da: String(k.rows?.[0]?.da || "").trim(),
+  };
+}
 
 router.get("/", async (req, res) => {
   try {
     const userId = Number(req.user?.id);
-    const idDg = Number(req.user?.id_dgeneral);
-    const idDa = Number(req.user?.id_dauxiliar);
-
     if (!userId) {
       return res.status(401).json({ error: "No autenticado" });
     }
 
-    const k = await query(
-      `
-      SELECT
-        (SELECT TRIM(clave) FROM public.dgeneral WHERE id = $1) AS dg,
-        (SELECT TRIM(clave) FROM public.dauxiliar WHERE id = $2) AS da
-      `,
-      [idDg, idDa]
-    );
-
-    const dg = k.rows?.[0]?.dg;
-    const da = k.rows?.[0]?.da;
-
+    const { dg, da } = await getUserDGDA(req);
     if (!dg || !da) {
       return res.status(400).json({ error: "Usuario sin DG/DA" });
+    }
+
+    if (!hasPartidasAccess(dg, da)) {
+      return res.status(403).json({
+        error: "Acceso denegado. Solo DG L00 con DA 117 puede entrar a Partidas.",
+      });
     }
 
     const r = await query(
       `
       SELECT
         p.clave AS clave,
-        COALESCE(p.descripcion, 'SIN DESCRIPCIÓN') AS partida,
+        COALESCE(p.descripcion, 'SIN DESCRIPCION') AS partida,
         COALESCE(pp.monto, 0)::numeric(18,2) AS monto,
         (pp.id_usuario IS NOT NULL) AS capturada
-      FROM public.partidas_permitidas per
-      JOIN public.partidas p
-        ON TRIM(p.clave) = TRIM(per.partida_clave)
+      FROM public.partidas p
       LEFT JOIN public.partidas_presupuesto pp
         ON pp.id_usuario = $1
        AND TRIM(pp.partida_clave) = TRIM(p.clave)
        AND pp.ejercicio = EXTRACT(YEAR FROM now())
-      WHERE TRIM(per.dgeneral_clave) = $2
-        AND TRIM(per.dauxiliar_clave) = $3
       ORDER BY p.clave::text ASC
       `,
-      [userId, dg, da]
+      [userId]
     );
 
-    // ✅ IMPORTANTE: regresamos dg/da y rows
     return res.json({ dg, da, rows: r.rows });
   } catch (e) {
     console.error("[PARTIDAS][GET] Error:", e);
     return res.status(500).json({ error: "Error al cargar partidas" });
   }
-}); // ✅ AQUÍ se cerraba y te faltaba
+});
 
 router.post("/monto", async (req, res) => {
   try {
@@ -69,35 +88,28 @@ router.post("/monto", async (req, res) => {
     }
     if (!clave) return res.status(400).json({ error: "clave requerida" });
     if (!Number.isFinite(monto) || monto < 0) {
-      return res.status(400).json({ error: "monto inválido" });
+      return res.status(400).json({ error: "monto invalido" });
     }
 
-    const keys = await query(
-      `
-      SELECT
-        (SELECT TRIM(clave) FROM public.dgeneral WHERE id = $1 LIMIT 1) AS dg,
-        (SELECT TRIM(clave) FROM public.dauxiliar WHERE id = $2 LIMIT 1) AS da
-      `,
-      [Number(req.user?.id_dgeneral), Number(req.user?.id_dauxiliar)]
-    );
+    const { dg, da } = await getUserDGDA(req);
+    if (!hasPartidasAccess(dg, da)) {
+      return res.status(403).json({
+        error: "Acceso denegado. Solo DG L00 con DA 117 puede guardar en Partidas.",
+      });
+    }
 
-    const dg = String(keys.rows?.[0]?.dg || "").trim();
-    const da = String(keys.rows?.[0]?.da || "").trim();
-
-    const allowed = await query(
+    const exists = await query(
       `
       SELECT 1
-      FROM public.partidas_permitidas
-      WHERE TRIM(dgeneral_clave) = $1
-        AND TRIM(dauxiliar_clave) = $2
-        AND TRIM(partida_clave) = $3
+      FROM public.partidas
+      WHERE TRIM(clave) = $1
       LIMIT 1
       `,
-      [dg, da, clave]
+      [clave]
     );
 
-    if (allowed.rowCount === 0) {
-      return res.status(403).json({ error: "Partida no permitida para tu área" });
+    if (exists.rowCount === 0) {
+      return res.status(404).json({ error: "Partida no encontrada" });
     }
 
     const r = await query(
@@ -111,11 +123,10 @@ router.post("/monto", async (req, res) => {
       [userId, clave, Number(monto.toFixed(2))]
     );
 
-    // ✅ si ya existía (bloqueo de edición en el año)
     if (r.rowCount === 0) {
       return res.status(409).json({
         error:
-          "Esta partida ya fue capturada en el ejercicio actual y no puede modificarse.",
+          "Esta partida ya fue capturada en el ejercicio actual y no puede modificarse",
       });
     }
 

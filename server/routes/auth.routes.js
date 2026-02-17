@@ -28,6 +28,8 @@ router.post("/login", async (req, res) => {
              u.activo,
              dg.clave AS dgeneral_clave,
              dg.dependencia AS dgeneral_nombre,
+             da.clave AS dauxiliar_clave,
+             da.dependencia AS dauxiliar_nombre,
              ARRAY(
                SELECT r.clave
                FROM usuario_rol ur
@@ -102,6 +104,8 @@ router.post("/login", async (req, res) => {
         id_dauxiliar: user.id_dauxiliar,
         dgeneral_clave: user.dgeneral_clave,
         dgeneral_nombre: user.dgeneral_nombre,
+        dauxiliar_clave: user.dauxiliar_clave,
+        dauxiliar_nombre: user.dauxiliar_nombre,
       },
     });
   } catch (err) {

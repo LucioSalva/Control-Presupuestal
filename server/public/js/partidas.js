@@ -47,6 +47,16 @@
       throw new Error("401");
     }
 
+    if (res.status === 403) {
+      await Swal.fire(
+        "Acceso denegado",
+        "Solo DG L00 con DA 117 puede entrar a Partidas.",
+        "warning",
+      );
+      window.location.href = "suficiencia_presupuestal.html";
+      throw new Error("403");
+    }
+
     if (!res.ok) {
       throw new Error(data?.error || `Error HTTP ${res.status}`);
     }
@@ -348,3 +358,5 @@ console.log("[PARTIDAS][DG/DA]", data?.dg, data?.da);
     });
   });
 })();
+
+
