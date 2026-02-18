@@ -1,0 +1,60 @@
+:root {
+  --pbp-wine: #691c32;
+  --pbp-gold: #bc955c;
+  --pbp-gold-soft: #efe2cf;
+  --pbp-bg: #f7f5f2;
+}
+
+.partidas-base-page {
+  background:
+    radial-gradient(circle at top right, rgba(188, 149, 92, 0.22), transparent 45%),
+    radial-gradient(circle at top left, rgba(105, 28, 50, 0.12), transparent 42%),
+    var(--pbp-bg);
+}
+
+.pbp-header h2 {
+  color: var(--pbp-wine);
+  font-weight: 800;
+}
+
+.pbp-card {
+  border-top: 3px solid var(--pbp-gold);
+}
+
+.pbp-errors-head {
+  background: linear-gradient(90deg, var(--pbp-gold-soft), #fffaf1);
+  color: #5f3b09;
+}
+
+.pbp-table-wrap {
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.pbp-table {
+  font-size: 0.79rem;
+  white-space: nowrap;
+}
+
+.pbp-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--pbp-wine);
+  color: #fff;
+  border-color: #5f1a2d;
+}
+
+.pbp-table tbody td {
+  vertical-align: middle;
+}
+
+#errorList .list-group-item {
+  border-left: 4px solid #b02a37;
+}
+
+@media (max-width: 992px) {
+  .pbp-table {
+    font-size: 0.75rem;
+  }
+}

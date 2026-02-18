@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     info.textContent = `${nombre} - Ultimo Acceso: ${loginTime}`;
   }
 
-  const partidasLinks = document.querySelectorAll('a[href="partidas.html"]');
+  const partidasLinks = document.querySelectorAll('a[href="partidas_base.html"]');
   const setPartidasVisible = (visible) => {
     partidasLinks.forEach((link) => {
       const item = link.closest("li") || link;
@@ -79,7 +79,12 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    const canViewPartidas = dgClave === "L00" && daClave === "117";
+    const roles = Array.isArray(user?.roles) ? user.roles : [];
+    const rolesNorm = roles
+      .filter((r) => r != null)
+      .map((r) => String(r).trim().toUpperCase());
+    const isGod = rolesNorm.includes("GOD");
+    const canViewPartidas = isGod || (dgClave === "L00" && daClave === "117");
     setPartidasVisible(canViewPartidas);
   })();
 
