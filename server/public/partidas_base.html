@@ -128,8 +128,8 @@
               </select>
             </div>
             <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-              <label for="fPartida" class="form-label">ID Partida</label>
-              <input id="fPartida" type="number" class="form-control" min="1" placeholder="Opcional" />
+              <label for="fPartida" class="form-label">Partida</label>
+              <input id="fPartida" type="text" class="form-control" placeholder="Clave o descripción" />
             </div>
             <div class="col-6 col-md-3 col-lg-1 d-grid">
               <button id="btnAplicarFiltros" class="btn btn-primary">
@@ -184,10 +184,11 @@
           </div>
         </div>
       </div>
+      <div class="small text-muted mb-3" id="txtTotal"></div>
 
       <div class="card shadow-sm pbp-card">
         <div class="card-header pbp-errors-head">
-          <strong>Errores de carga</strong>
+          <strong>Errores de Carga</strong>
         </div>
         <div class="card-body">
           <div id="errorEmpty" class="alert alert-success mb-0">Sin errores en la ultima carga.</div>

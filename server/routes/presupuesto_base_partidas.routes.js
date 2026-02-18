@@ -208,11 +208,20 @@ router.get("/", async (req, res) => {
       params.push(value);
     };
 
+    const addTextFilter = (queryKey, column) => {
+      const raw = req.query[queryKey];
+      if (raw == null || String(raw).trim() === "") return;
+
+      const value = String(raw).trim();
+      where.push(`${column} ILIKE $${idx++}`);
+      params.push(`%${value}%`);
+    };
+
     addNumericFilter("ejercicio", "pbp.ejercicio");
     addNumericFilter("id_dgeneral", "pbp.id_dgeneral");
     addNumericFilter("id_dauxiliar", "pbp.id_dauxiliar");
     addNumericFilter("id_fuente", "pbp.id_fuente");
-    addNumericFilter("id_partida", "pbp.id_partida");
+    addTextFilter("partida", "pa.clave");
 
     const sql = `
       SELECT

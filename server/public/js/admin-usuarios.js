@@ -661,7 +661,7 @@ function initPasswordGeneratorModal() {
 document.addEventListener("DOMContentLoaded", async () => {
   initPasswordGeneratorModal();
   const btnVolver = document.getElementById("btnVolver");
-  if (btnVolver) btnVolver.addEventListener("click", () => (window.location.href = "index.html"));
+  if (btnVolver) btnVolver.addEventListener("click", () => (window.location.href = "suficiencia_presupuestal.html"));
 
   const btnNuevoUsuario = document.getElementById("btnNuevoUsuario");
   if (btnNuevoUsuario) btnNuevoUsuario.addEventListener("click", abrirModalNuevoUsuario);

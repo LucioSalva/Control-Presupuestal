@@ -118,7 +118,7 @@
     const idDgeneral = String(document.getElementById("fDgeneral")?.value || "").trim();
     const idDauxiliar = String(document.getElementById("fDauxiliar")?.value || "").trim();
     const idFuente = String(document.getElementById("fFuente")?.value || "").trim();
-    const idPartida = String(document.getElementById("fPartida")?.value || "").trim();
+    const partida = String(document.getElementById("fPartida")?.value || "").trim();
 
     const params = new URLSearchParams();
 
@@ -126,15 +126,19 @@
     if (idDgeneral) params.set("id_dgeneral", idDgeneral);
     if (idDauxiliar) params.set("id_dauxiliar", idDauxiliar);
     if (idFuente) params.set("id_fuente", idFuente);
-    if (idPartida) params.set("id_partida", idPartida);
+    if (partida) params.set("partida", partida);
 
     return params;
   }
 
-  function renderResumen(totalRows) {
+  function renderResumen(totalRows, totalMonto) {
     const txtResumen = document.getElementById("txtResumen");
+    const txtTotal = document.getElementById("txtTotal");
     if (!txtResumen) return;
     txtResumen.textContent = `${totalRows} registro(s)`;
+    if (txtTotal) {
+      txtTotal.textContent = `Total: ${money(totalMonto)}`;
+    }
   }
 
   function renderRows(rows) {
@@ -144,9 +148,11 @@
     if (!Array.isArray(rows) || rows.length === 0) {
       tbody.innerHTML =
         '<tr><td colspan="20" class="text-center text-muted py-4">Sin resultados.</td></tr>';
-      renderResumen(0);
+      renderResumen(0, 0);
       return;
     }
+
+    const totalMonto = rows.reduce((acc, row) => acc + Number(row?.total || 0), 0);
 
     tbody.innerHTML = rows
       .map((row) => {
@@ -177,7 +183,7 @@
       })
       .join("");
 
-    renderResumen(rows.length);
+    renderResumen(rows.length, totalMonto);
   }
 
   function renderErrors(errors) {
