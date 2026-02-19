@@ -788,15 +788,6 @@
     setVal("dependencia", depGenNombre);
     setVal("dependencia_aux", depAuxNombre);
 
-    const inputDireccionFirma = document.querySelector(
-      '[name="firma_direccion_solicitante"]',
-    );
-    if (inputDireccionFirma) {
-      const nombreDireccion =
-        dgeneralInfo?.dependencia || dgeneralInfo?.nombre || "";
-      inputDireccionFirma.value = nombreDireccion;
-    }
-
     updateClaveProgramatica();
     if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
   }
@@ -1133,6 +1124,10 @@
     formatMoneyFields();
 
     lastSavedId = Number(data.id);
+    try {
+      if (btnDescargarPdf)
+        btnDescargarPdf.disabled = !(Number.isFinite(lastSavedId) && lastSavedId > 0);
+    } catch {}
 
     localStorage.setItem("cp_last_suf_id", String(lastSavedId));
     sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
@@ -1247,6 +1242,10 @@
       throw new Error("El servidor no devolvió el ID del registro.");
 
     lastSavedId = Number(saved.id);
+    try {
+      if (btnDescargarPdf)
+        btnDescargarPdf.disabled = !(Number.isFinite(lastSavedId) && lastSavedId > 0);
+    } catch {}
 
     localStorage.setItem("cp_last_suf_id", String(lastSavedId));
     sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
@@ -1433,6 +1432,291 @@
         f.setText(String(value ?? ""));
       } catch {}
     };
+    const setTextMulti = (fieldNames, value, size, align) => {
+      for (const nm of fieldNames || []) {
+        try {
+          const f = form.getTextField(nm);
+          if (size != null) f.setFontSize(size);
+          if (align != null && window.PDFLib?.TextAlignment) {
+            f.setAlignment(align);
+          }
+          f.setText(String(value ?? ""));
+          return;
+        } catch {}
+      }
+    };
+    const setTextByPattern = (includesArray, value, size, align) => {
+      try {
+        const fields = form.getFields();
+        const lowerInc = (includesArray || []).map((s) =>
+          String(s || "").toLowerCase(),
+        );
+        let wrote = 0;
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const nmLower = nm.toLowerCase();
+          const ok = lowerInc.every((frag) => nmLower.includes(frag));
+          if (ok) {
+            if (size != null) f.setFontSize(size);
+            if (align != null && window.PDFLib?.TextAlignment) {
+              f.setAlignment(align);
+            }
+            f.setText(String(value ?? ""));
+            wrote++;
+          }
+        }
+        if (wrote > 0) return true;
+      } catch {}
+      return false;
+    };
+    const getFirmasStore = () => {
+      try {
+        const raw = localStorage.getItem("cp_suf_firmas") || "{}";
+        const obj = JSON.parse(raw);
+        return obj && typeof obj === "object" ? obj : {};
+      } catch {
+        return {};
+      }
+    };
+    const saveFirmasStore = (map) => {
+      try {
+        localStorage.setItem("cp_suf_firmas", JSON.stringify(map || {}));
+      } catch {}
+    };
+    const collectSignatureFieldNames = () => {
+      const out = [];
+      try {
+        const fields = form.getFields();
+        const keys = [
+          "firma",
+          "firmante",
+          "autoriza",
+          "vobo",
+          "vo.bo",
+          "recibe",
+          "responsable",
+          "titular",
+        ];
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const lower = nm.toLowerCase();
+          if (keys.some((k) => lower.includes(k))) out.push(nm);
+        }
+      } catch {}
+      return out;
+    };
+    const ensureFirmasValues = async () => {
+      const nombres = collectSignatureFieldNames();
+      if (!nombres.length) return {};
+      const store = getFirmasStore();
+      const missing = nombres.filter((n) => !store[n]);
+      if (!missing.length) return store;
+      if (!window.Swal) return store;
+      const html = `
+        <div class="text-start">
+          <p class="mb-2">Captura los nombres/cargos para las firmas. Se guardarán y se reutilizarán.</p>
+          ${missing
+            .map(
+              (nm, i) =>
+                `<div class="mb-2">
+                  <label class="form-label small">${nm}</label>
+                  <input type="text" class="form-control form-control-sm" id="firma_${i}" placeholder="Nombre / Cargo">
+                </div>`,
+            )
+            .join("")}
+        </div>`;
+      const result = await Swal.fire({
+        title: "Firmas del PDF",
+        html,
+        focusConfirm: false,
+        width: 700,
+        confirmButtonText: "Guardar",
+        showCancelButton: true,
+      });
+      if (result.isConfirmed) {
+        missing.forEach((nm, i) => {
+          const el = document.getElementById(`firma_${i}`);
+          const val = (el?.value || "").trim();
+          if (val) store[nm] = val;
+        });
+        saveFirmasStore(store);
+      }
+      return store;
+    };
+    const getExtrasStore = () => {
+      try {
+        const raw = localStorage.getItem("cp_suf_extras") || "{}";
+        const obj = JSON.parse(raw);
+        return obj && typeof obj === "object" ? obj : {};
+      } catch {
+        return {};
+      }
+    };
+    const saveExtrasStore = (map) => {
+      try {
+        localStorage.setItem("cp_suf_extras", JSON.stringify(map || {}));
+      } catch {}
+    };
+    const collectCategoryFields = () => {
+      const cats = { enlace: [], area: [], direccion: [] };
+      try {
+        const fields = form.getFields();
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const lower = nm.toLowerCase();
+          if (
+            lower.includes("coordinación") &&
+            lower.includes("administrativa") &&
+            lower.includes("área") &&
+            lower.includes("solicitante")
+          ) {
+            cats.enlace.push(nm);
+          } else if (
+            lower.includes("área") &&
+            lower.includes("solicitante") &&
+            !lower.includes("coordinación") &&
+            !lower.includes("administrativa")
+          ) {
+            cats.area.push(nm);
+          } else if (lower.includes("dirección") && lower.includes("solicitante")) {
+            cats.direccion.push(nm);
+          }
+        }
+      } catch {}
+      return cats;
+    };
+    const ensureExtrasValues = async () => {
+      const cats = collectCategoryFields();
+      const store = getExtrasStore();
+      const needEnlace = cats.enlace.length && !store.enlace;
+      const needArea = cats.area.length && !store.area;
+      const needDireccion = cats.direccion.length && !store.direccion;
+      if (!needEnlace && !needArea && !needDireccion) return store;
+      if (!window.Swal) return store;
+      const html = `
+        <div class="text-start">
+          <p class="mb-2">Captura textos para los encabezados:</p>
+          ${needEnlace ? `<div class="mb-2">
+              <label class="form-label small">ENLACE SOLICITANTE (Coordinación Administrativa)</label>
+              <input type="text" class="form-control form-control-sm" id="extra_enlace" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA">
+            </div>` : ""}
+          ${needArea ? `<div class="mb-2">
+              <label class="form-label small">ÁREA SOLICITANTE</label>
+              <input type="text" class="form-control form-control-sm" id="extra_area" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS...">
+            </div>` : ""}
+          ${needDireccion ? `<div class="mb-2">
+              <label class="form-label small">DIRECCIÓN SOLICITANTE</label>
+              <input type="text" class="form-control form-control-sm" id="extra_direccion" placeholder="Dirección Solicitante">
+            </div>` : ""}
+        </div>`;
+      const result = await Swal.fire({
+        title: "Encabezados del Solicitante",
+        html,
+        focusConfirm: false,
+        width: 700,
+        confirmButtonText: "Guardar",
+        showCancelButton: true,
+      });
+      if (result.isConfirmed) {
+        if (needEnlace) {
+          const v = (document.getElementById("extra_enlace")?.value || "").trim();
+          if (v) store.enlace = v;
+        }
+        if (needArea) {
+          const v = (document.getElementById("extra_area")?.value || "").trim();
+          if (v) store.area = v;
+        }
+        if (needDireccion) {
+          const v = (document.getElementById("extra_direccion")?.value || "").trim();
+          if (v) store.direccion = v;
+        }
+        saveExtrasStore(store);
+      }
+      return store;
+    };
+    const getRolesStore = () => {
+      return {
+        enlace_label: "",
+        enlace_firma: "",
+        area_label: "",
+        area_firma: "",
+        direccion_firma: "",
+      };
+    };
+    const ensureRolesValues = async () => {
+      const roles = getRolesStore();
+      if (!window.Swal) return roles;
+      const html = `
+        <div class="text-start">
+          <p class="mb-2">Captura los datos para encabezados y firmantes:</p>
+          <div class="row g-2">
+            <div class="col-8">
+              <label class="form-label small">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
+              <input type="text" class="form-control form-control-sm" id="roles_enlace_label" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA" value="${roles.enlace_label || ""}">
+            </div>
+            <div class="col-4">
+              <label class="form-label small">Firmante Enlace</label>
+              <input type="text" class="form-control form-control-sm" id="roles_enlace_firma" placeholder="Nombre del firmante" value="${roles.enlace_firma || ""}">
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-8">
+              <label class="form-label small">ÁREA SOLICITANTE</label>
+              <input type="text" class="form-control form-control-sm" id="roles_area_label" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS..." value="${roles.area_label || ""}">
+            </div>
+            <div class="col-4">
+              <label class="form-label small">Firmante Área</label>
+              <input type="text" class="form-control form-control-sm" id="roles_area_firma" placeholder="Nombre del firmante" value="${roles.area_firma || ""}">
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-8">
+              <label class="form-label small">Dirección Solicitante</label>
+              <input type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
+            </div>
+            <div class="col-4">
+              <label class="form-label small">Firmante Dirección</label>
+              <input type="text" class="form-control form-control-sm" id="roles_direccion_firma" placeholder="Nombre del firmante" value="${roles.direccion_firma || ""}">
+            </div>
+          </div>
+        </div>`;
+      const result = await Swal.fire({
+        title: "Datos de Solicitante y Firmantes",
+        html,
+        focusConfirm: false,
+        width: 800,
+        confirmButtonText: "Guardar",
+        showCancelButton: true,
+      });
+      if (!result.isConfirmed) {
+        throw new Error("Captura cancelada: faltan datos de encabezados y firmantes.");
+      }
+      roles.enlace_label =
+        (document.getElementById("roles_enlace_label")?.value || "").trim();
+      roles.enlace_firma =
+        (document.getElementById("roles_enlace_firma")?.value || "").trim();
+      roles.area_label =
+        (document.getElementById("roles_area_label")?.value || "").trim();
+      roles.area_firma =
+        (document.getElementById("roles_area_firma")?.value || "").trim();
+      roles.direccion_firma =
+        (document.getElementById("roles_direccion_firma")?.value || "").trim();
+      return roles;
+    };
+    const findFirmasByName = () => {
+      const out = { firma1: [], firma2: [], firma3: [] };
+      try {
+        const fields = form.getFields();
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const lower = nm.toLowerCase();
+          if (lower.includes("firma1")) out.firma1.push(nm);
+          else if (lower.includes("firma2")) out.firma2.push(nm);
+          else if (lower.includes("firma3")) out.firma3.push(nm);
+        }
+      } catch {}
+      return out;
+    };
 
     const safeN = (x) => {
       const n = Number(x);
@@ -1459,22 +1743,40 @@
     }
 
     const sizeHeader = 9;
-    const sizeSmall = 8;
-    const sizeTiny = 7;
+    const sizeDG = 12;
+    const sizeSmall = 9;
+    const sizeTiny = 9;
 
     // CABECERA
     const depGeneralName =
       String(dgeneralInfo?.dependencia || "").trim() ||
       String(get("dependencia") || "").trim() ||
       String(getLoggedUser()?.dgeneral_nombre || "").trim();
-    setTextSafe(
-      "NOMBRE DE LA DEPENDENCIA GENERAL:",
-      depGeneralName,
-      sizeHeader,
-      PDFLib?.TextAlignment?.Center,
-    );
-    setTextSafe(
-      "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+    const wroteDep =
+      setTextByPattern(
+        ["dependencia", "general"],
+        depGeneralName,
+        sizeDG,
+        PDFLib?.TextAlignment?.Center,
+      ) ||
+      setTextMulti(
+        [
+          "NOMBRE DE LA DEPENDENCIA GENERAL:",
+          "NOMBRE DE LA DEPENDENCIA GENERAL",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#4",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#3",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#2",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#1",
+        ],
+        depGeneralName,
+        sizeDG,
+        PDFLib?.TextAlignment?.Center,
+      );
+    setTextMulti(
+      [
+        "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+        "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
+      ],
       payload.clave_programatica || "",
       sizeHeader,
       PDFLib?.TextAlignment?.Center,
@@ -1483,12 +1785,50 @@
       String(document.getElementById("claveProgDesc")?.textContent || "")
         .trim() ||
       String(get("meta") || "").trim();
-    setTextSafe(
-      "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+    setTextMulti(
+      [
+        "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+        "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
+      ],
       claveProgDesc,
       sizeHeader,
       PDFLib?.TextAlignment?.Center,
     );
+
+    // Roles y encabezados: Enlace solicitante / Área solicitante / Dirección solicitante (label desde DG)
+    const roles = await ensureRolesValues();
+    try {
+      const cats = collectCategoryFields();
+      if (roles.enlace_label) {
+        for (const nm of cats.enlace) {
+          setTextSafe(nm, roles.enlace_label, sizeSmall, PDFLib?.TextAlignment?.Center);
+        }
+      }
+      if (roles.area_label) {
+        for (const nm of cats.area) {
+          setTextSafe(nm, roles.area_label, sizeSmall, PDFLib?.TextAlignment?.Center);
+        }
+      }
+      // Dirección: se rellena con dependencia general (depGeneralName)
+      for (const nm of cats.direccion) {
+        setTextSafe(nm, depGeneralName, sizeSmall, PDFLib?.TextAlignment?.Center);
+      }
+      setTextByPattern(["dirección", "solicitante"], depGeneralName, sizeSmall, PDFLib?.TextAlignment?.Center);
+    } catch {}
+
+    // FIRMAS específicas: Firma1 (enlace), Firma2 (área), Firma3 (dirección)
+    try {
+      const m = findFirmasByName();
+      for (const nm of m.firma1) {
+        if (roles.enlace_firma) setTextSafe(nm, roles.enlace_firma, sizeSmall, PDFLib?.TextAlignment?.Center);
+      }
+      for (const nm of m.firma2) {
+        if (roles.area_firma) setTextSafe(nm, roles.area_firma, sizeSmall, PDFLib?.TextAlignment?.Center);
+      }
+      for (const nm of m.firma3) {
+        if (roles.direccion_firma) setTextSafe(nm, roles.direccion_firma, sizeSmall, PDFLib?.TextAlignment?.Center);
+      }
+    } catch {}
 
     const fuenteSel = document.querySelector('[name="fuente"]');
     const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
@@ -1630,19 +1970,75 @@
     );
     setTextSafe("Meta", payload.meta || "", sizeTiny);
 
-    form.flatten();
+    // Tamaño de fuente uniforme para todos los campos del formulario
+    try {
+      const UNIFORM_SIZE = 9;
+      const fields = form.getFields();
+      for (const f of fields) {
+        try {
+          if (typeof f.setFontSize === "function") f.setFontSize(UNIFORM_SIZE);
+        } catch {}
+      }
+    } catch {}
+
+    try {
+      const font =
+        (PDFLib?.StandardFonts &&
+          (await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica))) ||
+        undefined;
+      form.updateFieldAppearances(font);
+    } catch (e2) {
+      console.warn("[SP][PDF] No pude aplicar fuente Helvetica:", e2?.message || e2);
+    }
+    try {
+      form.flatten();
+    } catch (e) {
+      console.warn("[SP][PDF] flatten falló:", e?.message || e);
+    }
 
     const outBytes = await pdfDoc.save();
     const blob = new Blob([outBytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
 
+    const folioRaw = String(payload.folio_num || "").trim();
     const folio =
-      String(payload.folio_num || "")
-        .replace(/\D/g, "")
-        .padStart(6, "0") || "000000";
+      (folioRaw &&
+        (folioRaw.match(/^ECA-\d{4}-\d{2}-SP-\d{4}$/)
+          ? folioRaw
+          : (() => {
+              const m = folioRaw.match(/^ECA-(\d{4})-(\d{2})-SP-(\d{1,6})$/i);
+              if (m) {
+                return `ECA-${m[1]}-${m[2]}-SP-${String(m[3]).padStart(4, "0")}`;
+              }
+              const onlyDigits = folioRaw.replace(/\D/g, "");
+              if (onlyDigits) {
+                const f = get("fecha");
+                const year =
+                  f && /^\d{4}-\d{2}-\d{2}$/.test(f)
+                    ? f.slice(0, 4)
+                    : String(new Date().getFullYear());
+                const month =
+                  f && /^\d{4}-\d{2}-\d{2}$/.test(f)
+                    ? f.slice(5, 7)
+                    : String(new Date().getMonth() + 1).padStart(2, "0");
+                const num = onlyDigits.padStart(4, "0");
+                return `ECA-${year}-${month}-SP-${num}`;
+              }
+              return "SUFICIENCIA";
+            })())) ||
+      "SUFICIENCIA";
     const a = document.createElement("a");
     a.href = url;
-    a.download = `SUFICIENCIA_${folio}.pdf`;
+    a.download = `${folio}.pdf`;
+
+    try {
+      setTextByPattern(
+        ["no", "suficiencia"],
+        folio,
+        sizeSmall,
+        PDFLib?.TextAlignment?.Center,
+      );
+    } catch {}
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1705,6 +2101,10 @@
     btnDescargarPdf?.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
+        if (!(Number.isFinite(lastSavedId) && lastSavedId > 0)) {
+          await uiWarn("Primero guarda la Suficiencia para poder descargar el PDF.", "PDF");
+          return;
+        }
         await generarPDF();
       } catch (err) {
         console.error("[SP] PDF error:", err);
@@ -1934,20 +2334,7 @@
         confirmButtonColor: "#BC955C",
       });
     });
-    const btnInfoDir = document.getElementById("infoDireccionSolicitante");
-
-    btnInfoDir?.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (!hasSwal()) return;
-
-      Swal.fire({
-        icon: "info",
-        title: "Dirección solicitante",
-        text: "Este campo se autollenará con la Dependencia General (DG) del usuario.",
-        confirmButtonText: "Ok",
-        confirmButtonColor: "#BC955C",
-      });
-    });
+    // Sección de info de Dirección solicitante removida del UI
   }
 
   // ---------------------------
@@ -1962,6 +2349,10 @@
     setFechaHoy();
     lockCantidadPago();
     initFolioUI();
+    try {
+      if (btnDescargarPdf)
+        btnDescargarPdf.disabled = !(Number.isFinite(lastSavedId) && lastSavedId > 0);
+    } catch {}
 
     if (DEBUG_PDF_FIELDS) {
       try {

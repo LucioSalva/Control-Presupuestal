@@ -61,9 +61,10 @@ router.post("/", async (req, res) => {
     const fechaBaseRaw = b.fecha ? new Date(b.fecha) : new Date();
     const fechaBase = Number.isNaN(fechaBaseRaw.getTime()) ? new Date() : fechaBaseRaw;
 
+    const year = String(fechaBase.getFullYear());
     const mes = String(fechaBase.getMonth() + 1).padStart(2, "0");
     const tipo = "CP";
-    const prefijo = `ECA-${mes}-${tipo}-`;
+    const prefijo = `ECA-${year}-${mes}-${tipo}-`;
 
     const departamento = b.departamento ?? b.dependencia_aux ?? null;
 
