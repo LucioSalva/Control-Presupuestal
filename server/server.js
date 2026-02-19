@@ -1,4 +1,4 @@
-﻿// =====================================================
+// =====================================================
 //  IMPORTS Y CONFIG
 // =====================================================
 import express from "express";
@@ -18,6 +18,7 @@ import suficienciasRouter from "./routes/suficiencias.routes.js";
 import presupuestoRouter from "./routes/presupuesto.routes.js";
 import comprometidoRouter from "./routes/comprometido.routes.js";
 import devengadoRouter from "./routes/devengado.routes.js";
+import expedientesEntregaRouter from "./routes/expedientes_entrega.routes.js";
 import metasRouter from "./routes/metas.routes.js";
 import partidasRouter from "./routes/partidas.routes.js";
 import presupuestoBasePartidasRouter from "./routes/presupuesto_base_partidas.routes.js";
@@ -233,6 +234,7 @@ app.use("/api/admin/usuarios", authRequired, requireGodOrAdmin, adminUsuariosRou
 app.use("/api/suficiencias", authRequired, suficienciasRouter);
 app.use("/api/comprometido", authRequired, comprometidoRouter);
 app.use("/api/devengado", authRequired, devengadoRouter);
+app.use("/api/expedientes-entrega", authRequired, expedientesEntregaRouter);
 
 app.use("/api", presupuestoRouter);
 

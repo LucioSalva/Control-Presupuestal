@@ -3,8 +3,7 @@
   const START_ROWS = 3;
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
   const DEBUG_PDF_FIELDS = true;
-const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
-
+  const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
 
   // ---------------------------
   // DOM
@@ -12,7 +11,7 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
   const btnGuardar = document.getElementById("btn-guardar");
   const btnSi = document.getElementById("btn-si-seguro");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
- 
+
   const DG_DA_PROYECTOS_FILTERS = window.DG_DA_PROYECTOS_FILTERS || {};
   const DG_DA_FUENTES_FILTERS = window.DG_DA_FUENTES_FILTERS || {};
 
@@ -37,8 +36,6 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
   let dgeneralInfo = null;
   let dauxiliarInfo = null;
   let proyectosById = {};
-
-  // ✅ Partidas (solo capturadas)
   let partidasRows = [];
   let partidasMap = {};
   let fuentesMap = {};
@@ -88,7 +85,6 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
     return Number.isFinite(x) ? x : 0;
   }
 
-  // helper: evita "Unexpected token <" y muestra errores DB
   async function fetchJson(url, options = {}) {
     const r = await fetch(url, options);
     const text = await r.text();
@@ -311,20 +307,20 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
   }
 
   // ---------------------------
-  // Catálogo de partidas (solo capturadas)
+  // Catálogo de partidas (permitidas por área)
   // ---------------------------
   async function loadPartidasCatalog() {
-    const data = await fetchJson(`${API}/api/catalogos/partidas`, {
+    const data = await fetchJson(`${API}/api/catalogos/partidas-permitidas`, {
       headers: { ...authHeaders() },
     });
 
     const rows = Array.isArray(data?.rows) ? data.rows : [];
-    partidasRows = rows.filter((r) => r && r.capturada === true);
+    partidasRows = rows.filter((r) => r && r.clave);
 
     partidasMap = {};
     for (const r of partidasRows) {
       const clave = String(r.clave || "").trim();
-      const desc = String(r.partida || "").trim();
+      const desc = String(r.partida ?? r.descripcion ?? "").trim();
       if (clave) partidasMap[clave] = desc;
     }
   }
@@ -505,7 +501,6 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
     return isCheckedAny('[name="imp_pension"], #imp_pension');
   }
 
-  // ✅ percent robusto (acepta "10", "10%", "10.5", "10,5")
   function clampPercent(val) {
     const raw = String(val ?? "").replace(",", ".");
     const clean = raw.replace(/[^0-9.]/g, "");
@@ -517,11 +512,9 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
     return n;
   }
 
-  // ✅ lee tasa por name o id, y si NO existe, avisa en consola
   function getRateValue(selectors, debugLabel) {
     const el = document.querySelector(selectors);
     if (!el) {
-      // Si ISR/IEPS no salen, es porque tu HTML no tiene estos inputs.
       console.warn(`[SP] Falta input de tasa: ${debugLabel} (${selectors})`);
       return 0;
     }
@@ -612,7 +605,7 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
       },
     });
 
-    if (value == null) return null; // canceló
+    if (value == null) return null;
     return clampPercent(value);
   }
 
@@ -622,7 +615,6 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
     el.value = String(percent);
   }
 
-  // Cuando cambie la partida (select), llena concepto
   document.addEventListener("change", (e) => {
     if (!e.target || !e.target.classList.contains("sp-clave")) return;
 
@@ -642,7 +634,6 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
     refreshTotales();
   });
 
-  // Cuando cambie importe recalcula (ya traes formateo y blur)
   document.addEventListener("input", (e) => {
     if (e.target && e.target.classList.contains("sp-importe")) {
       refreshTotales();
@@ -907,7 +898,6 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
         `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`,
     );
 
-    // Mapa para PDF: id -> {clave, fuente}
     window.fuentesMap = window.fuentesMap || {};
     window.fuentesMap = {};
     (data || []).forEach((x) => {
@@ -1006,7 +996,7 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
     const all = Object.values(proyectosById || {});
     if (!all.length) return;
 
-    const allowed = getAllowedProyectoSet(); // Set o null
+    const allowed = getAllowedProyectoSet();
 
     const rows =
       allowed === null
@@ -1145,14 +1135,13 @@ const SUF_PDF_TEMPLATE_URL = "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
     lastSavedId = Number(data.id);
 
     localStorage.setItem("cp_last_suf_id", String(lastSavedId));
-sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
+    sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
 
-const aComp = document.getElementById("linkComprometido");
-if (aComp) aComp.href = `comprometido.html?id=${lastSavedId}`;
+    const aComp = document.getElementById("linkComprometido");
+    if (aComp) aComp.href = `comprometido.html?id=${lastSavedId}`;
 
-const aDev = document.getElementById("linkDevengado");
-if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
-
+    const aDev = document.getElementById("linkDevengado");
+    if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
 
     modalBuscar?.hide?.();
     await uiSuccess("Suficiencia cargada correctamente.");
@@ -1258,23 +1247,20 @@ if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
       throw new Error("El servidor no devolvió el ID del registro.");
 
     lastSavedId = Number(saved.id);
-    
-localStorage.setItem("cp_last_suf_id", String(lastSavedId));
-sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
 
-const aComp = document.getElementById("linkComprometido");
-if (aComp) aComp.href = `comprometido.html?id=${lastSavedId}`;
+    localStorage.setItem("cp_last_suf_id", String(lastSavedId));
+    sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
 
-const aDev = document.getElementById("linkDevengado");
-if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
+    const aComp = document.getElementById("linkComprometido");
+    if (aComp) aComp.href = `comprometido.html?id=${lastSavedId}`;
 
+    const aDev = document.getElementById("linkDevengado");
+    if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
 
     if (saved.no_suficiencia)
       setVal("no_suficiencia", String(saved.no_suficiencia));
     else if (saved.folio_num != null)
       setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
-
-    
 
     await uiSuccess("Guardado correctamente.");
     return saved;
@@ -1291,13 +1277,11 @@ if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
       });
     };
 
-    // checkboxes
     listen('[name="imp_iva"], #imp_iva');
     listen('[name="imp_isr"], #imp_isr');
     listen('[name="imp_ieps"], #imp_ieps');
     listen('[name="imp_pension"], #imp_pension');
 
-    // tasas
     listen('[name="isr_tasa"], #isr_tasa');
     listen('[name="ieps_tasa"], #ieps_tasa');
     listen('[name^="pension"][name$="_tasa"]');
@@ -1386,128 +1370,284 @@ if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
   }
 
   // ---------------------------
-// PDF SUFICIENCIA (pdf-lib)
-// ---------------------------
-async function fetchPdfTemplateBytesSuf() {
-  const r = await fetch(SUF_PDF_TEMPLATE_URL);
-  if (!r.ok) {
-    throw new Error(`No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`);
-  }
-  return await r.arrayBuffer();
-}
-
-async function debugListPdfFields() {
-  const bytes = await fetchPdfTemplateBytesSuf();
-  const pdfDoc = await PDFLib.PDFDocument.load(bytes);
-  const form = pdfDoc.getForm();
-  console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
-}
-
-async function generarPDF() {
-  refreshTotales();
-
-  if (!window.PDFLib?.PDFDocument) {
-    throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
+  // PDF SUFICIENCIA (pdf-lib)
+  // ---------------------------
+  async function fetchPdfTemplateBytesSuf() {
+    const r = await fetch(SUF_PDF_TEMPLATE_URL);
+    if (!r.ok) {
+      throw new Error(
+        `No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`,
+      );
+    }
+    return await r.arrayBuffer();
   }
 
-  const payload = {
-    fecha: get("fecha"),
-    dependencia: get("dependencia"),
-    fuente: get("fuente"),
-    mes_pago: get("mes_pago"),
-    subtotal: moneyParse(get("subtotal")),
-    iva: moneyParse(get("iva")),
-    isr: moneyParse(get("isr")),
-    ieps: moneyParse(get("ieps")),
-    pension_total: moneyParse(get("pension_total")),
-    total: moneyParse(get("total")),
-    cantidad_con_letra: get("cantidad_con_letra"),
-    meta: get("meta"),
-    clave_programatica: get("clave_programatica"),
-    detalle: buildDetalle(),
-    folio_num: get("no_suficiencia"),
-  };
-
-  const templateBytes = await fetchPdfTemplateBytesSuf();
-  const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
-  const form = pdfDoc.getForm();
-
-  const setTextSafe = (fieldName, value) => {
-    try {
-      const f = form.getTextField(fieldName);
-      f.setText(String(value ?? ""));
-    } catch {}
-  };
-
-  const safeN = (x) => {
-    const n = Number(x);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  function splitFechaParts(iso) {
-    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
-    const [y, m, d] = iso.split("-");
-    return { d, m, y };
+  async function debugListPdfFields() {
+    const bytes = await fetchPdfTemplateBytesSuf();
+    const pdfDoc = await PDFLib.PDFDocument.load(bytes);
+    const form = pdfDoc.getForm();
+    console.log(
+      "[PDF] Campos:",
+      form.getFields().map((f) => f.getName()),
+    );
   }
 
-  // CABECERA
-  setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
-  setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
-  setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+  async function generarPDF() {
+    refreshTotales();
 
-  const fuenteSel = document.querySelector('[name="fuente"]');
-  const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+    if (!window.PDFLib?.PDFDocument) {
+      throw new Error(
+        "Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.",
+      );
+    }
 
-  setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente || ""));
-  setTextSafe("NOMBRE F.F", String(fuenteText || ""));
+    const payload = {
+      fecha: get("fecha"),
+      dependencia: get("dependencia"),
+      fuente: get("fuente"),
+      mes_pago: get("mes_pago"),
+      subtotal: moneyParse(get("subtotal")),
+      iva: moneyParse(get("iva")),
+      isr: moneyParse(get("isr")),
+      ieps: moneyParse(get("ieps")),
+      pension_total: moneyParse(get("pension_total")),
+      total: moneyParse(get("total")),
+      cantidad_con_letra: get("cantidad_con_letra"),
+      meta: get("meta"),
+      clave_programatica: get("clave_programatica"),
+      detalle: buildDetalle(),
+      folio_num: get("no_suficiencia"),
+    };
 
-  const { d, m, y } = splitFechaParts(payload.fecha);
-  setTextSafe("fechadia", d);
-  setTextSafe("fechames", m);
-  setTextSafe("fechayear", y);
+    const templateBytes = await fetchPdfTemplateBytesSuf();
+    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
+    const form = pdfDoc.getForm();
 
-  // PROGRAMACIÓN DE PAGO
-  const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
-  const totalTxt = safeN(payload.total).toFixed(2);
-  const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
-  for (const mes of meses) {
-    setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
+    const setTextSafe = (fieldName, value, size, align) => {
+      try {
+        const f = form.getTextField(fieldName);
+        if (size != null) f.setFontSize(size);
+        if (align != null && window.PDFLib?.TextAlignment) {
+          f.setAlignment(align);
+        }
+        f.setText(String(value ?? ""));
+      } catch {}
+    };
+
+    const safeN = (x) => {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const normalizeCell = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
+    const cut = (v, max) => {
+      const s = normalizeCell(v);
+      if (!max || s.length <= max) return s;
+      return s.slice(0, max);
+    };
+    const padLines = (arr, max) => {
+      const out = arr.slice(0, max);
+      while (out.length < max) out.push("");
+      return out;
+    };
+
+    function splitFechaParts(iso) {
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso))
+        return { d: "", m: "", y: "" };
+      const [y, m, d] = iso.split("-");
+      return { d, m, y };
+    }
+
+    const sizeHeader = 9;
+    const sizeSmall = 8;
+    const sizeTiny = 7;
+
+    // CABECERA
+    const depGeneralName =
+      String(dgeneralInfo?.dependencia || "").trim() ||
+      String(get("dependencia") || "").trim() ||
+      String(getLoggedUser()?.dgeneral_nombre || "").trim();
+    setTextSafe(
+      "NOMBRE DE LA DEPENDENCIA GENERAL:",
+      depGeneralName,
+      sizeHeader,
+      PDFLib?.TextAlignment?.Center,
+    );
+    setTextSafe(
+      "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+      payload.clave_programatica || "",
+      sizeHeader,
+      PDFLib?.TextAlignment?.Center,
+    );
+    const claveProgDesc =
+      String(document.getElementById("claveProgDesc")?.textContent || "")
+        .trim() ||
+      String(get("meta") || "").trim();
+    setTextSafe(
+      "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+      claveProgDesc,
+      sizeHeader,
+      PDFLib?.TextAlignment?.Center,
+    );
+
+    const fuenteSel = document.querySelector('[name="fuente"]');
+    const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+    const fuenteId = String(get("fuente") || "").trim();
+    const fuenteInfo = fuentesMap?.[fuenteId];
+    let fuenteClave = String(fuenteInfo?.clave || "").trim();
+    let fuenteDesc = String(fuenteInfo?.fuente || "").trim();
+    if (!fuenteClave && fuenteText.includes(" - ")) {
+      const [c, ...rest] = fuenteText.split(" - ");
+      fuenteClave = String(c || "").trim();
+      fuenteDesc = rest.join(" - ").trim();
+    }
+
+    setTextSafe(
+      "FUENTE DE FINANCIAMIENTO",
+      fuenteClave || "",
+      sizeHeader,
+      PDFLib?.TextAlignment?.Center,
+    );
+    setTextSafe(
+      "NOMBRE F.F",
+      fuenteDesc || fuenteText || "",
+      sizeSmall,
+      PDFLib?.TextAlignment?.Center,
+    );
+
+    const { d, m, y } = splitFechaParts(payload.fecha);
+    setTextSafe("fechadia", d, sizeSmall);
+    setTextSafe("fechames", m, sizeSmall);
+    setTextSafe("fechayear", y, sizeSmall);
+
+    // PROGRAMACIÓN DE PAGO
+    const mesSel = String(payload.mes_pago || "")
+      .trim()
+      .toUpperCase();
+    const totalTxt = safeN(payload.total).toFixed(2);
+    const meses = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+    ];
+    for (const mes of meses) {
+      setTextSafe(
+        `${mes}PROGRAMACIÓN DE PAGO`,
+        mes === mesSel ? totalTxt : "",
+        sizeTiny,
+      );
+    }
+
+    // DETALLE
+    const detalle = Array.isArray(payload.detalle) ? payload.detalle : [];
+    const rows = detalle.slice(0, MAX_ROWS);
+    const linesNo = padLines(
+      rows.map((r, i) => String(r.renglon ?? i + 1)),
+      MAX_ROWS,
+    );
+    const linesClave = padLines(
+      rows.map((r) => cut(r.clave || "", 12)),
+      MAX_ROWS,
+    );
+    const linesConcepto = padLines(
+      rows.map((r) => cut(r.concepto_partida || "", 46)),
+      MAX_ROWS,
+    );
+    const linesJust = padLines(
+      rows.map((r) => cut(r.justificacion || "", 58)),
+      MAX_ROWS,
+    );
+    const linesDesc = padLines(
+      rows.map((r) => cut(r.descripcion || "", 58)),
+      MAX_ROWS,
+    );
+    const linesImp = padLines(
+      rows.map((r) => safeN(r.importe).toFixed(2)),
+      MAX_ROWS,
+    );
+
+    setTextSafe("No", linesNo.join("\n"), sizeSmall);
+    setTextSafe("CLAVE", linesClave.join("\n"), sizeSmall);
+    setTextSafe(
+      "CONCEPTO DE PARTIDA",
+      linesConcepto.join("\n"),
+      sizeSmall,
+    );
+    setTextSafe("JUSTIFICACIÓN", linesJust.join("\n"), sizeSmall);
+    setTextSafe("DESCRIPCIÓN", linesDesc.join("\n"), sizeSmall);
+    setTextSafe("IMPORTE", linesImp.join("\n"), sizeSmall);
+
+    // TOTALES
+    setTextSafe(
+      "subtotal",
+      safeN(payload.subtotal).toFixed(2),
+      sizeSmall,
+      PDFLib?.TextAlignment?.Right,
+    );
+    setTextSafe(
+      "IVA",
+      safeN(payload.iva).toFixed(2),
+      sizeSmall,
+      PDFLib?.TextAlignment?.Right,
+    );
+    setTextSafe(
+      "ISR",
+      safeN(payload.isr).toFixed(2),
+      sizeSmall,
+      PDFLib?.TextAlignment?.Right,
+    );
+    setTextSafe(
+      "IEPS",
+      safeN(payload.ieps).toFixed(2),
+      sizeSmall,
+      PDFLib?.TextAlignment?.Right,
+    );
+    setTextSafe(
+      "PENSION",
+      safeN(payload.pension_total).toFixed(2),
+      sizeSmall,
+      PDFLib?.TextAlignment?.Right,
+    );
+    setTextSafe(
+      "total",
+      safeN(payload.total).toFixed(2),
+      sizeSmall,
+      PDFLib?.TextAlignment?.Right,
+    );
+    setTextSafe(
+      "CANTIDAD CON LETRA:",
+      payload.cantidad_con_letra || "",
+      sizeTiny,
+    );
+    setTextSafe("Meta", payload.meta || "", sizeTiny);
+
+    form.flatten();
+
+    const outBytes = await pdfDoc.save();
+    const blob = new Blob([outBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+
+    const folio =
+      String(payload.folio_num || "")
+        .replace(/\D/g, "")
+        .padStart(6, "0") || "000000";
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `SUFICIENCIA_${folio}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
-
-  // DETALLE
-  const detalle = payload.detalle || [];
-  setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
-  setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
-  setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
-  setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
-  setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
-  setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
-
-  // TOTALES
-  setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
-  setTextSafe("IVA", safeN(payload.iva).toFixed(2));
-  setTextSafe("ISR", safeN(payload.isr).toFixed(2));
-  setTextSafe("IEPS", safeN(payload.ieps).toFixed(2));
-  setTextSafe("PENSION", safeN(payload.pension_total).toFixed(2));
-  setTextSafe("total", safeN(payload.total).toFixed(2));
-  setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
-  setTextSafe("Meta", payload.meta || "");
-
-  form.flatten();
-
-  const outBytes = await pdfDoc.save();
-  const blob = new Blob([outBytes], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-
-  const folio = String(payload.folio_num || "").replace(/\D/g, "").padStart(6, "0") || "000000";
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `SUFICIENCIA_${folio}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
 
   // ---------------------------
   // Eventos
@@ -1824,12 +1964,12 @@ async function generarPDF() {
     initFolioUI();
 
     if (DEBUG_PDF_FIELDS) {
-    try {
-      await debugListPdfFields();
-    } catch (e) {
-      console.warn("[PDF] No pude listar campos:", e?.message || e);
+      try {
+        await debugListPdfFields();
+      } catch (e) {
+        console.warn("[PDF] No pude listar campos:", e?.message || e);
+      }
     }
-  }
 
     try {
       await loadPartidasCatalog();

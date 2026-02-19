@@ -1,0 +1,31 @@
+.expedientes-entrega-page {
+  margin: 0;
+  background-color: #f5f5f5;
+  padding-top: 100px;
+}
+
+.expedientes-entrega-page .card {
+  border-radius: 10px;
+}
+
+.expedientes-entrega-page .table thead th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.expedientes-entrega-page .readonly {
+  background-color: #f8f9fa;
+}
+
+.expedientes-entrega-page .form-section-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.expedientes-entrega-page .table-responsive {
+  max-height: 420px;
+}
