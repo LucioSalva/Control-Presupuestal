@@ -22,6 +22,7 @@ import expedientesEntregaRouter from "./routes/expedientes_entrega.routes.js";
 import metasRouter from "./routes/metas.routes.js";
 import partidasRouter from "./routes/partidas.routes.js";
 import presupuestoBasePartidasRouter from "./routes/presupuesto_base_partidas.routes.js";
+import dashboardPartidasRouter from "./routes/dashboard_partidas.routes.js";
 import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
 
 
@@ -242,6 +243,7 @@ app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite, partidasRou
 app.use("/api/presupuesto-base-partidas", authRequired, requireGodOrAdmin, presupuestoBasePartidasRouter);
 app.use("/api/catalogos/metas", authRequired, metasRouter);
 app.use("/api/catalogos", authRequired, catalogosRoutes);
+app.use("/api/dashboard", authRequired, dashboardPartidasRouter);
 
 
 // =====================================================

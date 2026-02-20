@@ -43,6 +43,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
   setPartidasVisible(false);
+  const dashboardLinks = document.querySelectorAll(
+    'a[href="dashboard_partidas.html"]',
+  );
+  const setDashboardVisible = (visible) => {
+    dashboardLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+  };
+  setDashboardVisible(false);
   const expLinks = document.querySelectorAll('a[href="expedientes_entrega.html"]');
   const setExpVisible = (visible) => {
     expLinks.forEach((link) => {
@@ -95,6 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isGod = rolesNorm.includes("GOD");
     const canViewPartidas = isGod || (dgClave === "L00" && daClave === "117");
     setPartidasVisible(canViewPartidas);
+    setDashboardVisible(canViewPartidas);
     const canViewExp = isGod || (dgClave === "L00" && daClave === "117");
     setExpVisible(canViewExp);
   })();

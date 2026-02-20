@@ -1,0 +1,48 @@
+.dashboard-partidas-page {
+  background: #f7f3ef;
+}
+
+.dp-card {
+  border: 1px solid #ead9c4;
+  border-radius: 14px;
+}
+
+.dp-kpi {
+  padding: 16px 18px;
+  background: #ffffff;
+  border-left: 6px solid #7a1f2b;
+}
+
+.dp-kpi-accent {
+  border-left-color: #bc955c;
+}
+
+.dp-kpi-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #2b2b2b;
+}
+
+.dp-table thead th {
+  background: #7a1f2b;
+  color: #ffffff;
+  border-bottom: none;
+}
+
+.dp-table tbody td {
+  vertical-align: middle;
+}
+
+.dp-table .btn {
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .dp-kpi {
+    padding: 14px 16px;
+  }
+  .dp-kpi-value {
+    font-size: 1.1rem;
+  }
+}

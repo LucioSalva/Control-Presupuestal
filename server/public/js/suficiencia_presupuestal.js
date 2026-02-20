@@ -68,6 +68,18 @@
     }
   }
 
+  function canViewCancelarSuf() {
+    const user = getLoggedUser();
+    const dg = _norm(dgeneralInfo?.clave || user?.dgeneral_clave);
+    const da = _normNum(dauxiliarInfo?.clave || user?.dauxiliar_clave);
+    return dg === "L00" && da === "117";
+  }
+
+  function applyCancelarSufVisibility(canView) {
+    if (!btnCancelarSuf) return;
+    btnCancelarSuf.style.display = canView ? "" : "none";
+  }
+
   // ---------------------------
   // Helpers DOM
   // ---------------------------
@@ -2597,6 +2609,7 @@
     lockCantidadPago();
     initFolioUI();
     updateSufStatusUI(null);
+    applyCancelarSufVisibility(false);
     try {
       if (btnDescargarPdf)
         btnDescargarPdf.disabled = !(Number.isFinite(lastSavedId) && lastSavedId > 0);
@@ -2626,6 +2639,7 @@
     } catch (e) {
       console.warn("[SP] dependencias:", e.message);
     }
+    applyCancelarSufVisibility(canViewCancelarSuf());
 
     await loadProyectosCatalog();
     try {
