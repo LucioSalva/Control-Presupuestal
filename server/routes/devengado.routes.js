@@ -60,6 +60,53 @@ router.get("/por-comprometido/:id", async (req, res) => {
   }
 });
 
+// Buscar devengado por folio completo (no_devengado)
+router.get("/buscar", async (req, res) => {
+  const client = await getClient();
+  try {
+    const no = String(req.query.no || "").trim();
+    if (!no) return res.status(400).json({ error: "Falta parámetro ?no=" });
+
+    const r = await client.query(
+      `
+      SELECT
+        d.*,
+        COALESCE(d.estatus, 'ACTIVO') AS estatus,
+        c.no_comprometido
+      FROM devengados d
+      LEFT JOIN comprometidos c ON c.id = d.id_comprometido
+      WHERE d.no_devengado = $1
+      LIMIT 1
+      `,
+      [no]
+    );
+
+    if (!r.rowCount) return res.status(404).json({ error: "Devengado no encontrado" });
+
+    const idDev = Number(r.rows[0].id);
+    const rDet = await client.query(
+      `
+      SELECT renglon, clave, concepto_partida, justificacion, descripcion, importe
+      FROM devengado_detalle
+      WHERE id_devengado = $1
+      ORDER BY renglon ASC
+      `,
+      [idDev]
+    );
+
+    return res.json({
+      ok: true,
+      ...r.rows[0],
+      detalle: rDet.rows,
+    });
+  } catch (e) {
+    console.error("[GET devengado buscar]", e);
+    return res.status(500).json({ error: "Error buscando devengado", db: e.message });
+  } finally {
+    client.release();
+  }
+});
+
 router.post("/", async (req, res) => {
   const client = await getClient();
 
@@ -98,7 +145,8 @@ router.post("/", async (req, res) => {
       new Date().toISOString().slice(0, 10);
 
     const mes = monthCode(fechaBase);
-    const prefijo = `ECA-${mes}-DV-`;
+    const year = String(new Date(fechaBase).getFullYear());
+    const prefijo = `ECA-${year}-${mes}-DV-`;
 
     const totalDev = toNumOrZero(b.total ?? b.monto_devengado);
     if (!(totalDev > 0)) {
@@ -177,6 +225,7 @@ router.post("/", async (req, res) => {
     const devAcum = Number(rSum.rows[0]?.dev_acum || 0);
     const saldo = totalComp - devAcum;
 
+    // Revertir: validar contra SALDO (totalComp - devAcum)
     if (totalDev > saldo) {
       await client.query("ROLLBACK");
       return res.status(400).json({

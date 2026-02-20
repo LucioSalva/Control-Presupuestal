@@ -7,10 +7,13 @@
 
   // ---------------------------
   // DOM
-  // ---------------------------
   const btnGuardar = document.getElementById("btn-guardar");
   const btnSi = document.getElementById("btn-si-seguro");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
+  const btnCancelarSuf = document.getElementById("btn-cancelar-suf");
+  const sufEstadoBadge = document.getElementById("sufEstadoBadge");
+  const sufRestanteText = document.getElementById("sufRestanteText");
+  const sufCaducaText = document.getElementById("sufCaducaText");
 
   const DG_DA_PROYECTOS_FILTERS = window.DG_DA_PROYECTOS_FILTERS || {};
   const DG_DA_FUENTES_FILTERS = window.DG_DA_FUENTES_FILTERS || {};
@@ -130,6 +133,230 @@
   const uiError = (m, t = "Error") => uiAlert(m, "error", t);
   const uiWarn = (m, t = "Atención") => uiAlert(m, "warning", t);
 
+  const scheduledAlertKeys = new Set();
+
+  function setBadgeState(estado) {
+    if (!sufEstadoBadge) return;
+    sufEstadoBadge.classList.remove(
+      "bg-success",
+      "bg-danger",
+      "bg-secondary",
+      "bg-dark",
+      "bg-warning",
+    );
+    const e = String(estado || "").toUpperCase();
+    if (e === "ACTIVO") sufEstadoBadge.classList.add("bg-success");
+    else if (e === "CANCELADO") sufEstadoBadge.classList.add("bg-danger");
+    else if (e === "CADUCADO") sufEstadoBadge.classList.add("bg-dark");
+    else sufEstadoBadge.classList.add("bg-secondary");
+  }
+
+  function updateSufStatusUI(data) {
+    const estadoRaw = String(data?.estado || "").trim().toUpperCase();
+    const estado =
+      estadoRaw === "ACTIVO" ||
+      estadoRaw === "CANCELADO" ||
+      estadoRaw === "CADUCADO"
+        ? estadoRaw
+        : "SIN CARGAR";
+
+    const expiresText = formatDateTime(data?.expires_at) || "—";
+    let days = Number(data?.dias_restantes);
+    let hours = Number(data?.horas_restantes);
+    if (!Number.isFinite(days) || !Number.isFinite(hours)) {
+      const d = parseDateSafe(data?.expires_at);
+      const diff = d ? d.getTime() - Date.now() : 0;
+      const r = diffToDaysHours(diff);
+      days = r.days;
+      hours = r.hours;
+    }
+
+    if (estado === "CANCELADO" || estado === "CADUCADO") {
+      days = 0;
+      hours = 0;
+    }
+
+    if (sufEstadoBadge) sufEstadoBadge.textContent = estado;
+    setBadgeState(estado);
+    if (sufRestanteText)
+      sufRestanteText.textContent =
+        estado === "SIN CARGAR"
+          ? "—"
+          : `${days} días ${hours} horas`;
+    if (sufCaducaText) sufCaducaText.textContent = expiresText;
+
+    if (btnCancelarSuf) {
+      btnCancelarSuf.disabled = !(
+        Number.isFinite(Number(data?.id)) &&
+        Number(data?.id) > 0 &&
+        estado === "ACTIVO"
+      );
+    }
+  }
+
+  async function cancelarSuficiencia() {
+    if (!lastSavedId) {
+      await uiWarn("Primero carga una suficiencia para cancelar.");
+      return;
+    }
+    if (!hasSwal()) {
+      await uiWarn("No está disponible SweetAlert2 para confirmar.");
+      return;
+    }
+    const result = await Swal.fire({
+      title: "Cancelar suficiencia",
+      input: "text",
+      inputLabel: "Motivo de cancelación",
+      inputPlaceholder: "Escribe el motivo (opcional)",
+      showCancelButton: true,
+      confirmButtonText: "Cancelar suficiencia",
+      confirmButtonColor: "#dc3545",
+      cancelButtonText: "Cerrar",
+      cancelButtonColor: "#6c757d",
+      allowOutsideClick: false,
+    });
+    if (!result.isConfirmed) return;
+
+    const payload = {
+      cancel_reason: String(result.value || "").trim() || null,
+    };
+    const updated = await fetchJson(
+      `${API}/api/suficiencias/${lastSavedId}/cancelar`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      },
+    );
+    updateSufStatusUI(updated);
+    await uiSuccess("Suficiencia cancelada correctamente.");
+  }
+
+  function parseDateSafe(v) {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatDateTime(v) {
+    const d = v instanceof Date ? v : parseDateSafe(v);
+    if (!d) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  }
+
+  function diffToDaysHours(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return { days: 0, hours: 0 };
+    const days = Math.floor(ms / 86400000);
+    const hours = Math.floor((ms % 86400000) / 3600000);
+    return { days, hours };
+  }
+
+  function remainingHours(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return 0;
+    return Math.max(0, Math.ceil(ms / 3600000));
+  }
+
+  function getRemainingFromSaved(saved) {
+    const expiresText = formatDateTime(saved?.expires_at);
+    let days = Number(saved?.dias_restantes);
+    let hours = Number(saved?.horas_restantes);
+    if (!Number.isFinite(days) || !Number.isFinite(hours)) {
+      const d = parseDateSafe(saved?.expires_at);
+      const diff = d ? d.getTime() - Date.now() : 0;
+      const r = diffToDaysHours(diff);
+      days = r.days;
+      hours = r.hours;
+    }
+    return {
+      days: Number.isFinite(days) ? days : 0,
+      hours: Number.isFinite(hours) ? hours : 0,
+      expiresText,
+    };
+  }
+
+  function wasAlertShown(key) {
+    try {
+      return localStorage.getItem(key) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function markAlertShown(key) {
+    try {
+      localStorage.setItem(key, "1");
+    } catch {}
+  }
+
+  function scheduleAlert(key, delay, handler) {
+    if (scheduledAlertKeys.has(key)) return;
+    scheduledAlertKeys.add(key);
+    if (delay <= 0) {
+      handler();
+      return;
+    }
+    setTimeout(handler, delay);
+  }
+
+  function scheduleSufAlerts(row) {
+    if (!row) return;
+    const estado = String(row.estado || "").trim().toUpperCase();
+    if (estado !== "ACTIVO") return;
+    const id = Number(row.id);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const createdAt = parseDateSafe(row.created_at);
+    const expiresAt = parseDateSafe(row.expires_at);
+    if (!createdAt || !expiresAt) return;
+
+    const now = Date.now();
+    const expiresMs = expiresAt.getTime();
+    const halfAt = createdAt.getTime() + (expiresMs - createdAt.getTime()) / 2;
+    const oneDayAt = expiresMs - 24 * 60 * 60 * 1000;
+
+    const halfKey = `cp_suf_alert_half_${id}`;
+    if (!wasAlertShown(halfKey)) {
+      const showHalf = () => {
+        if (wasAlertShown(halfKey)) return;
+        const remaining = diffToDaysHours(expiresMs - Date.now());
+        if (expiresMs <= Date.now()) return;
+        uiWarn(
+          `Tu suficiencia va a la mitad. Te faltan ${remaining.days} días ${remaining.hours} horas para caducar.`,
+        ).then(() => markAlertShown(halfKey));
+      };
+      if (now >= halfAt && now < expiresMs) {
+        showHalf();
+      } else if (halfAt > now) {
+        scheduleAlert(halfKey, halfAt - now, showHalf);
+      }
+    }
+
+    const oneDayKey = `cp_suf_alert_1day_${id}`;
+    if (!wasAlertShown(oneDayKey)) {
+      const showOneDay = () => {
+        if (wasAlertShown(oneDayKey)) return;
+        const hours = remainingHours(expiresMs - Date.now());
+        if (expiresMs <= Date.now()) return;
+        uiWarn(
+          `⚠️ Mañana caduca tu suficiencia. Te faltan ${hours} horas.`,
+        ).then(() => markAlertShown(oneDayKey));
+      };
+      if (now >= oneDayAt && now < expiresMs) {
+        showOneDay();
+      } else if (oneDayAt > now) {
+        scheduleAlert(oneDayKey, oneDayAt - now, showOneDay);
+      }
+    }
+  }
+
+  function scheduleSufAlertsList(rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(scheduleSufAlerts);
+  }
+
   // ---------------------------
   // Folio buscador helpers
   // ---------------------------
@@ -203,6 +430,7 @@
       await uiWarn("No encontrada (o no corresponde a tu área).");
       return;
     }
+    scheduleSufAlertsList(rows);
 
     if (rows.length === 1) {
       cargarSuficienciaEnFormulario(rows[0].id);
@@ -1139,6 +1367,8 @@
     if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
 
     modalBuscar?.hide?.();
+    updateSufStatusUI(data);
+    scheduleSufAlerts(data);
     await uiSuccess("Suficiencia cargada correctamente.");
   }
 
@@ -1261,7 +1491,13 @@
     else if (saved.folio_num != null)
       setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
 
-    await uiSuccess("Guardado correctamente.");
+    const remaining = getRemainingFromSaved(saved);
+    const expiresText = remaining.expiresText || "—";
+    updateSufStatusUI(saved);
+    await uiSuccess(
+      `Suficiencia creada. Tiempo restante: ${remaining.days} días ${remaining.hours} horas. Caduca el: ${expiresText}`,
+    );
+    scheduleSufAlerts(saved);
     return saved;
   }
 
@@ -2055,6 +2291,7 @@
     if (btnGuardar) btnGuardar.type = "button";
     if (btnSi) btnSi.type = "button";
     if (btnDescargarPdf) btnDescargarPdf.type = "button";
+    if (btnCancelarSuf) btnCancelarSuf.type = "button";
 
     btnAbrirBuscarSuf?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -2109,6 +2346,16 @@
       } catch (err) {
         console.error("[SP] PDF error:", err);
         await uiError(err?.message || "Error al generar PDF");
+      }
+    });
+
+    btnCancelarSuf?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await cancelarSuficiencia();
+      } catch (err) {
+        console.error("[SP] cancelar error:", err);
+        await uiError(err?.message || "Error al cancelar suficiencia");
       }
     });
 
@@ -2349,6 +2596,7 @@
     setFechaHoy();
     lockCantidadPago();
     initFolioUI();
+    updateSufStatusUI(null);
     try {
       if (btnDescargarPdf)
         btnDescargarPdf.disabled = !(Number.isFinite(lastSavedId) && lastSavedId > 0);

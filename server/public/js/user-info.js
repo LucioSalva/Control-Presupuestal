@@ -43,6 +43,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
   setPartidasVisible(false);
+  const expLinks = document.querySelectorAll('a[href="expedientes_entrega.html"]');
+  const setExpVisible = (visible) => {
+    expLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+  };
+  setExpVisible(false);
 
   async function resolveClaveFromCatalog(path, id) {
     if (!Number.isFinite(id) || id <= 0) return "";
@@ -86,6 +95,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const isGod = rolesNorm.includes("GOD");
     const canViewPartidas = isGod || (dgClave === "L00" && daClave === "117");
     setPartidasVisible(canViewPartidas);
+    const canViewExp = isGod || (dgClave === "L00" && daClave === "117");
+    setExpVisible(canViewExp);
   })();
 
   if (btnLogout) {

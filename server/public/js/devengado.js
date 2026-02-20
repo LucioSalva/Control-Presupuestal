@@ -156,10 +156,10 @@
           );
           if (res?.ok) {
             await refrescarResumenYParcialidades();
-            alert("Devengado cancelado.");
+            await uiSuccess("Devengado cancelado.");
           }
         } catch (e) {
-          alert(e?.message || "Error al cancelar devengado");
+          await uiError(e?.message || "Error al cancelar devengado");
         }
       });
     });
@@ -182,6 +182,30 @@
 }
 
     return data;
+  }
+
+  function hasSwal() {
+    return typeof window !== "undefined" && !!window.Swal;
+  }
+  function uiAlert(message, icon = "info", title = "Aviso") {
+    const msg = String(message ?? "");
+    if (!hasSwal()) return alert(`${title}: ${msg}`);
+    return window.Swal.fire({
+      icon,
+      title,
+      text: msg,
+      confirmButtonText: "Aceptar",
+      confirmButtonColor: "#BC955C",
+    });
+  }
+  function uiSuccess(message, title = "Listo") {
+    return uiAlert(message, "success", title);
+  }
+  function uiError(message, title = "Error") {
+    return uiAlert(message, "error", title);
+  }
+  function uiWarn(message, title = "Atención") {
+    return uiAlert(message, "warning", title);
   }
 
   function getQueryId() {
@@ -207,6 +231,20 @@
     (data || []).forEach((x) => {
       map[String(x.id)] =
         `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`.trim();
+    });
+    return map;
+  }
+
+  // Catálogo dauxiliar (id -> dependencia)
+  async function loadDauxiliarMap() {
+    const r = await fetch(`${API}/api/catalogos/dauxiliar`, {
+      headers: { ...authHeaders() },
+    });
+    if (!r.ok) return {};
+    const data = await r.json();
+    const map = {};
+    (data || []).forEach((x) => {
+      map[String(x.id)] = String(x.dependencia ?? "").trim();
     });
     return map;
   }
@@ -561,6 +599,24 @@
     return payload;
   }
 
+  async function buscarDevengadoPorFolio(noDevengado) {
+    const no = String(noDevengado || "").trim();
+    if (!no) throw new Error("Escribe el No. de Devengado");
+
+    const data = await fetchJson(
+      `${API}/api/devengado/buscar?no=${encodeURIComponent(no)}`,
+      {
+        headers: { ...authHeaders() },
+      },
+    );
+
+    const payload = data;
+    payload.id_devengado = Number(data.id);
+    payload.id_comprometido = Number(data.id_comprometido);
+    payload.no_devengado = data.no_devengado;
+    return payload;
+  }
+
   async function refrescarResumenYParcialidades() {
     if (!currentIdComp) return;
 
@@ -600,6 +656,7 @@
 
     // recalcula
     recalcularTotales();
+    updateDownloadLock();
   }
 
   // ---------------------------
@@ -642,7 +699,15 @@
     );
 
     setVal("dependencia", payload?.dependencia || "");
-    setVal("dependencia_aux", payload?.dependencia_aux || "");
+    setVal("dependencia_aux", payload?.dependencia_aux || payload?.departamento || "");
+    if (!getVal("dependencia_aux")) {
+      const idDa = payload?.id_dauxiliar != null ? String(payload.id_dauxiliar) : "";
+      if (idDa) {
+        if (!window.__dauxMap) window.__dauxMap = await loadDauxiliarMap();
+        const depAux = window.__dauxMap[idDa] || "";
+        setVal("dependencia_aux", depAux);
+      }
+    }
 
     const fecha = formatFecha(
       payload?.fecha_devengado ||
@@ -801,8 +866,276 @@
     return data;
   }
 
+  function updateDownloadLock() {
+    const val = String(getVal("no_devengado") || "").trim().toUpperCase();
+    if (btnDescargarPdf) btnDescargarPdf.disabled = !val || val === "NUEVO";
+  }
+
+  const DEV_PDF_TEMPLATE_URL = "/PDF/devengado.pdf";
+  async function fetchPdfTemplateBytesDev() {
+    const r = await fetch(DEV_PDF_TEMPLATE_URL);
+    if (!r.ok) throw new Error(`No se pudo cargar la plantilla PDF: ${DEV_PDF_TEMPLATE_URL}`);
+    return await r.arrayBuffer();
+  }
+
   async function generarPDF() {
-    alert("Conecta aquí tu generador real de PDF (pdf-lib) para Devengado.");
+    if (!window.PDFLib?.PDFDocument) {
+      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
+    }
+    const normalizeCell = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
+    const sizeHeader = 9;
+    const sizeSmall = 7;
+    const sizeTiny = 6;
+    const sizeDG = 12;
+
+    const tplBytes = await fetchPdfTemplateBytesDev();
+    const pdfDoc = await PDFLib.PDFDocument.load(tplBytes);
+    const form = pdfDoc.getForm();
+
+    // Helpers de escritura
+    const setTextByPattern = (includesArray, value, size, align) => {
+      try {
+        const fields = form.getFields();
+        const lowerInc = (includesArray || []).map((s) => String(s || "").toLowerCase());
+        let wrote = 0;
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const nmLower = nm.toLowerCase();
+          const ok = lowerInc.every((frag) => nmLower.includes(frag));
+          if (ok) {
+            if (size != null) f.setFontSize(size);
+            if (align != null && window.PDFLib?.TextAlignment) {
+              f.setAlignment(align);
+            }
+            f.setText(String(value ?? ""));
+            wrote++;
+          }
+        }
+        if (wrote > 0) return true;
+      } catch {}
+      return false;
+    };
+    const setTextSafe = (name, value, size, align) => {
+      try {
+        const f = form.getFieldMaybe
+          ? form.getFieldMaybe(name)
+          : (() => {
+              try {
+                return form.getField(name);
+              } catch {
+                return null;
+              }
+            })();
+        if (!f) return setTextByPattern([name], value, size, align);
+        if (size != null) f.setFontSize(size);
+        if (align != null && window.PDFLib?.TextAlignment) {
+          f.setAlignment(align);
+        }
+        f.setText(String(value ?? ""));
+      } catch {
+        setTextByPattern([name], value, size, align);
+      }
+    };
+
+    // Fuente Helvetica para apariencias
+    try {
+      const font =
+        (PDFLib?.StandardFonts &&
+          (await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica))) ||
+        undefined;
+      for (const f of form.getFields()) {
+        try {
+          const ac = f.getAcroField();
+          if (ac) {
+            const da = ac.getDefaultAppearance?.();
+            if (da && font) ac.defaultUpdateAppearances(font);
+          }
+        } catch {}
+      }
+    } catch {}
+
+    // Recolectar datos desde la UI
+    const payload = {
+      no_devengado: getVal("no_devengado"),
+      no_comprometido: getVal("no_comprometido"),
+      fecha: getVal("fecha"),
+      dependencia: getVal("dependencia"),
+      dependencia_aux: getVal("dependencia_aux"),
+      fuente_text: getVal("fuente_text"),
+      clave_programatica: getVal("clave_programatica"),
+      mes_pago: getVal("mes_pago"),
+      meta: getVal("meta"),
+      subtotal: safeNumber(getVal("subtotal")),
+      iva: safeNumber(getVal("iva")),
+      isr: safeNumber(getVal("isr")),
+      total: safeNumber(getVal("total")),
+      cantidad_con_letra: getVal("cantidad_con_letra"),
+    };
+    // detalle desde la tabla visible
+    const detalle = [];
+    document.querySelectorAll("#detalleBody tr").forEach((tr, idx) => {
+      const original = currentPayload?.detalle?.[idx] || {};
+      const renglon = original?.no || original?.renglon || idx + 1;
+      const inpImporte = tr.querySelector(`[name="importe_${idx}"]`);
+      detalle.push({
+        renglon,
+        clave: String(original?.clave || "").trim(),
+        concepto_partida: String(original?.concepto_partida || "").trim(),
+        justificacion: String(original?.justificacion || "").trim(),
+        descripcion: String(original?.descripcion || "").trim(),
+        importe: safeNumber(inpImporte?.value ?? original?.importe),
+      });
+    });
+
+    // Dependencias
+    setTextByPattern(
+      ["nombre", "dependencia", "general"],
+      normalizeCell(payload.dependencia || ""),
+      sizeDG,
+      PDFLib?.TextAlignment?.Center,
+    );
+    setTextByPattern(
+      ["clave", "programática"],
+      normalizeCell(payload.clave_programatica || ""),
+      sizeHeader,
+      PDFLib?.TextAlignment?.Center,
+    );
+    const fuenteLabel = String(payload.fuente_text || "").trim();
+    let fuenteClave = "";
+    let fuenteDesc = fuenteLabel;
+    if (fuenteLabel.includes(" - ")) {
+      const [c, ...rest] = fuenteLabel.split(" - ");
+      fuenteClave = String(c || "").trim();
+      fuenteDesc = rest.join(" - ").trim();
+    }
+    setTextByPattern(["fuente", "financiamiento"], fuenteClave, sizeSmall, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["nombre", "f.f"], fuenteDesc, sizeSmall, PDFLib?.TextAlignment?.Center);
+
+    try {
+      const iso = payload.fecha;
+      const [y, m, d] = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-") : ["", "", ""];
+      setTextByPattern(["fechadia"], d, sizeSmall);
+      setTextByPattern(["fechames"], m, sizeSmall);
+      setTextByPattern(["fechayear"], y, sizeSmall);
+    } catch {}
+
+    // Firmas — capturar como en Suficiencia/Comprometido
+    const roles = await (async () => {
+      if (!window.Swal) {
+        return {
+          area_firma: getVal("firma_area_nombre"),
+          direccion_firma: getVal("firma_direccion_nombre"),
+          coordinacion_firma: getVal("firma_suficiencia_nombre"),
+        };
+      }
+      const html = `
+        <div class="text-start">
+          <p class="mb-2">Captura firmantes (Devengado):</p>
+          <div class="row g-2">
+            <div class="col-8">
+              <label class="form-label small">Coordinación Administrativa (ÁREA SOLICITANTE)</label>
+              <input id="dlg_firma_area" class="form-control form-control-sm" value="${String(getVal("firma_area_nombre") || "").replace(/"/g, "&quot;")}">
+            </div>
+            <div class="col-8">
+              <label class="form-label small">Dirección de Área</label>
+              <input id="dlg_firma_dir" class="form-control form-control-sm" value="${String(getVal("firma_direccion_nombre") || "").replace(/"/g, "&quot;")}">
+            </div>
+            <div class="col-8">
+              <label class="form-label small">Coordinación de Suficiencia Presupuestal</label>
+              <input id="dlg_firma_suf" class="form-control form-control-sm" value="${String(getVal("firma_suficiencia_nombre") || "").replace(/"/g, "&quot;")}">
+            </div>
+          </div>
+        </div>
+      `;
+      const result = await window.Swal.fire({
+        title: "Firmantes del Devengado",
+        html,
+        focusConfirm: false,
+        confirmButtonText: "Usar firmantes",
+        cancelButtonText: "Cancelar",
+        showCancelButton: true,
+        confirmButtonColor: "#198754",
+      });
+      if (!result.isConfirmed) {
+        return {
+          area_firma: getVal("firma_area_nombre"),
+          direccion_firma: getVal("firma_direccion_nombre"),
+          coordinacion_firma: getVal("firma_suficiencia_nombre"),
+        };
+      }
+      const c = window.Swal.getHtmlContainer();
+      return {
+        area_firma: c?.querySelector("#dlg_firma_area")?.value || getVal("firma_area_nombre"),
+        direccion_firma: c?.querySelector("#dlg_firma_dir")?.value || getVal("firma_direccion_nombre"),
+        coordinacion_firma: c?.querySelector("#dlg_firma_suf")?.value || getVal("firma_suficiencia_nombre"),
+      };
+    })();
+
+    // Escribir firmantes en el PDF (patrones amplios)
+    try {
+      const center = PDFLib?.TextAlignment?.Center;
+      roles.area_firma && setTextByPattern(["firm", "area"], roles.area_firma, sizeSmall, center);
+      roles.direccion_firma && setTextByPattern(["firm", "direc"], roles.direccion_firma, sizeSmall, center);
+      roles.coordinacion_firma && setTextByPattern(["firm", "coor"], roles.coordinacion_firma, sizeSmall, center);
+    } catch {}
+
+    // Folios
+    setTextByPattern(["no", "devengado"], String(payload.no_devengado || ""), sizeSmall, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["no", "comprometido"], String(payload.no_comprometido || ""), sizeSmall, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["ref", "comprometido"], String(payload.no_comprometido || ""), sizeSmall, PDFLib?.TextAlignment?.Center);
+
+    // Detalle
+    const MAX_ROWS = 20;
+    const rows = Array.isArray(detalle) ? detalle.slice(0, MAX_ROWS) : [];
+    const padLines = (arr, max) => {
+      const out = arr.slice(0, max);
+      while (out.length < max) out.push("");
+      return out;
+    };
+    const cut = (v, max) => {
+      const s = normalizeCell(v);
+      if (!max || s.length <= max) return s;
+      return s.slice(0, max);
+    };
+    const linesNo = padLines(rows.map((r, i) => String(r?.renglon ?? i + 1)), MAX_ROWS);
+    const linesClave = padLines(rows.map((r) => cut(String(r?.clave || ""), 12)), MAX_ROWS);
+    const linesConcepto = padLines(rows.map((r) => cut(String(r?.concepto_partida || ""), 44)), MAX_ROWS);
+    const linesJust = padLines(rows.map((r) => cut(String(r?.justificacion || ""), 52)), MAX_ROWS);
+    const linesDesc = padLines(rows.map((r) => cut(String(r?.descripcion || ""), 52)), MAX_ROWS);
+    const linesImp = padLines(rows.map((r) => safeNumber(r?.importe).toFixed(2)), MAX_ROWS);
+
+    setTextSafe("No", linesNo.join("\n"), sizeSmall);
+    setTextSafe("CLAVE", linesClave.join("\n"), sizeSmall);
+    setTextSafe("CONCEPTO DE PARTIDA", linesConcepto.join("\n"), sizeSmall);
+    setTextSafe("JUSTIFICACIÓN", linesJust.join("\n"), sizeSmall);
+    setTextSafe("DESCRIPCIÓN", linesDesc.join("\n"), sizeSmall);
+    setTextSafe("IMPORTE", linesImp.join("\n"), sizeSmall);
+
+    // Totales y meta
+    setTextSafe("subtotal", safeNumber(payload.subtotal).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("IVA", safeNumber(payload.iva).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("ISR", safeNumber(payload.isr).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("total", safeNumber(payload.total).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "", sizeTiny);
+    setTextSafe("Meta", payload.meta || "", sizeSmall);
+
+    try {
+      form.flatten();
+    } catch (e) {
+      console.warn("[DV][PDF] flatten falló:", e?.message || e);
+    }
+
+    const outBytes = await pdfDoc.save();
+    const blob = new Blob([outBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const fname = String(getVal("no_devengado") || "devengado").trim() || "devengado";
+    a.download = `${fname}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
 
   // ---------------------------
@@ -819,7 +1152,7 @@
       const saldo = montoComprometido - montoDevengado;
 
       if (montoDevengado > montoComprometido) {
-        alert("El monto a devengar no puede ser mayor al monto comprometido.");
+        uiWarn("El monto a devengar no puede ser mayor al monto comprometido.");
         return;
       }
 
@@ -850,11 +1183,12 @@
         else if (data?.folio_num)
           setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
 
-        alert("Devengado guardado correctamente.");
+        updateDownloadLock();
+        await uiSuccess("Devengado guardado correctamente.");
         await refrescarResumenYParcialidades();
       } catch (err) {
         console.error("[DEVENGADO] guardar:", err);
-        alert(err?.message || "Error al guardar");
+        await uiError(err?.message || "Error al guardar");
       } finally {
         btnConfirmarGuardar.disabled = false;
       }
@@ -863,9 +1197,14 @@
     btnDescargarPdf?.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
+        const noDev = String(getVal("no_devengado") || "").trim().toUpperCase();
+        if (!noDev || noDev === "NUEVO") {
+          await uiWarn("Primero guarda el Devengado para poder descargar el PDF.", "PDF");
+          return;
+        }
         await generarPDF();
       } catch (err) {
-        alert(err?.message || "Error generando PDF");
+        await uiError(err?.message || "Error generando PDF", "PDF");
       }
     });
 
@@ -875,7 +1214,7 @@
           throw new Error("Primero busca un No. de Comprometido.");
         await refrescarResumenYParcialidades();
       } catch (err) {
-        alert(err?.message || "No se pudo recargar");
+        await uiError(err?.message || "No se pudo recargar");
       }
     });
 
@@ -896,13 +1235,26 @@
       try {
         btnBuscarComprometido.disabled = true;
 
-        const payload = await buscarComprometidoPorFolio(
-          txtNoComprometido.value,
-        );
-        currentIdComp = Number(payload.id_comprometido);
+        const folio = String(txtNoComprometido.value || "").trim().toUpperCase();
+        if (!/^ECA-\d{4}-\d{2}-(CP|DV)-\d{4}$/.test(folio)) {
+          await uiWarn("Escribe un folio completo: ECA-YYYY-MM-CP-#### o ECA-YYYY-MM-DV-####");
+          return;
+        }
+
+        let payload = null;
+        if (/-DV-/.test(folio)) {
+          payload = await buscarDevengadoPorFolio(folio);
+          currentIdComp = Number(payload.id_comprometido);
+          setVal("no_devengado", payload.no_devengado || "");
+        } else {
+          payload = await buscarComprometidoPorFolio(folio);
+          currentIdComp = Number(payload.id_comprometido);
+          setVal("no_devengado", "NUEVO");
+        }
 
         await renderPayload(payload);
         await refrescarResumenYParcialidades();
+        updateDownloadLock();
 
         // guardamos último comprometido buscado
         localStorage.setItem(
@@ -910,12 +1262,12 @@
           JSON.stringify({
             id: String(currentIdComp),
             payload,
-            loaded_from: "buscar_folio",
+            loaded_from: /-DV-/.test(folio) ? "buscar_devengado" : "buscar_comprometido",
             loaded_at: new Date().toISOString(),
           }),
         );
       } catch (err) {
-        alert(err?.message || "No se pudo buscar el comprometido");
+        await uiError(err?.message || "No se pudo buscar el comprometido");
       } finally {
         btnBuscarComprometido.disabled = false;
       }
@@ -933,6 +1285,8 @@
   async function init() {
     bindEvents();
     if (btnCancelar) btnCancelar.style.display = "none";
+    if (btnDescargarPdf) btnDescargarPdf.type = "button";
+    updateDownloadLock();
     renderResumen({
       total_comprometido: 0,
       devengado_acumulado: 0,

@@ -13,6 +13,13 @@
     ? "DV"
     : "CP";
 
+  function updateDownloadLock(state) {
+    try {
+      const idRef = Number(state?.payload?.id_comprometido || 0);
+      if (btnDescargarPdf)
+        btnDescargarPdf.disabled = !(Number.isFinite(idRef) && idRef > 0);
+    } catch {}
+  }
   // ---------------------------
   // AUTH
   // ---------------------------
@@ -229,6 +236,85 @@
     );
 
     return data;
+  }
+
+  function isFullFolio(raw) {
+    const s = String(raw || "").trim().toUpperCase();
+    return /^ECA-\d{4}-\d{2}-(SP|CP)-\d{4}$/i.test(s);
+  }
+
+  async function buscarPorFolioGeneral(folioInput) {
+    const folio = String(folioInput || "").trim().toUpperCase();
+    if (!isFullFolio(folio)) {
+      await uiWarn(
+        "Escribe el folio completo: ECA-YYYY-MM-SP-#### o ECA-YYYY-MM-CP-####",
+        "Buscar",
+      );
+      return { kind: null, value: null };
+    }
+    if (/-SP-/.test(folio)) {
+      const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(folio)}`;
+      const res = await fetchJson(url, { headers: { ...authHeaders() } });
+      const rows = res?.data || [];
+      if (!rows.length) {
+        await uiWarn("Suficiencia no encontrada.", "Buscar");
+        return { kind: null, value: null };
+      }
+      if (rows.length === 1) return { kind: "SP", value: Number(rows[0].id) };
+      if (!hasSwal()) {
+        await uiWarn("Varias coincidencias. Activa SweetAlert2.", "Buscar");
+        return { kind: null, value: null };
+      }
+      const listHtml = `
+        <div class="list-group text-start">
+          ${rows
+            .map((r) => {
+              const folio = r.no_suficiencia || "—";
+              const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
+              return `
+                <button type="button" class="list-group-item list-group-item-action" data-id="${r.id}">
+                  <div class="fw-semibold">${folio}</div>
+                  <small class="text-muted">${fecha}</small>
+                </button>`;
+            })
+            .join("")}
+        </div>`;
+      const pick = await new Promise((resolve) => {
+        Swal.fire({
+          title: "Selecciona una Suficiencia",
+          html: listHtml,
+          icon: "info",
+          showConfirmButton: false,
+          showCancelButton: true,
+          cancelButtonText: "Cancelar",
+          didOpen: () => {
+            const c = Swal.getHtmlContainer();
+            c?.querySelectorAll("button[data-id]")?.forEach((btn) => {
+              btn.addEventListener("click", () => {
+                const id = Number(btn.dataset.id);
+                Swal.close();
+                resolve(id);
+              });
+            });
+          },
+        }).then(() => resolve(null));
+      });
+      return pick ? { kind: "SP", value: Number(pick) } : { kind: null, value: null };
+    } else {
+      const data = await fetchJson(
+        `${API}/api/comprometido/buscar?no=${encodeURIComponent(folio)}`,
+        { headers: { ...authHeaders() } },
+      );
+      const payload = data || null;
+      if (!payload?.id) {
+        await uiWarn("Comprometido no encontrado.", "Buscar");
+        return { kind: null, value: null };
+      }
+      payload.id_comprometido = Number(payload.id);
+      payload.no_comprometido = payload.no_comprometido || folio;
+      payload.id = Number(payload.id_suficiencia || payload.id);
+      return { kind: "CP", value: payload };
+    }
   }
 
   // ---------------------------
@@ -486,24 +572,11 @@
 
         return payload;
       } catch (e) {
-        console.warn(
-          "[COMPROMETIDO] API falló, usando LocalStorage:",
-          e.message,
-        );
+        console.warn("[COMPROMETIDO] API falló:", e.message);
       }
     }
 
-    const raw = localStorage.getItem("cp_last_suficiencia");
-    if (!raw) {
-      return null; // ✅ no truena, deja usar el buscador
-    }
-
-    let obj = null;
-    try {
-      obj = JSON.parse(raw);
-    } catch {}
-    if (!obj || !obj.payload) return null;
-    return obj.payload;
+    return null; // página en blanco hasta que se busque una suficiencia
   }
 
   // ---------------------------
@@ -563,11 +636,352 @@
     return payload;
   }
 
+  // Limpia la UI al entrar sin datos
+  function clearUI() {
+    try {
+      setReadonlyVal("no_comprometido", "");
+      setReadonlyVal("fecha", "");
+      setReadonlyVal("dependencia", "");
+      setReadonlyVal("dependencia_aux", "");
+      setVal("id_proyecto", "");
+      setVal("id_fuente", "");
+      setReadonlyVal("proyecto_text", "");
+      setReadonlyVal("fuente_text", "");
+      setTextById("claveProgramaticaClave", "");
+      setTextById("claveProgramaticaTexto", "—");
+      setReadonlyVal("mes_pago", "");
+      setReadonlyVal("cantidad_pago", "0.00");
+      setReadonlyVal("meta", "");
+      setReadonlyVal("subtotal", "0.00");
+      setReadonlyVal("iva", "0.00");
+      setReadonlyVal("isr", "0.00");
+      setReadonlyVal("ieps", "0.00");
+      setReadonlyVal("total", "0.00");
+      setReadonlyVal("cantidad_con_letra", "");
+      setImpuestoTipo("NONE");
+      setReadonlyVal("isr_tasa", "");
+      setReadonlyVal("ieps_tasa", "");
+      renderDetalle([]);
+    } catch {}
+  }
+
   // ---------------------------
-  // PDF (placeholder)
+  // PDF COMPROMETIDO (pdf-lib)
   // ---------------------------
-  async function generarPDF(_payload) {
-    await uiWarn("Aquí conecta tu generador real de PDF (pdf-lib).", "PDF");
+  const COMP_PDF_TEMPLATE_URL = "/PDF/comprometido.pdf";
+
+  async function fetchPdfTemplateBytesComp() {
+    const r = await fetch(COMP_PDF_TEMPLATE_URL);
+    if (!r.ok) throw new Error(`No se pudo cargar la plantilla PDF: ${COMP_PDF_TEMPLATE_URL}`);
+    return await r.arrayBuffer();
+  }
+
+  async function generarPDF(rawPayload) {
+    if (!window.PDFLib?.PDFDocument) {
+      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
+    }
+
+    const payload = normalizePayload(rawPayload || {});
+
+    const templateBytes = await fetchPdfTemplateBytesComp();
+    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
+    const form = pdfDoc.getForm();
+
+    const setTextSafe = (fieldName, value, size, align) => {
+      try {
+        const f = form.getTextField(fieldName);
+        if (size != null) f.setFontSize(size);
+        if (align != null && window.PDFLib?.TextAlignment) f.setAlignment(align);
+        f.setText(String(value ?? ""));
+      } catch {}
+    };
+    const setTextMulti = (fieldNames, value, size, align) => {
+      for (const nm of fieldNames || []) {
+        try {
+          const f = form.getTextField(nm);
+          if (size != null) f.setFontSize(size);
+          if (align != null && window.PDFLib?.TextAlignment) f.setAlignment(align);
+          f.setText(String(value ?? ""));
+          return;
+        } catch {}
+      }
+    };
+    const setTextByPattern = (includesArray, value, size, align) => {
+      try {
+        const fields = form.getFields();
+        const lowerInc = (includesArray || []).map((s) => String(s || "").toLowerCase());
+        let wrote = 0;
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const nmLower = nm.toLowerCase();
+          const ok = lowerInc.every((frag) => nmLower.includes(frag));
+          if (ok) {
+            if (size != null) f.setFontSize(size);
+            if (align != null && window.PDFLib?.TextAlignment) f.setAlignment(align);
+            f.setText(String(value ?? ""));
+            wrote++;
+          }
+        }
+        if (wrote > 0) return true;
+      } catch {}
+      return false;
+    };
+
+    const normalizeCell = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
+    const sizeHeader = 9;
+    const sizeSmall = 7;
+    const sizeTiny = 6;
+    const sizeDG = 12;
+
+    // Fuente para apariencias
+    try {
+      const font =
+        (PDFLib?.StandardFonts &&
+          (await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica))) ||
+        undefined;
+      form.updateFieldAppearances(font);
+    } catch {}
+
+    // Dependencia general
+    const depGeneralName = normalizeCell(payload.dependencia || "");
+    setTextByPattern(["dependencia", "general"], depGeneralName, sizeDG, PDFLib?.TextAlignment?.Center) ||
+      setTextMulti(
+        [
+          "NOMBRE DE LA DEPENDENCIA GENERAL:",
+          "NOMBRE DE LA DEPENDENCIA GENERAL",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#4",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#3",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#2",
+          "NOMBRE DE LA DEPENDENCIA GENERAL#1",
+        ],
+        depGeneralName,
+        sizeDG,
+        PDFLib?.TextAlignment?.Center,
+      );
+
+    // Clave programática y nombre
+    setTextByPattern(
+      ["clave", "programática"],
+      normalizeCell(payload.clave_programatica || ""),
+      sizeHeader,
+      PDFLib?.TextAlignment?.Center,
+    );
+    const proyLabel = getProyectoLabel(payload.id_proyecto) || "";
+    const claveProgDesc = proyLabel ? proyLabel.split(" - ").slice(1).join(" - ").trim() : "";
+    setTextByPattern(
+      ["nombre", "clave", "programática"],
+      claveProgDesc,
+      sizeHeader,
+      PDFLib?.TextAlignment?.Center,
+    );
+
+    // Fuente de financiamiento
+    const fuenteLabel = getFuenteLabel(payload.id_fuente) || "";
+    let fuenteClave = "";
+    let fuenteDesc = fuenteLabel;
+    if (fuenteLabel.includes(" - ")) {
+      const [c, ...rest] = fuenteLabel.split(" - ");
+      fuenteClave = String(c || "").trim();
+      fuenteDesc = rest.join(" - ").trim();
+    }
+    setTextByPattern(["fuente", "financiamiento"], fuenteClave, sizeSmall, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["nombre", "f.f"], fuenteDesc, sizeSmall, PDFLib?.TextAlignment?.Center);
+
+    // Fecha
+    try {
+      const iso = payload.fecha;
+      const [y, m, d] = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-") : ["", "", ""];
+      setTextByPattern(["fechadia"], d, sizeSmall);
+      setTextByPattern(["fechames"], m, sizeSmall);
+      setTextByPattern(["fechayear"], y, sizeSmall);
+    } catch {}
+
+    // Encabezados de solicitante y firmantes
+    const roles = await (async () => {
+      if (!window.Swal) return {};
+      const html = `
+        <div class="text-start">
+          <p class="mb-2">Captura encabezados y firmantes (Comprometido):</p>
+          <div class="row g-2">
+            <div class="col-8">
+              <label class="form-label small">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
+              <input type="text" class="form-control form-control-sm" id="roles_enlace_label" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA">
+            </div>
+            <div class="col-4">
+              <label class="form-label small">Firmante Enlace</label>
+              <input type="text" class="form-control form-control-sm" id="roles_enlace_firma" placeholder="Nombre del firmante">
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-8">
+              <label class="form-label small">ÁREA SOLICITANTE</label>
+              <input type="text" class="form-control form-control-sm" id="roles_area_label" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS...">
+            </div>
+            <div class="col-4">
+              <label class="form-label small">Firmante Área</label>
+              <input type="text" class="form-control form-control-sm" id="roles_area_firma" placeholder="Nombre del firmante">
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-8">
+              <label class="form-label small">Dirección Solicitante</label>
+              <input type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
+            </div>
+            <div class="col-4">
+              <label class="form-label small">Firmante Dirección</label>
+              <input type="text" class="form-control form-control-sm" id="roles_direccion_firma" placeholder="Nombre del firmante">
+            </div>
+          </div>
+        </div>`;
+      const res = await Swal.fire({
+        title: "Datos del Solicitante (Comprometido)",
+        html,
+        focusConfirm: false,
+        width: 800,
+        confirmButtonText: "Usar",
+        showCancelButton: true,
+      });
+      if (!res.isConfirmed) throw new Error("Cancelado por el usuario.");
+      return {
+        enlace_label: String(document.getElementById("roles_enlace_label")?.value || "").trim(),
+        enlace_firma: String(document.getElementById("roles_enlace_firma")?.value || "").trim(),
+        area_label: String(document.getElementById("roles_area_label")?.value || "").trim(),
+        area_firma: String(document.getElementById("roles_area_firma")?.value || "").trim(),
+        direccion_firma: String(document.getElementById("roles_direccion_firma")?.value || "").trim(),
+      };
+    })();
+
+    const collectCategoryFields = () => {
+      const cats = { enlace: [], area: [], direccion: [] };
+      try {
+        const fields = form.getFields();
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const lower = nm.toLowerCase();
+          if (lower.includes("coordinación") && lower.includes("administrativa") && lower.includes("área") && lower.includes("solicitante")) {
+            cats.enlace.push(nm);
+          } else if (lower.includes("área") && lower.includes("solicitante") && !lower.includes("coordinación") && !lower.includes("administrativa")) {
+            cats.area.push(nm);
+          } else if (lower.includes("dirección") && lower.includes("solicitante")) {
+            cats.direccion.push(nm);
+          }
+        }
+      } catch {}
+      return cats;
+    };
+
+    try {
+      const cats = collectCategoryFields();
+      if (roles.enlace_label) cats.enlace.forEach((nm) => setTextSafe(nm, roles.enlace_label, sizeSmall, PDFLib?.TextAlignment?.Center));
+      if (roles.area_label) cats.area.forEach((nm) => setTextSafe(nm, roles.area_label, sizeSmall, PDFLib?.TextAlignment?.Center));
+      cats.direccion.forEach((nm) => setTextSafe(nm, depGeneralName, sizeSmall, PDFLib?.TextAlignment?.Center));
+    } catch {}
+
+    const findFirmasByName = () => {
+      const out = { firma1: [], firma2: [], firma3: [] };
+      try {
+        const fields = form.getFields();
+        for (const f of fields) {
+          const nm = String(f.getName() || "");
+          const lower = nm.toLowerCase();
+          if (lower.includes("firma1")) out.firma1.push(nm);
+          else if (lower.includes("firma2")) out.firma2.push(nm);
+          else if (lower.includes("firma3")) out.firma3.push(nm);
+        }
+      } catch {}
+      return out;
+    };
+
+    try {
+      const m = findFirmasByName();
+      m.firma1.forEach((nm) => roles.enlace_firma && setTextSafe(nm, roles.enlace_firma, sizeSmall, PDFLib?.TextAlignment?.Center));
+      m.firma2.forEach((nm) => roles.area_firma && setTextSafe(nm, roles.area_firma, sizeSmall, PDFLib?.TextAlignment?.Center));
+      m.firma3.forEach((nm) => roles.direccion_firma && setTextSafe(nm, roles.direccion_firma, sizeSmall, PDFLib?.TextAlignment?.Center));
+    } catch {}
+
+    // Detalle de partidas (tabla)
+    const MAX_ROWS = 20;
+    const detalleRows = Array.isArray(payload.detalle) ? payload.detalle.slice(0, MAX_ROWS) : [];
+    const padLines = (arr, max) => {
+      const out = arr.slice(0, max);
+      while (out.length < max) out.push("");
+      return out;
+    };
+    const cut = (v, max) => {
+      const s = normalizeCell(v);
+      if (!max || s.length <= max) return s;
+      return s.slice(0, max);
+    };
+    const linesNo = padLines(detalleRows.map((r, i) => String(r?.renglon ?? i + 1)), MAX_ROWS);
+    const linesClave = padLines(detalleRows.map((r) => cut(String(r?.clave || ""), 12)), MAX_ROWS);
+    const linesConcepto = padLines(detalleRows.map((r) => cut(String(r?.concepto_partida || ""), 44)), MAX_ROWS);
+    const linesJust = padLines(detalleRows.map((r) => cut(String(r?.justificacion || ""), 52)), MAX_ROWS);
+    const linesDesc = padLines(detalleRows.map((r) => cut(String(r?.descripcion || ""), 52)), MAX_ROWS);
+    const linesImp = padLines(detalleRows.map((r) => safeNumber(r?.importe).toFixed(2)), MAX_ROWS);
+
+    setTextSafe("No", linesNo.join("\n"), sizeSmall);
+    setTextSafe("CLAVE", linesClave.join("\n"), sizeSmall);
+    setTextSafe("CONCEPTO DE PARTIDA", linesConcepto.join("\n"), sizeSmall);
+    setTextSafe("JUSTIFICACIÓN", linesJust.join("\n"), sizeSmall);
+    setTextSafe("DESCRIPCIÓN", linesDesc.join("\n"), sizeSmall);
+    setTextSafe("IMPORTE", linesImp.join("\n"), sizeSmall);
+
+    // Totales y meta
+    setTextSafe("subtotal", safeNumber(payload.subtotal).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("IVA", safeNumber(payload.iva).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("ISR", safeNumber(payload.isr).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("IEPS", safeNumber(payload.ieps).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("PENSION", safeNumber(payload.pension_total).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("total", safeNumber(payload.total).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
+    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "", sizeTiny);
+    setTextSafe("Meta", payload.meta || "", sizeSmall);
+
+    try {
+      form.flatten();
+    } catch (e) {
+      console.warn("[COMP][PDF] flatten falló:", e?.message || e);
+    }
+
+    const outBytes = await pdfDoc.save();
+    const blob = new Blob([outBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const folioRaw = String(payload.no_comprometido || "").trim();
+    const folio =
+      (folioRaw &&
+        (folioRaw.match(/^ECA-\d{4}-\d{2}-CP-\d{4}$/)
+          ? folioRaw
+          : (() => {
+              const m = folioRaw.match(/^ECA-(\d{4})-(\d{2})-CP-(\d{1,6})$/i);
+              if (m) {
+                return `ECA-${m[1]}-${m[2]}-CP-${String(m[3]).padStart(4, "0")}`;
+              }
+              const onlyDigits = folioRaw.replace(/\D/g, "");
+              if (onlyDigits) {
+                const f = String(payload.fecha || "");
+                const year =
+                  f && /^\d{4}-\d{2}-\d{2}$/.test(f)
+                    ? f.slice(0, 4)
+                    : String(new Date().getFullYear());
+                const month =
+                  f && /^\d{4}-\d{2}-\d{2}$/.test(f)
+                    ? f.slice(5, 7)
+                    : String(new Date().getMonth() + 1).padStart(2, "0");
+                const num = onlyDigits.padStart(4, "0");
+                return `ECA-${year}-${month}-CP-${num}`;
+              }
+              return "COMPROMETIDO";
+            })())) ||
+      "COMPROMETIDO";
+    a.download = `${folio}.pdf`;
+    try {
+      setTextByPattern(["no", "comprometido"], String(payload.no_comprometido || ""), sizeSmall, PDFLib?.TextAlignment?.Center);
+    } catch {}
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
 
   // ---------------------------
@@ -579,20 +993,28 @@
       document.getElementById("txtFolioSuf") ||
       document.getElementById("txtNumeroSuf");
 
+    if (btnDescargarPdf) btnDescargarPdf.type = "button";
+    updateDownloadLock(state);
+
     btnBuscarSuf?.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
-        const id = await buscarSuficienciaPorFolio(txtNumeroSuf?.value || "");
-        if (!id) return;
-
-        const raw = await cargarSuficienciaEnComprometido(id);
-        if (!raw) return;
-
-        state.payload = renderPayload(raw);
-        await uiSuccess("Suficiencia cargada correctamente.", "Buscar");
+        const res = await buscarPorFolioGeneral(txtNumeroSuf?.value || "");
+        if (!res?.kind) return;
+        if (res.kind === "SP") {
+          const raw = await cargarSuficienciaEnComprometido(res.value);
+          if (!raw) return;
+          state.payload = renderPayload(raw);
+          updateDownloadLock(state);
+          await uiSuccess("Suficiencia cargada correctamente.", "Buscar");
+        } else if (res.kind === "CP") {
+          state.payload = renderPayload(res.value);
+          updateDownloadLock(state);
+          await uiSuccess("Comprometido cargado correctamente.", "Buscar");
+        }
       } catch (err) {
         console.error("[COMPROMETIDO] buscar suf error:", err);
-        await uiError(err?.message || "Error al buscar suficiencia", "Buscar");
+        await uiError(err?.message || "Error en la búsqueda", "Buscar");
       }
     });
 
@@ -606,6 +1028,11 @@
     btnDescargarPdf?.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
+        let idRef = Number(state?.payload?.id_comprometido || 0);
+        if (!(Number.isFinite(idRef) && idRef > 0)) {
+          await uiWarn("Primero guarda el Comprometido para poder descargar el PDF.", "PDF");
+          return;
+        }
         await generarPDF(state.payload);
       } catch (err) {
         console.error("[COMPROMETIDO][PDF]", err);
@@ -617,6 +1044,7 @@
       try {
         const raw = await loadData();
         state.payload = renderPayload(raw);
+        updateDownloadLock(state);
         await uiSuccess("Datos recargados correctamente.", "Recargar");
       } catch (err) {
         await uiError(err?.message || "No se pudo recargar", "Recargar");
@@ -673,6 +1101,7 @@
           `Comprometido guardado: ${r.no_comprometido}`,
           "Guardado",
         );
+        updateDownloadLock(state);
       } catch (err) {
         console.error("[COMPROMETIDO] save error:", err);
         await uiError(err?.message || "Error al guardar comprometido");
@@ -718,7 +1147,7 @@
   async function init() {
     const state = { payload: null };
 
-    const hasInitial = !!getQueryId() || !!localStorage.getItem("cp_last_suficiencia");
+    const hasInitial = !!getQueryId();
 
 if (hasSwal() && hasInitial) {
   Swal.fire({
@@ -735,6 +1164,7 @@ if (hasSwal() && hasInitial) {
       const raw = await loadData();
 
       if (!raw) {
+        clearUI();
         state.payload = null;
       } else {
         state.payload = renderPayload(raw);

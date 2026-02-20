@@ -100,7 +100,7 @@
   <div class="container mt-5 mb-2 no-print">
     <!-- ACCIONES -->
     <div class="cp-actions mt-3">
-      <div class="cp-actions__left">
+      <div class="cp-actions__left d-flex flex-wrap align-items-center gap-2">
         <button id="btn-guardar" class="btn btn-success btn-sm me-3">
           <i class="bi bi-save me-1"></i>Guardar
         </button>
@@ -112,11 +112,25 @@
         <a href="/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank" class="btn btn-secondary btn-sm">
           <i class="bi bi-file-earmark-pdf-fill me-1"></i>Abrir instructivo en PDF
         </a>
+
+        <button id="btn-cancelar-suf" class="btn btn-outline-dark btn-sm">
+          <i class="bi bi-x-circle me-1"></i>Cancelar suficiencia
+        </button>
       </div>
-      <!-- ahora abre MODAL -->
-      <button id="btnAbrirBuscarSuf" type="button" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-search me-1"></i>Buscar suficiencia
-      </button>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <div id="sufStatusBox" class="suf-status-box">
+          <div class="d-flex align-items-center gap-2">
+            <span id="sufEstadoBadge" class="badge bg-secondary">Sin cargar</span>
+            <span id="sufRestanteText" class="small text-muted">—</span>
+          </div>
+          <div class="small text-muted">
+            Caduca: <span id="sufCaducaText">—</span>
+          </div>
+        </div>
+        <button id="btnAbrirBuscarSuf" type="button" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-search me-1"></i>Buscar suficiencia
+        </button>
+      </div>
     </div>
   </div>
 

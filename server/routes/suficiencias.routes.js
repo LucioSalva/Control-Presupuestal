@@ -172,6 +172,24 @@ router.post("/", async (req, res) => {
       await client.query(sqlDet, params);
     }
 
+    const rFull = await client.query(
+      `
+      SELECT
+        id,
+        folio_num,
+        no_suficiencia,
+        created_at,
+        expires_at,
+        estado,
+        dias_restantes,
+        horas_restantes
+      FROM v_suficiencias_estado
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [idSuf],
+    );
+
     await client.query("COMMIT");
 
     return res.json({
@@ -179,6 +197,11 @@ router.post("/", async (req, res) => {
       id: idSuf,
       folio_num: rHead.rows[0].folio_num,
       no_suficiencia: rHead.rows[0].no_suficiencia,
+      created_at: rFull.rows?.[0]?.created_at ?? null,
+      expires_at: rFull.rows?.[0]?.expires_at ?? null,
+      estado: rFull.rows?.[0]?.estado ?? null,
+      dias_restantes: rFull.rows?.[0]?.dias_restantes ?? null,
+      horas_restantes: rFull.rows?.[0]?.horas_restantes ?? null,
     });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -225,8 +248,19 @@ router.get("/buscar", async (req, res) => {
     }
 
     const sql = `
-      SELECT id, folio_num, no_suficiencia, fecha, id_dgeneral, id_dauxiliar
-      FROM suficiencias
+      SELECT
+        id,
+        folio_num,
+        no_suficiencia,
+        fecha,
+        id_dgeneral,
+        id_dauxiliar,
+        created_at,
+        expires_at,
+        estado,
+        dias_restantes,
+        horas_restantes
+      FROM v_suficiencias_estado
       WHERE ${where.join(" AND ")}
       ORDER BY id DESC
       LIMIT 50
@@ -240,6 +274,108 @@ router.get("/buscar", async (req, res) => {
       error: "Error al buscar suficiencia",
       db: err.message,
     });
+  }
+});
+
+router.post("/:id/cancelar", async (req, res) => {
+  const client = await getClient();
+  try {
+    const role = getRole(req);
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "id inválido" });
+    }
+
+    const where = [`id = $1`];
+    const params = [id];
+    let i = 2;
+
+    if (role === "AREA") {
+      if (req.user?.id_dgeneral != null) {
+        where.push(`id_dgeneral = $${i++}`);
+        params.push(req.user.id_dgeneral);
+      }
+      if (req.user?.id_dauxiliar != null) {
+        where.push(`id_dauxiliar = $${i++}`);
+        params.push(req.user.id_dauxiliar);
+      }
+    }
+
+    const cancelReasonRaw = String(req.body?.cancel_reason || "").trim();
+    const cancelReason = cancelReasonRaw || null;
+    const userId = Number(req.user?.id);
+    const cancelUser = Number.isFinite(userId) ? userId : null;
+
+    await client.query("BEGIN");
+
+    const rCur = await client.query(
+      `
+      SELECT id, cancelled_at
+      FROM suficiencias
+      WHERE ${where.join(" AND ")}
+      LIMIT 1
+      FOR UPDATE
+      `,
+      params,
+    );
+
+    if (!rCur.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "No encontrada" });
+    }
+
+    if (rCur.rows[0].cancelled_at) {
+      const rView = await client.query(
+        `SELECT * FROM v_suficiencias_estado WHERE id = $1 LIMIT 1`,
+        [id],
+      );
+      await client.query("ROLLBACK");
+      return res.json({ ok: true, already: true, ...rView.rows?.[0] });
+    }
+
+    const whereUpdate = [`id = $1`];
+    const paramsUpdate = [id, cancelUser, cancelReason];
+    let j = 4;
+    if (role === "AREA") {
+      if (req.user?.id_dgeneral != null) {
+        whereUpdate.push(`id_dgeneral = $${j++}`);
+        paramsUpdate.push(req.user.id_dgeneral);
+      }
+      if (req.user?.id_dauxiliar != null) {
+        whereUpdate.push(`id_dauxiliar = $${j++}`);
+        paramsUpdate.push(req.user.id_dauxiliar);
+      }
+    }
+
+    await client.query(
+      `
+      UPDATE suficiencias
+      SET cancelled_at = NOW(),
+          cancelled_by = $2,
+          cancel_reason = $3
+      WHERE ${whereUpdate.join(" AND ")}
+      `,
+      paramsUpdate,
+    );
+
+    const rView = await client.query(
+      `SELECT * FROM v_suficiencias_estado WHERE id = $1 LIMIT 1`,
+      [id],
+    );
+
+    await client.query("COMMIT");
+    return res.json({ ok: true, ...rView.rows?.[0] });
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+    console.error("[POST /api/suficiencias/:id/cancelar] error:", err);
+    return res.status(500).json({
+      error: "Error al cancelar suficiencia",
+      db: err.message,
+    });
+  } finally {
+    client.release();
   }
 });
 
@@ -269,7 +405,7 @@ router.get("/:id", async (req, res) => {
     // 1) Cabecera
     const rHead = await query(
       `SELECT *
-       FROM suficiencias
+       FROM v_suficiencias_estado
        WHERE ${where.join(" AND ")}
        LIMIT 1`,
       params,
