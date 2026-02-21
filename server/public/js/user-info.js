@@ -46,8 +46,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const dashboardLinks = document.querySelectorAll(
     'a[href="dashboard_partidas.html"]',
   );
+  const graficaLinks = document.querySelectorAll(
+    'a[href="dashboard_partidas_grafica.html"]',
+  );
+  const historialLinks = document.querySelectorAll(
+    'a[href="suficiencia_historial.html"]',
+  );
   const setDashboardVisible = (visible) => {
     dashboardLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+    graficaLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+    historialLinks.forEach((link) => {
       const item = link.closest("li") || link;
       if (visible) item.classList.remove("d-none");
       else item.classList.add("d-none");

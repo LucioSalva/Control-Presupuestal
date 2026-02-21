@@ -16,6 +16,7 @@
   const lblSegmento = document.getElementById("lblSegmento");
   const btnAplicar = document.getElementById("btnAplicar");
   const btnRefresh = document.getElementById("btnRefresh");
+  const btnGrafica = document.getElementById("btnGrafica");
 
   const kpiPresupuesto = document.getElementById("kpiPresupuesto");
   const kpiSuficiencia = document.getElementById("kpiSuficiencia");
@@ -299,6 +300,17 @@
     btnRefresh?.addEventListener("click", () =>
       loadResumen().catch((e) => Swal.fire("Error", e.message, "error")),
     );
+    btnGrafica?.addEventListener("click", () => {
+      const filters = getFilters();
+      const params = new URLSearchParams();
+      params.set("periodo", filters.periodo);
+      params.set("anio", filters.anio);
+      params.set("segmento", filters.segmento);
+      if (filters.id_dgeneral) params.set("id_dgeneral", filters.id_dgeneral);
+      if (filters.partida) params.set("partida", filters.partida);
+      const url = `dashboard_partidas_grafica.html?${params.toString()}`;
+      window.open(url, "_blank", "noopener");
+    });
     tbodyCapitulos?.addEventListener("click", (e) => {
       const target = e.target.closest("button[data-capitulo]");
       if (!target) return;

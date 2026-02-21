@@ -20,6 +20,21 @@ function pad6(v) {
   return s;
 }
 
+async function isUserL00117(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  const daId = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
+
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
+  ]);
+
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "L00" && daClave === "117";
+}
+
 /* =====================================================
   GET /api/suficiencias/next-folio
    ===================================================== */
@@ -376,6 +391,40 @@ router.post("/:id/cancelar", async (req, res) => {
     });
   } finally {
     client.release();
+  }
+});
+
+router.get("/historial", async (req, res) => {
+  try {
+    const role = getRole(req);
+    const allowed = role === "GOD" || role === "ADMIN" || (await isUserL00117(req));
+    if (!allowed) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+
+    const sql = `
+      SELECT
+        v.id,
+        v.no_suficiencia,
+        v.estado,
+        v.created_at,
+        v.expires_at,
+        v.dias_restantes,
+        v.horas_restantes,
+        s.cancel_reason
+      FROM v_suficiencias_estado v
+      JOIN suficiencias s ON s.id = v.id
+      ORDER BY v.created_at DESC
+    `;
+
+    const r = await query(sql);
+    return res.json({ ok: true, data: r.rows });
+  } catch (err) {
+    console.error("[GET /api/suficiencias/historial] error:", err);
+    return res.status(500).json({
+      error: "Error al obtener historial",
+      db: err.message,
+    });
   }
 });
 

@@ -2669,6 +2669,11 @@
       console.warn("[SP] fuentes:", e.message);
     }
 
+    const idParam = Number(new URLSearchParams(window.location.search).get("id"));
+    if (Number.isFinite(idParam) && idParam > 0) {
+      await cargarSuficienciaEnFormulario(idParam);
+    }
+
     refreshTotales();
     updateClaveProgramatica();
     syncMetaFromProyecto();

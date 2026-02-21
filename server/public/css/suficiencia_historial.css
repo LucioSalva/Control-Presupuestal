@@ -1,0 +1,49 @@
+body {
+  background: #f5f5f5;
+}
+
+.historial-title {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 1;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-vigente {
+  background: rgba(25, 135, 84, 0.12);
+  color: #198754;
+}
+
+.status-cancelada {
+  background: rgba(220, 53, 69, 0.12);
+  color: #dc3545;
+}
+
+.status-expirada {
+  background: rgba(33, 37, 41, 0.12);
+  color: #212529;
+}
+
+.status-otro {
+  background: rgba(108, 117, 125, 0.15);
+  color: #6c757d;
+}
+
+.table-responsive {
+  max-height: 70vh;
+}
