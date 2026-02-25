@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs/promises";
 import { fileURLToPath } from "url";
 
 import helmet from "helmet";
@@ -23,6 +24,7 @@ import metasRouter from "./routes/metas.routes.js";
 import partidasRouter from "./routes/partidas.routes.js";
 import presupuestoBasePartidasRouter from "./routes/presupuesto_base_partidas.routes.js";
 import dashboardPartidasRouter from "./routes/dashboard_partidas.routes.js";
+import reconduccionesRouter from "./routes/reconducciones.routes.js";
 import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
 
 
@@ -244,6 +246,7 @@ app.use("/api/presupuesto-base-partidas", authRequired, requireGodOrAdmin, presu
 app.use("/api/catalogos/metas", authRequired, metasRouter);
 app.use("/api/catalogos", authRequired, catalogosRoutes);
 app.use("/api/dashboard", authRequired, dashboardPartidasRouter);
+app.use("/api/reconducciones", authRequired, reconduccionesRouter);
 
 
 // =====================================================
@@ -266,6 +269,19 @@ app.use((req, res) => {
 // =====================================================
 (async () => {
   try {
+    try {
+      const r = await query("SELECT to_regclass('public.reconducciones') AS tbl");
+      const exists = Boolean(r.rows?.[0]?.tbl);
+      if (!exists) {
+        const sqlPath = path.join(__dirname, "sql", "migrations", "2026_02_23_reconducciones.sql");
+        const sql = await fs.readFile(sqlPath, "utf8");
+        await query(sql);
+        console.log("[MIGRATION] reconducciones aplicada");
+      }
+    } catch (e) {
+      console.error("[MIGRATION] reconducciones error:", e);
+    }
+
     if (process.env.SEED === "true") {
       await seedPartidasPermitidas();
     }

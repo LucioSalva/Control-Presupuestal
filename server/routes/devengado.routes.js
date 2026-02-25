@@ -1,11 +1,30 @@
 import express from "express";
-import { getClient } from "../db.js";
+import { query, getClient } from "../db.js";
 
 const router = express.Router();
 
 // ---------------------------
 // Helpers 
 // ---------------------------
+async function isUserL00117(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  const daId = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
+  ]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "L00" && daClave === "117";
+}
+async function isUserE00(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  if (!Number.isFinite(dgId)) return false;
+  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "E00";
+}
 function toNullIfEmpty(v) {
   const s = String(v ?? "").trim();
   return s === "" ? null : v;
@@ -112,6 +131,7 @@ router.post("/", async (req, res) => {
 
   try {
     const b = req.body || {};
+    const allowIEPSPensiones = (await isUserL00117(req)) || (await isUserE00(req));
 
     const idSuf = Number(b.id_suficiencia ?? b.id ?? 0);
     if (!Number.isFinite(idSuf) || idSuf <= 0) {
@@ -293,6 +313,19 @@ router.post("/", async (req, res) => {
       RETURNING id, folio_num, no_devengado;
     `;
 
+    // Normalizar y aplicar permisos
+    let isr_tasa = toNumOrNull(b.isr_tasa ?? comp.isr_tasa);
+    let ieps_tasa = toNumOrNull(b.ieps_tasa ?? comp.ieps_tasa);
+    let subtotal = toNumOrZero(b.subtotal ?? comp.subtotal);
+    let iva = toNumOrZero(b.iva ?? comp.iva);
+    let isr = toNumOrZero(b.isr ?? comp.isr);
+    let ieps = toNumOrZero(b.ieps ?? comp.ieps);
+
+    if (!allowIEPSPensiones) {
+      ieps_tasa = null;
+      ieps = 0;
+    }
+
     const headParams = [
       idComp, // $1
       idSuf, // $2
@@ -314,13 +347,13 @@ router.post("/", async (req, res) => {
 
       comp.impuesto_tipo ?? "NONE", // $16
 
-      toNumOrNull(b.isr_tasa ?? comp.isr_tasa), // $17
-      toNumOrNull(b.ieps_tasa ?? comp.ieps_tasa), // $18
+      isr_tasa, // $17
+      ieps_tasa, // $18
 
-      toNumOrZero(b.subtotal ?? comp.subtotal), // $19
-      toNumOrZero(b.iva ?? comp.iva), // $20
-      toNumOrZero(b.isr ?? comp.isr), // $21
-      toNumOrZero(b.ieps ?? comp.ieps), // $22
+      subtotal, // $19
+      iva, // $20
+      isr, // $21
+      ieps, // $22
 
       totalDev, // $23
       toNullIfEmpty(b.cantidad_con_letra ?? comp.cantidad_con_letra), // $24

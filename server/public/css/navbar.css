@@ -2,6 +2,12 @@
   --cp-gold: #bc955c;
   --cp-gold-dark: #bc955c; /* mismo color, sin contraste */
   --cp-text: #495057;
+  --cp-nav-main-h: 56px;
+  --cp-nav-tabs-h: 44px;
+}
+
+body {
+  padding-top: calc(var(--cp-nav-main-h) + var(--cp-nav-tabs-h));
 }
 
 /* CONTENEDOR DE TABS */
@@ -9,6 +15,11 @@
   background: #ffffff !important;
   border-bottom: 2px solid var(--cp-gold);
   padding: 0;
+  position: fixed;
+  top: var(--cp-nav-main-h);
+  left: 0;
+  right: 0;
+  z-index: 1029;
 }
 
 /* UL */
@@ -87,6 +98,11 @@
    ========================== */
 .cp-main-nav {
   background: var(--cp-gold) !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
 }
 
 .cp-main-nav .navbar-brand {
@@ -119,6 +135,11 @@
 
 /* En pantallas chicas baja un poco */
 @media (max-width: 768px) {
+  :root {
+    --cp-nav-main-h: 72px;
+    --cp-nav-tabs-h: 48px;
+  }
+
   .cp-main-nav .cp-logo,
   .cp-main-nav .navbar-logo {
     height: 36px;

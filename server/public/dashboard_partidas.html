@@ -95,36 +95,30 @@
         </div>
       </div>
 
-      <div class="row g-3 mb-3">
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="dp-kpi dp-card shadow-sm">
-            <div class="small text-muted">Presupuesto total</div>
-            <div id="kpiPresupuesto" class="dp-kpi-value">—</div>
-          </div>
+      <div class="dp-kpi-grid mb-3">
+        <div class="dp-kpi-tile dp-kpi-primary">
+          <div class="dp-kpi-label">Presupuesto total</div>
+          <div id="kpiPresupuesto" class="dp-kpi-value">—</div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="dp-kpi dp-card shadow-sm">
-            <div class="small text-muted">Total solicitado en suficiencia</div>
-            <div id="kpiSuficiencia" class="dp-kpi-value">—</div>
-          </div>
+        <div class="dp-kpi-tile">
+          <div class="dp-kpi-label">Total solicitado en suficiencia</div>
+          <div id="kpiSuficiencia" class="dp-kpi-value">—</div>
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
-          <div class="dp-kpi dp-card shadow-sm">
-            <div class="small text-muted">Total comprometido</div>
-            <div id="kpiComprometido" class="dp-kpi-value">—</div>
-          </div>
+        <div class="dp-kpi-tile">
+          <div class="dp-kpi-label">Total comprometido</div>
+          <div id="kpiComprometido" class="dp-kpi-value">—</div>
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
-          <div class="dp-kpi dp-card shadow-sm">
-            <div class="small text-muted">Total devengado</div>
-            <div id="kpiDevengado" class="dp-kpi-value">—</div>
-          </div>
+        <div class="dp-kpi-tile">
+          <div class="dp-kpi-label">Total devengado</div>
+          <div id="kpiDevengado" class="dp-kpi-value">—</div>
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
-          <div class="dp-kpi dp-card shadow-sm dp-kpi-accent">
-            <div class="small text-muted">Saldo disponible</div>
-            <div id="kpiSaldo" class="dp-kpi-value">—</div>
-          </div>
+        <div class="dp-kpi-tile">
+          <div class="dp-kpi-label">Total reconducciones</div>
+          <div id="kpiReconducciones" class="dp-kpi-value">—</div>
+        </div>
+        <div class="dp-kpi-tile dp-kpi-accent">
+          <div class="dp-kpi-label">Saldo disponible</div>
+          <div id="kpiSaldo" class="dp-kpi-value">—</div>
         </div>
       </div>
 
@@ -139,6 +133,7 @@
                   <th class="text-end">Suficiencia</th>
                   <th class="text-end">Comprometido</th>
                   <th class="text-end">Devengado</th>
+                  <th class="text-end">Reconducciones</th>
                   <th class="text-end">Saldo</th>
                   <th class="text-end">% Ejercido</th>
                   <th class="text-center">Detalle</th>
@@ -146,7 +141,7 @@
               </thead>
               <tbody id="tbodyCapitulos">
                 <tr>
-                  <td colspan="8" class="text-center text-muted py-4">Cargando...</td>
+                  <td colspan="9" class="text-center text-muted py-4">Cargando...</td>
                 </tr>
               </tbody>
             </table>
@@ -174,13 +169,14 @@
                   <th class="text-end">Suficiencia</th>
                   <th class="text-end">Comprometido</th>
                   <th class="text-end">Devengado</th>
+                  <th class="text-end">Reconducciones</th>
                   <th class="text-end">Saldo</th>
                   <th class="text-end">% Ejercido</th>
                 </tr>
               </thead>
               <tbody id="tbodyDetalle">
                 <tr>
-                  <td colspan="8" class="text-center text-muted py-3">Sin detalle</td>
+                  <td colspan="9" class="text-center text-muted py-3">Sin detalle</td>
                 </tr>
               </tbody>
             </table>

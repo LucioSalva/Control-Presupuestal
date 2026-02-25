@@ -3,6 +3,26 @@ import { query, getClient } from "../db.js";
 
 const router = express.Router();
 
+async function isUserL00117(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  const daId = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
+  ]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "L00" && daClave === "117";
+}
+async function isUserE00(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  if (!Number.isFinite(dgId)) return false;
+  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "E00";
+}
+
 function toNullIfEmpty(v) {
   const s = String(v ?? "").trim();
   return s === "" ? null : v;
@@ -34,6 +54,7 @@ router.post("/", async (req, res) => {
   const client = await getClient();
   try {
     const b = req.body || {};
+    const allowIEPSPensiones = (await isUserL00117(req)) || (await isUserE00(req));
 
     const idSuf = Number(b.id_suficiencia ?? b.id);
     if (!Number.isFinite(idSuf) || idSuf <= 0) {
@@ -123,6 +144,21 @@ router.post("/", async (req, res) => {
       RETURNING id, folio_num, no_comprometido;
     `;
 
+    // Normalizar montos y tasas
+    let isr_tasa = toNumOrNull(b.isr_tasa);
+    let ieps_tasa = toNumOrNull(b.ieps_tasa);
+    let subtotal = toNumOrZero(b.subtotal);
+    let iva = toNumOrZero(b.iva);
+    let isr = toNumOrZero(b.isr);
+    let ieps = toNumOrZero(b.ieps);
+    let total = toNumOrZero(b.total);
+
+    if (!allowIEPSPensiones) {
+      ieps_tasa = null;
+      ieps = 0;
+      total = subtotal + iva + isr + 0;
+    }
+
     const headParams = [
       idSuf, // $1
       req.user.id, // $2
@@ -142,13 +178,13 @@ router.post("/", async (req, res) => {
       b.clave_programatica ?? null, // $14
 
       b.impuesto_tipo ?? "NONE", // $15
-      toNumOrNull(b.isr_tasa), // $16
-      toNumOrNull(b.ieps_tasa), // $17
-      toNumOrZero(b.subtotal), // $18
-      toNumOrZero(b.iva), // $19
-      toNumOrZero(b.isr), // $20
-      toNumOrZero(b.ieps), // $21
-      toNumOrZero(b.total), // $22
+      isr_tasa, // $16
+      ieps_tasa, // $17
+      subtotal, // $18
+      iva, // $19
+      isr, // $20
+      ieps, // $21
+      total, // $22
       toNullIfEmpty(b.cantidad_con_letra), // $23
     ];
 

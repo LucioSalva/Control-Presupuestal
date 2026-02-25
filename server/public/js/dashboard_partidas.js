@@ -22,6 +22,7 @@
   const kpiSuficiencia = document.getElementById("kpiSuficiencia");
   const kpiComprometido = document.getElementById("kpiComprometido");
   const kpiDevengado = document.getElementById("kpiDevengado");
+  const kpiReconducciones = document.getElementById("kpiReconducciones");
   const kpiSaldo = document.getElementById("kpiSaldo");
 
   const tbodyCapitulos = document.getElementById("tbodyCapitulos");
@@ -92,6 +93,8 @@
     if (kpiSuficiencia) kpiSuficiencia.textContent = money(kpis.suficiencia);
     if (kpiComprometido) kpiComprometido.textContent = money(kpis.comprometido);
     if (kpiDevengado) kpiDevengado.textContent = money(kpis.devengado);
+    if (kpiReconducciones)
+      kpiReconducciones.textContent = money(kpis.reconducciones);
     if (kpiSaldo) kpiSaldo.textContent = money(kpis.saldo_disponible);
   }
 
@@ -99,7 +102,7 @@
     if (!tbodyCapitulos) return;
     if (!Array.isArray(rows) || rows.length === 0) {
       tbodyCapitulos.innerHTML =
-        '<tr><td colspan="8" class="text-center text-muted py-4">Sin resultados.</td></tr>';
+        '<tr><td colspan="9" class="text-center text-muted py-4">Sin resultados.</td></tr>';
       return;
     }
 
@@ -113,6 +116,7 @@
             <td class="text-end">${money(row.suficiencia)}</td>
             <td class="text-end">${money(row.comprometido)}</td>
             <td class="text-end">${money(row.devengado)}</td>
+            <td class="text-end">${money(row.reconducciones)}</td>
             <td class="text-end">${money(row.saldo_disponible)}</td>
             <td class="text-end">${percent(row.porcentaje_ejercido)}</td>
             <td class="text-center">
@@ -130,7 +134,7 @@
     if (!tbodyDetalle) return;
     if (!Array.isArray(rows) || rows.length === 0) {
       tbodyDetalle.innerHTML =
-        '<tr><td colspan="8" class="text-center text-muted py-3">Sin detalle.</td></tr>';
+        '<tr><td colspan="9" class="text-center text-muted py-3">Sin detalle.</td></tr>';
       return;
     }
 
@@ -144,6 +148,7 @@
             <td class="text-end">${money(row.suficiencia)}</td>
             <td class="text-end">${money(row.comprometido)}</td>
             <td class="text-end">${money(row.devengado)}</td>
+            <td class="text-end">${money(row.reconducciones)}</td>
             <td class="text-end">${money(row.saldo_disponible)}</td>
             <td class="text-end">${percent(row.porcentaje_ejercido)}</td>
           </tr>
@@ -247,7 +252,7 @@
   async function loadResumen() {
     if (tbodyCapitulos) {
       tbodyCapitulos.innerHTML =
-        '<tr><td colspan="8" class="text-center text-muted py-4">Cargando...</td></tr>';
+        '<tr><td colspan="9" class="text-center text-muted py-4">Cargando...</td></tr>';
     }
     const filters = getFilters();
     const params = new URLSearchParams();
@@ -269,7 +274,7 @@
   async function loadDetalle(capitulo) {
     if (!tbodyDetalle) return;
     tbodyDetalle.innerHTML =
-      '<tr><td colspan="8" class="text-center text-muted py-3">Cargando...</td></tr>';
+      '<tr><td colspan="9" class="text-center text-muted py-3">Cargando...</td></tr>';
     if (modalDetalleTitle) {
       modalDetalleTitle.textContent = `Detalle de capítulo ${capitulo}`;
     }

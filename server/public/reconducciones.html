@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reconducciones</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/navbar.css">
+  <link rel="stylesheet" href="/css/reconducciones.css">
+</head>
+
+<body>
+  <div id="cp-navbar"></div>
+
+  <main class="container py-4">
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <div>
+            <h5 class="mb-1">Reconducciones recientes</h5>
+            <div class="text-muted small">Consulta y edita movimientos recientes</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <label class="small text-muted">Estatus</label>
+            <select id="filtro-estatus" class="form-select form-select-sm w-auto">
+              <option value="TODOS">Todos</option>
+              <option value="BORRADOR">Borrador</option>
+              <option value="ENVIADO">Enviado</option>
+              <option value="AUTORIZADO">Autorizado</option>
+              <option value="APLICADO">Aplicado</option>
+              <option value="CANCELADO">Cancelado</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle" id="tabla-recon">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Oficio</th>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Estatus</th>
+                <th class="text-end">Origen</th>
+                <th class="text-end">Destino</th>
+                <th class="text-end">Diferencia</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-recon-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-container rc-form">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 rc-doc-header">
+        <div>
+          <div class="form-title">Dictamen de Reconducción y Actualización Programático-Presupuestal</div>
+          <div class="sub-title">Formato de control interno</div>
+        </div>
+        <div class="text-end">
+          <div class="small text-muted">ID</div>
+          <div id="rc-id" class="fw-bold">—</div>
+          <span id="rc-status" class="badge bg-secondary mt-2">BORRADOR</span>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <label class="form-label">No. de oficio</label>
+          <input id="rc-oficio" type="text" class="form-control form-control-sm" placeholder="Ej. RCP-2026-001">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Fecha de elaboración</label>
+          <input id="rc-fecha" type="date" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Tipo de movimiento</label>
+          <select id="rc-tipo" class="form-select form-select-sm">
+            <option value="">Seleccione...</option>
+            <option value="TRASPASO">Traspaso</option>
+            <option value="RECONDUCCION">Reconducción</option>
+            <option value="AMPLIACION">Ampliación</option>
+            <option value="REDUCCION">Reducción</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Ejercicio</label>
+          <input id="rc-ejercicio" type="number" class="form-control form-control-sm" placeholder="2026">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Mes (saldo)</label>
+          <select id="rc-mes" class="form-select form-select-sm">
+            <option value="">Seleccione...</option>
+            <option value="ENERO">Enero</option>
+            <option value="FEBRERO">Febrero</option>
+            <option value="MARZO">Marzo</option>
+            <option value="ABRIL">Abril</option>
+            <option value="MAYO">Mayo</option>
+            <option value="JUNIO">Junio</option>
+            <option value="JULIO">Julio</option>
+            <option value="AGOSTO">Agosto</option>
+            <option value="SEPTIEMBRE">Septiembre</option>
+            <option value="OCTUBRE">Octubre</option>
+            <option value="NOVIEMBRE">Noviembre</option>
+            <option value="DICIEMBRE">Diciembre</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card rc-side-card">
+            <div class="card-header rc-side-header rc-origen">Identificación del Proyecto en el que se cancela o reduce</div>
+            <div class="card-body">
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">DG</label>
+                  <select id="origen-dgeneral" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">DA</label>
+                  <select id="origen-dauxiliar" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Programa</label>
+                  <select id="origen-programa" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Fuente</label>
+                  <select id="origen-fuente" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Proyecto</label>
+                  <select id="origen-proyecto" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Clave</label>
+                  <input id="origen-clave" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Denominación</label>
+                  <input id="origen-denominacion" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Objetivo</label>
+                  <input id="origen-objetivo" type="text" class="form-control form-control-sm">
+                </div>
+              </div>
+
+              <div class="rc-subtitle mt-3">Recursos a nivel proyecto</div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label">Autorizado</label>
+                  <input id="origen-autorizado" type="number" step="0.01" class="form-control form-control-sm text-end">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Por Ejercer</label>
+                  <input id="origen-por-ejercer" type="number" step="0.01" class="form-control form-control-sm text-end" readonly>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Por Cancelar / Reconducir / Ampliar / Asignar</label>
+                  <input id="origen-monto" type="number" step="0.01" class="form-control form-control-sm text-end">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Autorizado Modificado</label>
+                  <input id="origen-autorizado-modificado" type="number" step="0.01" class="form-control form-control-sm text-end" readonly>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card rc-side-card">
+            <div class="card-header rc-side-header rc-destino">Identificación del Proyecto en el que se asigna o se amplia</div>
+            <div class="card-body">
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">DG</label>
+                  <select id="destino-dgeneral" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">DA</label>
+                  <select id="destino-dauxiliar" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Programa</label>
+                  <select id="destino-programa" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Fuente</label>
+                  <select id="destino-fuente" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Proyecto</label>
+                  <select id="destino-proyecto" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Clave</label>
+                  <input id="destino-clave" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Denominación</label>
+                  <input id="destino-denominacion" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Objetivo</label>
+                  <input id="destino-objetivo" type="text" class="form-control form-control-sm">
+                </div>
+              </div>
+
+              <div class="rc-subtitle mt-3">Recursos a nivel proyecto</div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label">Autorizado</label>
+                  <input id="destino-autorizado" type="number" step="0.01" class="form-control form-control-sm text-end">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Por Ejercer</label>
+                  <input id="destino-por-ejercer" type="number" step="0.01" class="form-control form-control-sm text-end" readonly>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Por Cancelar / Reconducir / Ampliar / Asignar</label>
+                  <input id="destino-monto" type="number" step="0.01" class="form-control form-control-sm text-end">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Autorizado Modificado</label>
+                  <input id="destino-autorizado-modificado" type="number" step="0.01" class="form-control form-control-sm text-end" readonly>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-3">
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header rc-table-header">Recursos por partida (ORIGEN)</div>
+            <div class="card-body">
+              <div class="d-flex gap-2 mb-2">
+                <button id="btn-add-origen" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
+                <button id="btn-del-origen" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle rc-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Partida</th>
+                      <th>Descripción</th>
+                      <th class="text-end">Por Ejercer</th>
+                      <th class="text-end">Por Cancelar / Reconducir / Ampliar / Asignar</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recursos-origen-body"></tbody>
+                </table>
+              </div>
+              <div id="origen-alerta-saldo" class="alert alert-warning d-none mb-2">
+                Hay partidas ORIGEN con saldo insuficiente.
+              </div>
+              <div class="rc-total-box">
+                <span>Total ORIGEN</span>
+                <strong id="total-origen">$0.00</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header rc-table-header">Recursos por partida (DESTINO)</div>
+            <div class="card-body">
+              <div class="d-flex gap-2 mb-2">
+                <button id="btn-add-destino" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
+                <button id="btn-del-destino" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle rc-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Partida</th>
+                      <th>Descripción</th>
+                      <th class="text-end">Por Ejercer</th>
+                      <th class="text-end">Por Cancelar / Reconducir / Ampliar / Asignar</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recursos-destino-body"></tbody>
+                </table>
+              </div>
+              <div class="rc-total-box">
+                <span>Total DESTINO</span>
+                <strong id="total-destino">$0.00</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rc-total-diff mt-2">
+        <span>Diferencia general</span>
+        <strong id="total-diff">$0.00</strong>
+      </div>
+
+      <div class="row g-3 mt-3">
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header rc-table-header">Metas (ORIGEN)</div>
+            <div class="card-body">
+              <div class="d-flex gap-2 mb-2">
+                <button id="btn-add-meta-origen" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
+                <button id="btn-del-meta-origen" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle rc-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Descripción</th>
+                      <th>Unidad</th>
+                      <th class="text-end">Inicial</th>
+                      <th class="text-end">Avance</th>
+                      <th class="text-end">Modificada</th>
+                      <th class="text-end">T1</th>
+                      <th class="text-end">T2</th>
+                      <th class="text-end">T3</th>
+                      <th class="text-end">T4</th>
+                    </tr>
+                  </thead>
+                  <tbody id="metas-origen-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header rc-table-header">Metas (DESTINO)</div>
+            <div class="card-body">
+              <div class="d-flex gap-2 mb-2">
+                <button id="btn-add-meta-destino" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
+                <button id="btn-del-meta-destino" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle rc-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Descripción</th>
+                      <th>Unidad</th>
+                      <th class="text-end">Inicial</th>
+                      <th class="text-end">Avance</th>
+                      <th class="text-end">Modificada</th>
+                      <th class="text-end">T1</th>
+                      <th class="text-end">T2</th>
+                      <th class="text-end">T3</th>
+                      <th class="text-end">T4</th>
+                    </tr>
+                  </thead>
+                  <tbody id="metas-destino-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label class="form-label">Justificación</label>
+        <textarea id="rc-justificacion" rows="3" class="form-control"></textarea>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="text-center mb-2">Datos de Solicitante y Firmantes</h5>
+          <div class="text-muted mb-3">Captura los datos para encabezados y firmantes:</div>
+          <div class="row g-2">
+            <div class="col-8">
+              <label class="form-label">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
+              <input id="firma-enlace-label" type="text" class="form-control form-control-sm" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Firmante Enlace</label>
+              <input id="firma-enlace-nombre" type="text" class="form-control form-control-sm" placeholder="Nombre del firmante">
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-8">
+              <label class="form-label">ÁREA SOLICITANTE</label>
+              <input id="firma-area-label" type="text" class="form-control form-control-sm" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS...">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Firmante Área</label>
+              <input id="firma-area-nombre" type="text" class="form-control form-control-sm" placeholder="Nombre del firmante">
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-8">
+              <label class="form-label">Dirección Solicitante</label>
+              <input id="firma-direccion-label" type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Firmante Dirección</label>
+              <input id="firma-direccion-nombre" type="text" class="form-control form-control-sm" placeholder="Nombre del firmante">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-4 rc-actions">
+        <button id="btn-guardar" class="btn btn-success">
+          <i class="bi bi-save me-1"></i>Guardar borrador
+        </button>
+        <button id="btn-enviar" class="btn btn-primary">
+          <i class="bi bi-send me-1"></i>Enviar
+        </button>
+        <button id="btn-aplicar" class="btn btn-warning">
+          <i class="bi bi-check2-circle me-1"></i>Aplicar
+        </button>
+        <button id="btn-cancelar" class="btn btn-outline-danger">
+          <i class="bi bi-x-circle me-1"></i>Cancelar
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/js/session-guard.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/user-info.js"></script>
+  <script src="/js/reconducciones.js"></script>
+</body>
+
+</html>

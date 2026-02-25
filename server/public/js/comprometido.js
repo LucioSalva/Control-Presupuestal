@@ -665,6 +665,29 @@
     } catch {}
   }
 
+  async function applyIEPSPensionesPermissions() {
+    try {
+      const r = await fetchJson(`${API}/api/suficiencias/perm-ieps-pensiones`, {
+        headers: { ...authHeaders() },
+      });
+      const allowed = !!r?.allowed;
+      if (allowed) return;
+      const iepsInput = document.querySelector('[name="ieps"]');
+      const iepsRow = iepsInput?.closest("tr");
+      if (iepsRow) iepsRow.classList.add("d-none");
+      const iepsTasa = document.querySelector('[name="ieps_tasa"]');
+      const iepsRadio = document.querySelector('input[name="impuesto_tipo"][value="IEPS"]');
+      const iepsRadioWrap = iepsRadio?.closest("div");
+      if (iepsTasa) {
+        iepsTasa.value = "";
+        iepsTasa.disabled = true;
+      }
+      if (iepsRadioWrap) iepsRadioWrap.classList.add("d-none");
+    } catch (e) {
+      console.warn("[COMP] permisos IEPS/Pensiones:", e?.message || e);
+    }
+  }
+
   // ---------------------------
   // PDF COMPROMETIDO (pdf-lib)
   // ---------------------------
@@ -1169,6 +1192,7 @@ if (hasSwal() && hasInitial) {
       } else {
         state.payload = renderPayload(raw);
       }
+      await applyIEPSPensionesPermissions();
     } catch (err) {
       console.error("[COMPROMETIDO]", err);
       await uiError(err?.message || "No se pudieron cargar datos");

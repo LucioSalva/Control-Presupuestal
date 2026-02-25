@@ -185,6 +185,7 @@ router.get("/partidas-resumen", async (req, res) => {
     const capituloSuf = capituloExpr("sd.clave");
     const capituloComp = capituloExpr("cd.clave");
     const capituloDev = capituloExpr("dd.clave");
+    const capituloRecon = capituloExpr("pa.clave");
 
     const sql = `
       WITH presupuesto AS (
@@ -236,6 +237,20 @@ router.get("/partidas-resumen", async (req, res) => {
           ${partidaFilter("dd", "clave")}
         GROUP BY COALESCE(${capituloDev}, 0)
       ),
+      reconducciones AS (
+        SELECT
+          COALESCE(${capituloRecon}, 0) AS capitulo,
+          SUM(rm.monto) AS reconducciones
+        FROM public.reconducciones_movimientos rm
+        JOIN public.reconducciones r ON r.id = rm.id_reconduccion
+        LEFT JOIN public.partidas pa ON pa.id = rm.id_partida
+        WHERE r.estatus = 'APLICADO'
+          AND COALESCE(rm.mes_pago_date, r.aplicado_at, r.created_at)::date BETWEEN ${startParam} AND ${endParam}
+          ${dgFilter("rm")}
+          ${daFilter("rm")}
+          ${partidaFilter("pa", "clave")}
+        GROUP BY COALESCE(${capituloRecon}, 0)
+      ),
       base AS (
         SELECT capitulo FROM presupuesto
         UNION
@@ -244,6 +259,8 @@ router.get("/partidas-resumen", async (req, res) => {
         SELECT capitulo FROM comprometido
         UNION
         SELECT capitulo FROM devengado
+        UNION
+        SELECT capitulo FROM reconducciones
       )
       SELECT
         b.capitulo,
@@ -251,6 +268,7 @@ router.get("/partidas-resumen", async (req, res) => {
         COALESCE(s.suficiencia, 0) AS suficiencia,
         COALESCE(c.comprometido, 0) AS comprometido,
         COALESCE(d.devengado, 0) AS devengado,
+        COALESCE(rm.reconducciones, 0) AS reconducciones,
         COALESCE(p.presupuesto, 0) - COALESCE(c.comprometido, 0) - COALESCE(d.devengado, 0) AS saldo_disponible,
         CASE
           WHEN COALESCE(p.presupuesto, 0) > 0
@@ -262,6 +280,7 @@ router.get("/partidas-resumen", async (req, res) => {
       LEFT JOIN suficiencia s ON s.capitulo = b.capitulo
       LEFT JOIN comprometido c ON c.capitulo = b.capitulo
       LEFT JOIN devengado d ON d.capitulo = b.capitulo
+      LEFT JOIN reconducciones rm ON rm.capitulo = b.capitulo
       ORDER BY b.capitulo;
     `;
 
@@ -273,9 +292,16 @@ router.get("/partidas-resumen", async (req, res) => {
         acc.suficiencia += Number(row.suficiencia || 0);
         acc.comprometido += Number(row.comprometido || 0);
         acc.devengado += Number(row.devengado || 0);
+        acc.reconducciones += Number(row.reconducciones || 0);
         return acc;
       },
-      { presupuesto: 0, suficiencia: 0, comprometido: 0, devengado: 0 },
+      {
+        presupuesto: 0,
+        suficiencia: 0,
+        comprometido: 0,
+        devengado: 0,
+        reconducciones: 0,
+      },
     );
     const saldoDisponible =
       totals.presupuesto - totals.comprometido - totals.devengado;
@@ -287,6 +313,7 @@ router.get("/partidas-resumen", async (req, res) => {
         suficiencia: totals.suficiencia,
         comprometido: totals.comprometido,
         devengado: totals.devengado,
+        reconducciones: totals.reconducciones,
         saldo_disponible: saldoDisponible,
       },
       rows: result.rows,
@@ -405,6 +432,20 @@ router.get("/partidas-detalle", async (req, res) => {
           ${partidaFilter("dd", "clave")}
         GROUP BY TRIM(dd.clave)
       ),
+      reconducciones AS (
+        SELECT
+          TRIM(pa.clave) AS clave,
+          SUM(rm.monto) AS reconducciones
+        FROM public.reconducciones_movimientos rm
+        JOIN public.reconducciones r ON r.id = rm.id_reconduccion
+        LEFT JOIN public.partidas pa ON pa.id = rm.id_partida
+        WHERE r.estatus = 'APLICADO'
+          AND COALESCE(rm.mes_pago_date, r.aplicado_at, r.created_at)::date BETWEEN ${startParam} AND ${endParam}
+          ${dgFilter("rm")}
+          ${daFilter("rm")}
+          ${partidaFilter("pa", "clave")}
+        GROUP BY TRIM(pa.clave)
+      ),
       base AS (
         SELECT clave FROM presupuesto
         UNION
@@ -413,6 +454,8 @@ router.get("/partidas-detalle", async (req, res) => {
         SELECT clave FROM comprometido
         UNION
         SELECT clave FROM devengado
+        UNION
+        SELECT clave FROM reconducciones
       )
       SELECT
         b.clave,
@@ -421,6 +464,7 @@ router.get("/partidas-detalle", async (req, res) => {
         COALESCE(s.suficiencia, 0) AS suficiencia,
         COALESCE(c.comprometido, 0) AS comprometido,
         COALESCE(d.devengado, 0) AS devengado,
+        COALESCE(rm.reconducciones, 0) AS reconducciones,
         COALESCE(p.presupuesto, 0) - COALESCE(c.comprometido, 0) - COALESCE(d.devengado, 0) AS saldo_disponible,
         CASE
           WHEN COALESCE(p.presupuesto, 0) > 0
@@ -433,6 +477,7 @@ router.get("/partidas-detalle", async (req, res) => {
       LEFT JOIN suficiencia s ON s.clave = b.clave
       LEFT JOIN comprometido c ON c.clave = b.clave
       LEFT JOIN devengado d ON d.clave = b.clave
+      LEFT JOIN reconducciones rm ON rm.clave = b.clave
       WHERE COALESCE(${capituloField}, 0) = ${capParam}
       ORDER BY b.clave::text;
     `;

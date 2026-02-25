@@ -265,6 +265,23 @@
     if (btnCancelar) btnCancelar.style.display = "none";
   }
 
+  async function applyIEPSPensionesPermissions() {
+    try {
+      const r = await fetch(`${API}/api/suficiencias/perm-ieps-pensiones`, {
+        headers: { ...authHeaders() },
+      });
+      if (!r.ok) return;
+      const data = await r.json().catch(() => ({}));
+      const allowed = !!data?.allowed;
+      if (allowed) return;
+      const iepsInput = document.querySelector('[name="ieps"]');
+      const row = iepsInput?.closest("tr");
+      if (row) row.classList.add("d-none");
+    } catch (e) {
+      console.warn("[DEV] permisos IEPS/Pensiones:", e?.message || e);
+    }
+  }
+
   function verificarVigencia(fechaBase, estatus) {
     const st = String(estatus || "").toUpperCase();
     if (st === "CANCELADO" || st === "CANCELADO_VIGENCIA") {
@@ -1284,6 +1301,7 @@
   // ---------------------------
   async function init() {
     bindEvents();
+    await applyIEPSPensionesPermissions();
     if (btnCancelar) btnCancelar.style.display = "none";
     if (btnDescargarPdf) btnDescargarPdf.type = "button";
     updateDownloadLock();

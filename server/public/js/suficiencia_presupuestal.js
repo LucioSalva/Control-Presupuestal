@@ -822,6 +822,95 @@
     formatMoneyFields();
   }
 
+  async function applyIEPSPensionesPermissions() {
+    try {
+      const r = await fetchJson(`${API}/api/suficiencias/perm-ieps-pensiones`, {
+        headers: { ...authHeaders() },
+      });
+      const allowed = !!r?.allowed;
+      if (allowed) return;
+      const impIeps = document.querySelector('[name="imp_ieps"], #imp_ieps');
+      const iepsTasa = document.querySelector('[name="ieps_tasa"], #ieps_tasa');
+      const impPens = document.querySelector('[name="imp_pension"], #imp_pension');
+      const btnAddPension = document.getElementById("btnAddPension");
+      const btnInfoPension = document.getElementById("btnInfoPension");
+      const pensionList = document.getElementById("pensionList");
+      const iepsControls = document.getElementById("iepsControls");
+      const pensionControls = document.getElementById("pensionControls");
+      const pensInputs = Array.from(
+        document.querySelectorAll('[name^="pension"][name$="_tasa"]'),
+      );
+
+      if (impIeps) {
+        impIeps.checked = false;
+        impIeps.disabled = true;
+      }
+      if (iepsTasa) {
+        iepsTasa.value = "";
+        iepsTasa.disabled = true;
+      }
+      if (impPens) {
+        impPens.checked = false;
+        impPens.disabled = true;
+      }
+      if (btnAddPension) btnAddPension.disabled = true;
+      if (btnInfoPension) btnInfoPension.disabled = true;
+      pensInputs.forEach((el) => {
+        el.value = "";
+        el.disabled = true;
+      });
+      if (pensionList) pensionList.classList.add("d-none");
+      if (iepsControls) iepsControls.classList.add("d-none");
+      if (pensionControls) pensionControls.classList.add("d-none");
+      refreshTotales();
+    } catch (e) {
+      console.warn("[SP] permisos IEPS/Pensiones:", e?.message || e);
+    }
+  }
+
+  function filterMesPagoOptions() {
+    const sel = document.querySelector('[name="mes_pago"]');
+    if (!sel) return;
+    const meses = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+    ];
+    const now = new Date();
+    const curIdx = now.getMonth(); // 0 = enero
+    const currentVal = String(sel.value || "").trim().toUpperCase();
+    const opts = Array.from(sel.options);
+    opts.forEach((opt) => {
+      const val = String(opt.value || "").trim().toUpperCase();
+      const idx = meses.indexOf(val);
+      if (idx >= 0 && idx < curIdx) {
+        if (val === currentVal) {
+          opt.disabled = true;
+          opt.textContent = `${val} (cerrado)`;
+        } else {
+          opt.remove();
+        }
+      }
+    });
+    // Si después de filtrar no hay selección, selecciona el mes actual
+    if (!sel.value || sel.selectedIndex < 0) {
+      const target = meses[curIdx] || "";
+      const match = Array.from(sel.options).find(
+        (o) => String(o.value || "").trim().toUpperCase() === target,
+      );
+      if (match) sel.value = match.value;
+    }
+  }
+
   async function askPercentSwal(title, defaultValue = 10) {
     if (!hasSwal()) {
       const v = prompt(`${title} (0 a 100)`, String(defaultValue));
@@ -2669,10 +2758,13 @@
       console.warn("[SP] fuentes:", e.message);
     }
 
+    await applyIEPSPensionesPermissions();
+
     const idParam = Number(new URLSearchParams(window.location.search).get("id"));
     if (Number.isFinite(idParam) && idParam > 0) {
       await cargarSuficienciaEnFormulario(idParam);
     }
+    filterMesPagoOptions();
 
     refreshTotales();
     updateClaveProgramatica();

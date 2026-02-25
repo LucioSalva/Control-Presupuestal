@@ -2,20 +2,6 @@ import { Router } from "express";
 import { query } from "../db.js";
 
 const router = Router();
-const PARTIDAS_ALLOWED_DG = "L00";
-const PARTIDAS_ALLOWED_DA = "117";
-
-function normalizeKey(v) {
-  return String(v || "").trim().toUpperCase();
-}
-
-function hasPartidasAccess(dg, da) {
-  return (
-    normalizeKey(dg) === PARTIDAS_ALLOWED_DG &&
-    normalizeKey(da) === PARTIDAS_ALLOWED_DA
-  );
-}
-
 async function getUserDGDA(req) {
   const idDg = Number(req.user?.id_dgeneral);
   const idDa = Number(req.user?.id_dauxiliar);
@@ -45,12 +31,6 @@ router.get("/", async (req, res) => {
     const { dg, da } = await getUserDGDA(req);
     if (!dg || !da) {
       return res.status(400).json({ error: "Usuario sin DG/DA" });
-    }
-
-    if (!hasPartidasAccess(dg, da)) {
-      return res.status(403).json({
-        error: "Acceso denegado. Solo DG L00 con DA 117 puede entrar a Partidas.",
-      });
     }
 
     const r = await query(
@@ -91,12 +71,7 @@ router.post("/monto", async (req, res) => {
       return res.status(400).json({ error: "monto invalido" });
     }
 
-    const { dg, da } = await getUserDGDA(req);
-    if (!hasPartidasAccess(dg, da)) {
-      return res.status(403).json({
-        error: "Acceso denegado. Solo DG L00 con DA 117 puede guardar en Partidas.",
-      });
-    }
+    await getUserDGDA(req);
 
     const exists = await query(
       `

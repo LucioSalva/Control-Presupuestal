@@ -21,9 +21,6 @@
         </button>
         <div class="collapse navbar-collapse" id="cpTabsNav">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0 cp-tabs">
-            <li class="nav-item">
-              <a class="nav-link" href="index.html">Inicio</a>
-            </li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Operación</a>
               <ul class="dropdown-menu">
@@ -31,6 +28,7 @@
                 <li><a class="dropdown-item" href="comprometido.html">Comprometido</a></li>
                 <li><a class="dropdown-item" href="devengado.html">Devengado</a></li>
                 <li><a class="dropdown-item" href="expedientes_entrega.html">Entregas Expedientes</a></li>
+                <li><a class="dropdown-item" href="reconducciones.html">Reconducciones</a></li>
               </ul>
             </li>
             <li class="nav-item dropdown">
@@ -40,7 +38,7 @@
                 <li><a class="dropdown-item" href="partidas_base.html">Carga Partidas</a></li>
               </ul>
             </li>
-            <li class="nav-item dropdown">
+            <li class="nav-item dropdown" id="cpNavDashboards">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Dashboards</a>
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="dashboard_partidas.html">Dashboard Partidas</a></li>
@@ -81,13 +79,59 @@
     });
   }
 
+  function setFavicon() {
+    const head = document.head || document.getElementsByTagName("head")[0];
+    if (!head) return;
+    const href = "/img/logo-flor.ico";
+    const existing = head.querySelector(`link[rel="icon"][href="${href}"]`);
+    if (existing) return;
+    const link1 = document.createElement("link");
+    link1.rel = "icon";
+    link1.type = "image/x-icon";
+    link1.href = href;
+    const link2 = document.createElement("link");
+    link2.rel = "shortcut icon";
+    link2.type = "image/x-icon";
+    link2.href = href;
+    head.appendChild(link1);
+    head.appendChild(link2);
+  }
+
+  async function applyDashboardsVisibility() {
+    try {
+      const t =
+        localStorage.getItem("cp_token") ||
+        sessionStorage.getItem("cp_token") ||
+        localStorage.getItem("token") ||
+        sessionStorage.getItem("token") ||
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken") ||
+        "";
+      const headers = t ? { Authorization: `Bearer ${t}` } : {};
+      const r = await fetch("/api/suficiencias/dashboards-perm", { headers });
+      const ok = r.ok ? await r.json() : { allowed: false };
+      const allowed = !!ok?.allowed;
+      if (!allowed) {
+        const li = document.getElementById("cpNavDashboards");
+        if (li) li.classList.add("d-none");
+      }
+    } catch {
+      const li = document.getElementById("cpNavDashboards");
+      if (li) li.classList.add("d-none");
+    }
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       mountNavbar();
       setActive();
+      setFavicon();
+      applyDashboardsVisibility();
     });
   } else {
     mountNavbar();
     setActive();
+    setFavicon();
+    applyDashboardsVisibility();
   }
 })();

@@ -35,6 +35,19 @@ async function isUserL00117(req) {
   return dgClave === "L00" && daClave === "117";
 }
 
+async function isUserE00(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  if (!Number.isFinite(dgId)) return false;
+  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "E00";
+}
+
+function normalizeNumber(n, def = 0) {
+  const v = Number(n);
+  return Number.isFinite(v) ? v : def;
+}
+
 /* =====================================================
   GET /api/suficiencias/next-folio
    ===================================================== */
@@ -57,6 +70,7 @@ router.post("/", async (req, res) => {
   const client = await getClient();
   try {
     const b = req.body || {};
+    const allowIEPSPensiones = (await isUserL00117(req)) || (await isUserE00(req));
 
     const fechaBaseRaw = b.fecha ? new Date(b.fecha) : new Date();
     const fechaBase = Number.isNaN(fechaBaseRaw.getTime())
@@ -125,32 +139,50 @@ router.post("/", async (req, res) => {
   RETURNING id, folio_num, no_suficiencia;
 `;
 
+    // Permisos IEPS/Pensiones: si no está permitido, se fuerzan valores seguros
+    let isr_tasa = b.isr_tasa;
+    let ieps_tasa = b.ieps_tasa;
+    let subtotal = normalizeNumber(b.subtotal);
+    let iva = normalizeNumber(b.iva);
+    let isr = normalizeNumber(b.isr);
+    let ieps = normalizeNumber(b.ieps);
+    let total = normalizeNumber(b.total);
+
+    if (!allowIEPSPensiones) {
+      ieps_tasa = null;
+      ieps = 0;
+      const pension_total = normalizeNumber(b.pension_total, 0);
+      const correctedTotal = subtotal + iva + isr + 0 - 0;
+      // En caso de manipulación cliente, recalculamos un total sin pensiones/IEPS
+      total = Number.isFinite(correctedTotal) ? correctedTotal : total + ieps + pension_total;
+    }
+
     const headParams = [
-  req.user.id,
-  b.id_dgeneral,
-  b.id_dauxiliar,
-  b.id_proyecto,
-  b.id_fuente,
+      req.user.id,
+      b.id_dgeneral,
+      b.id_dauxiliar,
+      b.id_proyecto,
+      b.id_fuente,
 
-  b.fecha,
-  b.dependencia,
-  departamento,
-  b.fuente,
-  b.mes_pago,
-  b.clave_programatica,
+      b.fecha,
+      b.dependencia,
+      departamento,
+      b.fuente,
+      b.mes_pago,
+      b.clave_programatica,
 
-  b.meta,
-  b.impuesto_tipo,
-  b.isr_tasa,
-  b.ieps_tasa,
-  b.subtotal,
-  b.iva,
-  b.isr,
-  b.ieps,
+      b.meta,
+      b.impuesto_tipo,
+      isr_tasa,
+      ieps_tasa,
+      subtotal,
+      iva,
+      isr,
+      ieps,
 
-  b.total,
-  b.cantidad_con_letra,
-];
+      total,
+      b.cantidad_con_letra,
+    ];
 
     const rHead = await client.query(sqlHead, headParams);
     const idSuf = rHead.rows[0].id;
@@ -227,6 +259,29 @@ router.post("/", async (req, res) => {
     });
   } finally {
     client.release();
+  }
+});
+
+/* =====================================================
+  GET /api/suficiencias/perm-ieps-pensiones
+   ===================================================== */
+router.get("/perm-ieps-pensiones", async (req, res) => {
+  try {
+    const allowed = (await isUserL00117(req)) || (await isUserE00(req));
+    return res.json({ allowed: !!allowed });
+  } catch (err) {
+    console.error("[GET perm-ieps-pensiones] error:", err);
+    return res.status(500).json({ error: "Error al evaluar permisos" });
+  }
+});
+
+router.get("/dashboards-perm", async (req, res) => {
+  try {
+    const allowed = await isUserL00117(req);
+    return res.json({ allowed: !!allowed });
+  } catch (err) {
+    console.error("[GET dashboards-perm] error:", err);
+    return res.status(500).json({ error: "Error al evaluar permisos" });
   }
 });
 
