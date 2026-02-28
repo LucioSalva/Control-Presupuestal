@@ -24,75 +24,29 @@
 
       <div class="card shadow-sm mb-3 pbp-card">
         <div class="card-body">
-          <div class="row g-3 align-items-end">
-            <div class="col-12 col-lg-5">
+          <div class="row g-1 align-items-end">
+            <div class="col-12 col-lg-4 px-1">
               <label for="fileExcel" class="form-label">Archivo Excel (.xlsx)</label>
               <input id="fileExcel" class="form-control" type="file" accept=".xlsx" />
             </div>
 
-            <div class="col-12 col-md-6 col-lg-3 d-grid">
+            <div class="col-12 col-md-6 col-lg-3 d-grid px-1">
               <button id="btnDescargarPlantilla" class="btn btn-outline-secondary">
                 <i class="bi bi-download me-1"></i>Descargar plantilla
               </button>
             </div>
 
-            <div class="col-12 col-md-6 col-lg-2 d-grid">
+            <div class="col-12 col-md-6 col-lg-2 d-grid px-1">
               <button id="btnSubirExcel" class="btn btn-success">
                 <i class="bi bi-cloud-upload me-1"></i>Subir Excel
               </button>
             </div>
-
-            <div class="col-12 col-lg-2 d-grid">
-              <button id="btnRecargar" class="btn btn-outline-dark">
-                <i class="bi bi-arrow-clockwise me-1"></i>Recargar
+            <div class="col-12 col-lg-2 d-grid px-1">
+              <button id="btnLimpiarBase" class="btn btn-danger">
+                <i class="bi bi-trash3 me-1"></i>Limpiar base
               </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="card shadow-sm mb-3 pbp-card">
-        <div class="card-body">
-          <div class="row g-2 align-items-end">
-            <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-              <label for="fEjercicio" class="form-label">Ejercicio</label>
-              <input id="fEjercicio" type="number" class="form-control" placeholder="Ej. 2026" min="2000" />
-            </div>
-            <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-              <label for="fDgeneral" class="form-label">DG</label>
-              <select id="fDgeneral" class="form-select">
-                <option value="">Todas</option>
-              </select>
-            </div>
-            <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-              <label for="fDauxiliar" class="form-label">DA</label>
-              <select id="fDauxiliar" class="form-select">
-                <option value="">Todas</option>
-              </select>
-            </div>
-            <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-              <label for="fFuente" class="form-label">FF</label>
-              <select id="fFuente" class="form-select">
-                <option value="">Todas</option>
-              </select>
-            </div>
-            <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-              <label for="fPartida" class="form-label">Partida</label>
-              <input id="fPartida" type="text" class="form-control" placeholder="Clave o descripción" />
-            </div>
-            <div class="col-6 col-md-3 col-lg-1 d-grid">
-              <button id="btnAplicarFiltros" class="btn btn-primary">
-                <i class="bi bi-funnel me-1"></i>Filtrar
-              </button>
-            </div>
-            <div class="col-6 col-md-3 col-lg-1 d-grid">
-              <button id="btnLimpiarFiltros" class="btn btn-outline-secondary">
-                <i class="bi bi-eraser me-1"></i>Limpiar
-              </button>
-            </div>
-          </div>
-
-          <div class="small text-muted mt-2" id="txtResumen">0 registros</div>
         </div>
       </div>
 

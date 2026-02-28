@@ -121,6 +121,59 @@
     return data;
   }
 
+  let qrTimer = null;
+
+  function buildQrPayloadSuf() {
+    const folio = String(get("no_suficiencia") || "").trim();
+    const fecha = String(get("fecha") || "").trim();
+    const dependencia = String(get("dependencia") || "").trim();
+    const dependenciaAux = String(get("dependencia_aux") || "").trim();
+    const idProyecto = String(get("id_proyecto") || "").trim();
+    const fuente = String(get("fuente") || "").trim();
+    const total = moneyParse(get("total"));
+    if (!folio && !fecha && !dependencia && !dependenciaAux) return "";
+    return JSON.stringify({
+      tipo: "SP",
+      folio,
+      fecha,
+      dependencia,
+      dependencia_aux: dependenciaAux,
+      id_proyecto: idProyecto,
+      fuente,
+      total,
+    });
+  }
+
+  async function renderQrSuf() {
+    const container = document.getElementById("qr-suf");
+    if (!container) return;
+    const text = buildQrPayloadSuf();
+    if (!text || !window.QRCode?.toDataURL) {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+      return;
+    }
+    try {
+      const dataUrl = await window.QRCode.toDataURL(text, {
+        width: 120,
+        margin: 1,
+      });
+      const img = new Image();
+      img.src = dataUrl;
+      img.alt = "QR";
+      container.innerHTML = "";
+      container.appendChild(img);
+    } catch {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+    }
+  }
+
+  function scheduleQrRender() {
+    if (qrTimer) clearTimeout(qrTimer);
+    qrTimer = setTimeout(() => {
+      renderQrSuf();
+    }, 120);
+  }
+
   // ---------------------------
   // SweetAlert2 helpers
   // ---------------------------
@@ -1470,6 +1523,7 @@
     modalBuscar?.hide?.();
     updateSufStatusUI(data);
     scheduleSufAlerts(data);
+    scheduleQrRender();
     await uiSuccess("Suficiencia cargada correctamente.");
   }
 
@@ -1599,6 +1653,7 @@
       `Suficiencia creada. Tiempo restante: ${remaining.days} días ${remaining.hours} horas. Caduca el: ${expiresText}`,
     );
     scheduleSufAlerts(saved);
+    scheduleQrRender();
     return saved;
   }
 
@@ -1758,6 +1813,7 @@
     const templateBytes = await fetchPdfTemplateBytesSuf();
     const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
     const form = pdfDoc.getForm();
+    const touchedFields = new Set();
 
     const setTextSafe = (fieldName, value, size, align) => {
       try {
@@ -1767,6 +1823,7 @@
           f.setAlignment(align);
         }
         f.setText(String(value ?? ""));
+        touchedFields.add(String(fieldName || ""));
       } catch {}
     };
     const setTextMulti = (fieldNames, value, size, align) => {
@@ -1778,6 +1835,7 @@
             f.setAlignment(align);
           }
           f.setText(String(value ?? ""));
+          touchedFields.add(String(nm || ""));
           return;
         } catch {}
       }
@@ -1799,6 +1857,7 @@
               f.setAlignment(align);
             }
             f.setText(String(value ?? ""));
+            touchedFields.add(String(nm || ""));
             wrote++;
           }
         }
@@ -1972,17 +2031,42 @@
       return store;
     };
     const getRolesStore = () => {
-      return {
-        enlace_label: "",
-        enlace_firma: "",
-        area_label: "",
-        area_firma: "",
-        direccion_firma: "",
-      };
+      try {
+        const raw = localStorage.getItem("cp_suf_roles") || "{}";
+        const obj = JSON.parse(raw);
+        return {
+          enlace_label: "",
+          enlace_firma: "",
+          area_label: "",
+          area_firma: "",
+          direccion_firma: "",
+          ...(obj && typeof obj === "object" ? obj : {}),
+        };
+      } catch {
+        return {
+          enlace_label: "",
+          enlace_firma: "",
+          area_label: "",
+          area_firma: "",
+          direccion_firma: "",
+        };
+      }
+    };
+    const saveRolesStore = (map) => {
+      try {
+        localStorage.setItem("cp_suf_roles", JSON.stringify(map || {}));
+      } catch {}
     };
     const ensureRolesValues = async () => {
       const roles = getRolesStore();
-      if (!window.Swal) return roles;
+      const missing = [
+        "enlace_label",
+        "enlace_firma",
+        "area_label",
+        "area_firma",
+        "direccion_firma",
+      ].filter((k) => !String(roles[k] || "").trim());
+      if (!window.Swal || !missing.length) return roles;
       const html = `
         <div class="text-start">
           <p class="mb-2">Captura los datos para encabezados y firmantes:</p>
@@ -2038,6 +2122,7 @@
         (document.getElementById("roles_area_firma")?.value || "").trim();
       roles.direccion_firma =
         (document.getElementById("roles_direccion_firma")?.value || "").trim();
+      saveRolesStore(roles);
       return roles;
     };
     const findFirmasByName = () => {
@@ -2079,10 +2164,20 @@
       return { d, m, y };
     }
 
-    const sizeHeader = 9;
-    const sizeDG = 12;
-    const sizeSmall = 9;
-    const sizeTiny = 9;
+    const sizeDG = 17;
+    const sizeClaveProg = 15;
+    const sizeClaveProgNombre = 9;
+    const sizeFuenteClave = 15;
+    const sizeFuenteNombre = 15;
+    const sizeFecha = 10;
+    const sizeRolesLabel = 9;
+    const sizeFirmas = 10;
+    const sizeProgPago = 9;
+    const sizeDetalle = 9;
+    const sizeTotales = 9;
+    const sizeCantidadLetra = 9;
+    const sizeMeta = 15;
+    const sizeFolios = 9;
 
     // CABECERA
     const depGeneralName =
@@ -2115,7 +2210,7 @@
         "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
       ],
       payload.clave_programatica || "",
-      sizeHeader,
+      sizeClaveProg,
       PDFLib?.TextAlignment?.Center,
     );
     const claveProgDesc =
@@ -2128,7 +2223,7 @@
         "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
       ],
       claveProgDesc,
-      sizeHeader,
+      sizeClaveProgNombre,
       PDFLib?.TextAlignment?.Center,
     );
 
@@ -2138,32 +2233,32 @@
       const cats = collectCategoryFields();
       if (roles.enlace_label) {
         for (const nm of cats.enlace) {
-          setTextSafe(nm, roles.enlace_label, sizeSmall, PDFLib?.TextAlignment?.Center);
+          setTextSafe(nm, roles.enlace_label, sizeRolesLabel, PDFLib?.TextAlignment?.Center);
         }
       }
       if (roles.area_label) {
         for (const nm of cats.area) {
-          setTextSafe(nm, roles.area_label, sizeSmall, PDFLib?.TextAlignment?.Center);
+          setTextSafe(nm, roles.area_label, sizeRolesLabel, PDFLib?.TextAlignment?.Center);
         }
       }
       // Dirección: se rellena con dependencia general (depGeneralName)
       for (const nm of cats.direccion) {
-        setTextSafe(nm, depGeneralName, sizeSmall, PDFLib?.TextAlignment?.Center);
+        setTextSafe(nm, depGeneralName, sizeRolesLabel, PDFLib?.TextAlignment?.Center);
       }
-      setTextByPattern(["dirección", "solicitante"], depGeneralName, sizeSmall, PDFLib?.TextAlignment?.Center);
+      setTextByPattern(["dirección", "solicitante"], depGeneralName, sizeRolesLabel, PDFLib?.TextAlignment?.Center);
     } catch {}
 
     // FIRMAS específicas: Firma1 (enlace), Firma2 (área), Firma3 (dirección)
     try {
       const m = findFirmasByName();
       for (const nm of m.firma1) {
-        if (roles.enlace_firma) setTextSafe(nm, roles.enlace_firma, sizeSmall, PDFLib?.TextAlignment?.Center);
+        if (roles.enlace_firma) setTextSafe(nm, roles.enlace_firma, sizeFirmas, PDFLib?.TextAlignment?.Center);
       }
       for (const nm of m.firma2) {
-        if (roles.area_firma) setTextSafe(nm, roles.area_firma, sizeSmall, PDFLib?.TextAlignment?.Center);
+        if (roles.area_firma) setTextSafe(nm, roles.area_firma, sizeFirmas, PDFLib?.TextAlignment?.Center);
       }
       for (const nm of m.firma3) {
-        if (roles.direccion_firma) setTextSafe(nm, roles.direccion_firma, sizeSmall, PDFLib?.TextAlignment?.Center);
+        if (roles.direccion_firma) setTextSafe(nm, roles.direccion_firma, sizeFirmas, PDFLib?.TextAlignment?.Center);
       }
     } catch {}
 
@@ -2182,20 +2277,20 @@
     setTextSafe(
       "FUENTE DE FINANCIAMIENTO",
       fuenteClave || "",
-      sizeHeader,
+      sizeFuenteClave,
       PDFLib?.TextAlignment?.Center,
     );
     setTextSafe(
       "NOMBRE F.F",
       fuenteDesc || fuenteText || "",
-      sizeSmall,
+      sizeFuenteNombre,
       PDFLib?.TextAlignment?.Center,
     );
 
     const { d, m, y } = splitFechaParts(payload.fecha);
-    setTextSafe("fechadia", d, sizeSmall);
-    setTextSafe("fechames", m, sizeSmall);
-    setTextSafe("fechayear", y, sizeSmall);
+    setTextSafe("fechadia", d, sizeFecha);
+    setTextSafe("fechames", m, sizeFecha);
+    setTextSafe("fechayear", y, sizeFecha);
 
     // PROGRAMACIÓN DE PAGO
     const mesSel = String(payload.mes_pago || "")
@@ -2220,7 +2315,7 @@
       setTextSafe(
         `${mes}PROGRAMACIÓN DE PAGO`,
         mes === mesSel ? totalTxt : "",
-        sizeTiny,
+        sizeProgPago,
       );
     }
 
@@ -2252,70 +2347,155 @@
       MAX_ROWS,
     );
 
-    setTextSafe("No", linesNo.join("\n"), sizeSmall);
-    setTextSafe("CLAVE", linesClave.join("\n"), sizeSmall);
+    setTextSafe("No", linesNo.join("\n"), sizeDetalle);
+    setTextSafe("CLAVE", linesClave.join("\n"), sizeDetalle);
     setTextSafe(
       "CONCEPTO DE PARTIDA",
       linesConcepto.join("\n"),
-      sizeSmall,
+      sizeDetalle,
     );
-    setTextSafe("JUSTIFICACIÓN", linesJust.join("\n"), sizeSmall);
-    setTextSafe("DESCRIPCIÓN", linesDesc.join("\n"), sizeSmall);
-    setTextSafe("IMPORTE", linesImp.join("\n"), sizeSmall);
+    setTextSafe("JUSTIFICACIÓN", linesJust.join("\n"), sizeDetalle);
+    setTextSafe("DESCRIPCIÓN", linesDesc.join("\n"), sizeDetalle);
+    setTextSafe("IMPORTE", linesImp.join("\n"), sizeDetalle);
 
     // TOTALES
     setTextSafe(
       "subtotal",
       safeN(payload.subtotal).toFixed(2),
-      sizeSmall,
+      sizeTotales,
       PDFLib?.TextAlignment?.Right,
     );
     setTextSafe(
       "IVA",
       safeN(payload.iva).toFixed(2),
-      sizeSmall,
+      sizeTotales,
       PDFLib?.TextAlignment?.Right,
     );
     setTextSafe(
       "ISR",
       safeN(payload.isr).toFixed(2),
-      sizeSmall,
+      sizeTotales,
       PDFLib?.TextAlignment?.Right,
     );
     setTextSafe(
       "IEPS",
       safeN(payload.ieps).toFixed(2),
-      sizeSmall,
+      sizeTotales,
       PDFLib?.TextAlignment?.Right,
     );
     setTextSafe(
       "PENSION",
       safeN(payload.pension_total).toFixed(2),
-      sizeSmall,
+      sizeTotales,
       PDFLib?.TextAlignment?.Right,
     );
     setTextSafe(
       "total",
       safeN(payload.total).toFixed(2),
-      sizeSmall,
+      sizeTotales,
       PDFLib?.TextAlignment?.Right,
     );
     setTextSafe(
       "CANTIDAD CON LETRA:",
       payload.cantidad_con_letra || "",
-      sizeTiny,
+      sizeCantidadLetra,
     );
-    setTextSafe("Meta", payload.meta || "", sizeTiny);
+    setTextSafe("Meta", payload.meta || "", sizeMeta);
 
-    // Tamaño de fuente uniforme para todos los campos del formulario
     try {
       const UNIFORM_SIZE = 9;
       const fields = form.getFields();
       for (const f of fields) {
         try {
-          if (typeof f.setFontSize === "function") f.setFontSize(UNIFORM_SIZE);
+          if (typeof f.setFontSize === "function") {
+            const name =
+              typeof f.getName === "function" ? String(f.getName() || "") : "";
+            if (!touchedFields.has(name)) {
+              f.setFontSize(UNIFORM_SIZE);
+            }
+          }
         } catch {}
       }
+    } catch {}
+
+    try {
+      const fields = form.getFields();
+      const setSizeByName = (name, size) => {
+        try {
+          const f = form.getTextField(name);
+          if (typeof f.setFontSize === "function") f.setFontSize(size);
+        } catch {}
+      };
+      const setSizeByNames = (names, size) => {
+        for (const nm of names || []) setSizeByName(nm, size);
+      };
+      const setSizeByPattern = (frags, size) => {
+        const lowerFrags = (frags || []).map((s) => String(s || "").toLowerCase());
+        for (const f of fields) {
+          try {
+            const nm = String(f.getName() || "");
+            const nmLower = nm.toLowerCase();
+            if (lowerFrags.every((frag) => nmLower.includes(frag))) {
+              if (typeof f.setFontSize === "function") f.setFontSize(size);
+            }
+          } catch {}
+        }
+      };
+      setSizeByPattern(["dependencia", "general"], sizeDG);
+      setSizeByPattern(["clave", "programática"], sizeClaveProg);
+      setSizeByPattern(["nombre", "clave", "programática"], sizeClaveProgNombre);
+      setSizeByPattern(["fuente", "financiamiento"], sizeFuenteClave);
+      setSizeByPattern(["nombre", "f.f"], sizeFuenteNombre);
+      setSizeByPattern(["fechadia"], sizeFecha);
+      setSizeByPattern(["fechames"], sizeFecha);
+      setSizeByPattern(["fechayear"], sizeFecha);
+      setSizeByPattern(["programación", "pago"], sizeProgPago);
+      setSizeByPattern(["firma1"], sizeFirmas);
+      setSizeByPattern(["firma2"], sizeFirmas);
+      setSizeByPattern(["firma3"], sizeFirmas);
+      setSizeByPattern(["subtotal"], sizeTotales);
+      setSizeByPattern(["iva"], sizeTotales);
+      setSizeByPattern(["isr"], sizeTotales);
+      setSizeByPattern(["ieps"], sizeTotales);
+      setSizeByPattern(["pension"], sizeTotales);
+      setSizeByPattern(["total"], sizeTotales);
+      setSizeByPattern(["cantidad", "letra"], sizeCantidadLetra);
+      setSizeByPattern(["meta"], sizeMeta);
+      setSizeByPattern(["no", "suficiencia"], sizeFolios);
+      setSizeByNames(
+        [
+          "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+          "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
+        ],
+        sizeClaveProg,
+      );
+      setSizeByNames(
+        [
+          "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+          "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
+        ],
+        sizeClaveProgNombre,
+      );
+      setSizeByNames(["FUENTE DE FINANCIAMIENTO"], sizeFuenteClave);
+      setSizeByNames(["NOMBRE F.F"], sizeFuenteNombre);
+      setSizeByNames(["fechadia", "fechames", "fechayear"], sizeFecha);
+      setSizeByNames(
+        [
+          "No",
+          "CLAVE",
+          "CONCEPTO DE PARTIDA",
+          "JUSTIFICACIÓN",
+          "DESCRIPCIÓN",
+          "IMPORTE",
+        ],
+        sizeDetalle,
+      );
+      setSizeByNames(
+        ["subtotal", "IVA", "ISR", "IEPS", "PENSION", "total"],
+        sizeTotales,
+      );
+      setSizeByNames(["CANTIDAD CON LETRA:", "Meta"], sizeCantidadLetra);
+      setSizeByNames(["Meta"], sizeMeta);
     } catch {}
 
     try {
@@ -2332,6 +2512,23 @@
     } catch (e) {
       console.warn("[SP][PDF] flatten falló:", e?.message || e);
     }
+
+    try {
+      const qrText = buildQrPayloadSuf();
+      if (qrText && window.QRCode?.toDataURL) {
+        const dataUrl = await window.QRCode.toDataURL(qrText, {
+          width: 330,
+          margin: 1,
+        });
+        const bytes = await fetch(dataUrl).then((r) => r.arrayBuffer());
+        const img = await pdfDoc.embedPng(bytes);
+        const page = pdfDoc.getPages()[0];
+        const size = 110;
+        const x = page.getWidth() - size - 135;
+        const y = page.getHeight() - size - 240;
+        page.drawImage(img, { x, y, width: size, height: size });
+      }
+    } catch {}
 
     const outBytes = await pdfDoc.save();
     const blob = new Blob([outBytes], { type: "application/pdf" });
@@ -2372,7 +2569,7 @@
       setTextByPattern(
         ["no", "suficiencia"],
         folio,
-        sizeSmall,
+        sizeFolios,
         PDFLib?.TextAlignment?.Center,
       );
     } catch {}
@@ -2416,6 +2613,9 @@
         btnBuscarNumero?.click();
       }
     });
+
+    document.addEventListener("input", scheduleQrRender);
+    document.addEventListener("change", scheduleQrRender);
 
     btnGuardar?.addEventListener("click", (e) => {
       e.preventDefault();

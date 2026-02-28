@@ -4,33 +4,96 @@ import { computeSaldo, getProjectKeys, buildHttpError } from "../utils/helpers.j
 
 const router = Router();
 
+function getRole(req) {
+  const roles = (req.user?.roles || []).map((r) => String(r).toUpperCase());
+  if (roles.includes("GOD")) return "GOD";
+  if (roles.includes("ADMIN")) return "ADMIN";
+  return "AREA";
+}
+
+async function isUserL00117(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  const daId = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
+  ]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "L00" && daClave === "117";
+}
+
 /* =====================================================
    PROYECTOS (LISTADO)
    GET /api/projects
    ===================================================== */
-router.get("/projects", async (_req, res) => {
+router.get("/projects", async (req, res) => {
   try {
-    const r = await query(`
+    const anio = Number(req.query.anio || 0);
+    const role = getRole(req);
+    const canSeeAll = role !== "AREA" || (await isUserL00117(req));
+
+    let idDgeneral = Number(req.query.id_dgeneral || 0);
+    let idDauxiliar = Number(req.query.id_dauxiliar || 0);
+
+    if (!canSeeAll) {
+      idDgeneral = Number(req.user?.id_dgeneral || 0);
+      idDauxiliar = Number(req.user?.id_dauxiliar || 0);
+    }
+
+    const where = [];
+    const params = [];
+    let idx = 1;
+    const addParam = (v) => {
+      params.push(v);
+      return `$${idx++}`;
+    };
+
+    if (Number.isFinite(anio) && anio > 0) {
+      const anioParam = addParam(anio);
+      const anioText = addParam(`${anio}-`);
+      where.push(
+        `(EXTRACT(YEAR FROM pd.fecha_registro) = ${anioParam} OR pd.mes ILIKE ${anioText} || '%')`
+      );
+    }
+
+    if (Number.isFinite(idDgeneral) && idDgeneral > 0) {
+      where.push(`pd.id_dgeneral = ${addParam(idDgeneral)}`);
+    }
+
+    if (Number.isFinite(idDauxiliar) && idDauxiliar > 0) {
+      where.push(`pd.id_dauxiliar = ${addParam(idDauxiliar)}`);
+    }
+
+    const r = await query(
+      `
       WITH p AS (
         SELECT
-          id_proyecto                       AS project,
-          MIN(id_dgeneral)                  AS id_dgeneral,
-          MIN(id_dauxiliar)                 AS id_dauxiliar,
-          MIN(id_fuente)                    AS id_fuente,
-          COUNT(*)                          AS partidas,
-          COALESCE(SUM(presupuesto),0)      AS presupuesto_total,
-          COALESCE(SUM(total_gastado),0)    AS gastado_total,
-          COALESCE(SUM(saldo_disponible),0) AS saldo_total
-        FROM presupuesto_detalle
+          id_proyecto                          AS project,
+          MIN(id_dgeneral)                     AS id_dgeneral,
+          MIN(id_dauxiliar)                    AS id_dauxiliar,
+          MIN(id_fuente)                       AS id_fuente,
+          COUNT(*)                             AS partidas,
+          COALESCE(SUM(presupuesto),0)         AS presupuesto_total,
+          COALESCE(SUM(total_gastado),0)       AS gastado_total,
+          COALESCE(SUM(total_reconducido),0)   AS reconducido_total,
+          COALESCE(SUM(saldo_disponible),0)    AS saldo_total
+        FROM presupuesto_detalle pd
+        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
         GROUP BY id_proyecto
       )
       SELECT
         p.*,
-        dg.clave AS dgeneral_clave
+        dg.clave AS dgeneral_clave,
+        da.clave AS dauxiliar_clave
       FROM p
       LEFT JOIN dgeneral dg ON dg.id = p.id_dgeneral
+      LEFT JOIN dauxiliar da ON da.id = p.id_dauxiliar
       ORDER BY p.project
-    `);
+      `,
+      params
+    );
 
     res.json(r.rows);
   } catch (err) {

@@ -4,6 +4,46 @@ import { computeSaldo, getActorId } from "../utils/helpers.js";
 
 const router = express.Router();
 
+function getRole(req) {
+  const roles = (req.user?.roles || []).map((r) => String(r).toUpperCase());
+  if (roles.includes("GOD")) return "GOD";
+  if (roles.includes("ADMIN")) return "ADMIN";
+  return "AREA";
+}
+
+async function isUserL00117(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  const daId = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
+  ]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "L00" && daClave === "117";
+}
+
+function canSeeAllAreas(role, isL00117) {
+  return role !== "AREA" || isL00117;
+}
+
+function getAreaIds(req) {
+  const idDg = Number(req.user?.id_dgeneral);
+  const idDa = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(idDg) || !Number.isFinite(idDa)) return null;
+  return { idDg, idDa };
+}
+
+function validateLadosArea(lados, areaIds) {
+  if (!areaIds) return false;
+  return (lados || []).every(
+    (l) =>
+      Number(l?.id_dgeneral) === Number(areaIds.idDg) &&
+      Number(l?.id_dauxiliar) === Number(areaIds.idDa)
+  );
+}
+
 function toNumOrNull(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
@@ -50,9 +90,82 @@ function getMesNombreDesdeFecha(dateValue) {
   return nombres[dt.getMonth()] || null;
 }
 
-router.get("/", async (_req, res) => {
+function normalizeYearMonth(inputYear, inputMonth) {
+  const now = new Date();
+  let year = Number(inputYear);
+  let month = Number(inputMonth);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    year = now.getFullYear();
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    month = now.getMonth() + 1;
+  }
+  return {
+    year: String(year),
+    month: String(month).padStart(2, "0"),
+  };
+}
+
+function getYearMonthFromFecha(fecha) {
+  const raw = String(fecha || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return { year: raw.slice(0, 4), month: raw.slice(5, 7) };
+  }
+  return { year: null, month: null };
+}
+
+router.get("/next-oficio", async (req, res) => {
   try {
-    const r = await query(`
+    const { year, month } = normalizeYearMonth(req.query?.year, req.query?.month);
+    const prefix = `ECA-${year}-${month}-RCP-`;
+    const like = `${prefix}%`;
+    const r = await query(
+      `
+      SELECT COALESCE(MAX(
+        CASE
+          WHEN oficio ~ '^ECA-\\d{4}-\\d{2}-RCP-\\d{4}$' THEN RIGHT(oficio, 4)::int
+          ELSE NULL
+        END
+      ), 0) AS max_num
+      FROM public.reconducciones
+      WHERE oficio LIKE $1
+      `,
+      [like]
+    );
+    const nextNum = Number(r.rows?.[0]?.max_num || 0) + 1;
+    const oficio = `${prefix}${String(nextNum).padStart(4, "0")}`;
+    return res.json({ next_num: nextNum, next_oficio: oficio, year, month });
+  } catch (err) {
+    console.error("GET /api/reconducciones/next-oficio", err);
+    return res.status(500).json({ error: "Error obteniendo folio de oficio" });
+  }
+});
+
+router.get("/", async (req, res) => {
+  try {
+    const role = getRole(req);
+    const isL00117 = await isUserL00117(req);
+    const allowAll = canSeeAllAreas(role, isL00117);
+    const areaIds = getAreaIds(req);
+
+    const params = [];
+    const where = [];
+    const add = (v) => {
+      params.push(v);
+      return `$${params.length}`;
+    };
+
+    if (!allowAll) {
+      if (!areaIds) return res.json([]);
+      const p1 = add(areaIds.idDg);
+      const p2 = add(areaIds.idDa);
+      where.push(
+        `EXISTS (SELECT 1 FROM public.reconducciones_lados l WHERE l.id_reconduccion = r.id AND l.id_dgeneral = ${p1} AND l.id_dauxiliar = ${p2})`
+      );
+    }
+
+    const r = await query(
+      `
       SELECT r.*,
              v.origen_total,
              v.destino_total,
@@ -60,8 +173,11 @@ router.get("/", async (_req, res) => {
         FROM public.reconducciones r
         LEFT JOIN public.v_reconducciones_resumen v
           ON v.id_reconduccion = r.id
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
        ORDER BY r.id DESC
-    `);
+      `,
+      params
+    );
     return res.json(r.rows);
   } catch (err) {
     console.error("GET /api/reconducciones", err);
@@ -71,6 +187,11 @@ router.get("/", async (_req, res) => {
 
 router.get("/saldos", async (req, res) => {
   try {
+    const role = getRole(req);
+    const isL00117 = await isUserL00117(req);
+    const allowAll = canSeeAllAreas(role, isL00117);
+    const areaIds = getAreaIds(req);
+
     const params = [];
     const where = [];
     const add = (v) => {
@@ -78,12 +199,17 @@ router.get("/saldos", async (req, res) => {
       return `$${params.length}`;
     };
 
-    const id_dgeneral = toNumOrNull(req.query.id_dgeneral);
-    const id_dauxiliar = toNumOrNull(req.query.id_dauxiliar);
+    let id_dgeneral = toNumOrNull(req.query.id_dgeneral);
+    let id_dauxiliar = toNumOrNull(req.query.id_dauxiliar);
     const id_fuente = toNumOrNull(req.query.id_fuente);
     const id_proyecto = toTextOrNull(req.query.id_proyecto);
     const id_partida = toNumOrNull(req.query.id_partida);
     const mes = toTextOrNull(req.query.mes);
+
+    if (!allowAll && areaIds) {
+      id_dgeneral = areaIds.idDg;
+      id_dauxiliar = areaIds.idDa;
+    }
 
     if (Number.isFinite(id_dgeneral)) where.push(`pd.id_dgeneral = ${add(id_dgeneral)}`);
     if (Number.isFinite(id_dauxiliar)) where.push(`pd.id_dauxiliar = ${add(id_dauxiliar)}`);
@@ -121,18 +247,41 @@ router.get("/:id", async (req, res) => {
       return res.status(400).json({ error: "id inválido" });
     }
 
-    const [cab, lados, recursos, metas, movimientos] = await Promise.all([
-      query(
-        `SELECT r.*,
-                v.origen_total,
-                v.destino_total,
-                v.diferencia
-           FROM public.reconducciones r
-           LEFT JOIN public.v_reconducciones_resumen v
-             ON v.id_reconduccion = r.id
-          WHERE r.id = $1`,
-        [id]
-      ),
+    const role = getRole(req);
+    const isL00117 = await isUserL00117(req);
+    const allowAll = canSeeAllAreas(role, isL00117);
+    const areaIds = getAreaIds(req);
+
+    const cabParams = [id];
+    let cabWhere = "r.id = $1";
+    if (!allowAll) {
+      if (!areaIds) return res.status(404).json({ error: "Reconducción no encontrada" });
+      cabParams.push(areaIds.idDg, areaIds.idDa);
+      cabWhere += ` AND EXISTS (
+        SELECT 1 FROM public.reconducciones_lados l
+        WHERE l.id_reconduccion = r.id
+          AND l.id_dgeneral = $2
+          AND l.id_dauxiliar = $3
+      )`;
+    }
+
+    const cab = await query(
+      `SELECT r.*,
+              v.origen_total,
+              v.destino_total,
+              v.diferencia
+         FROM public.reconducciones r
+         LEFT JOIN public.v_reconducciones_resumen v
+           ON v.id_reconduccion = r.id
+        WHERE ${cabWhere}`,
+      cabParams
+    );
+
+    if (cab.rowCount === 0) {
+      return res.status(404).json({ error: "Reconducción no encontrada" });
+    }
+
+    const [lados, recursos, metas, movimientos] = await Promise.all([
       query(
         `SELECT *
            FROM public.reconducciones_lados
@@ -163,10 +312,6 @@ router.get("/:id", async (req, res) => {
       ),
     ]);
 
-    if (cab.rowCount === 0) {
-      return res.status(404).json({ error: "Reconducción no encontrada" });
-    }
-
     return res.json({
       cabecera: cab.rows[0],
       lados: lados.rows,
@@ -185,15 +330,47 @@ router.post("/", async (req, res) => {
   try {
     const b = req.body || {};
     const actorId = getActorId(req) || req.user?.id || null;
+    const role = getRole(req);
+    const isL00117 = await isUserL00117(req);
+    const allowAll = canSeeAllAreas(role, isL00117);
+    const areaIds = getAreaIds(req);
 
-    const oficio = toTextOrNull(b.oficio);
+    let oficio = toTextOrNull(b.oficio);
     const fecha_elaboracion = toTextOrNull(b.fecha_elaboracion);
     const tipo_movimiento = normalizeTipo(b.tipo_movimiento);
     const justificacion = toTextOrNull(b.justificacion);
     const ejercicio = toNumOrNull(b.ejercicio);
     const mes_pago_date = toTextOrNull(b.mes_pago_date);
+    const lados = Array.isArray(b.lados) ? b.lados : [];
+
+    if (!allowAll && !validateLadosArea(lados, areaIds)) {
+      return res.status(403).json({ error: "Sin permisos para esta área" });
+    }
 
     await client.query("BEGIN");
+
+    if (!oficio) {
+      const ym = getYearMonthFromFecha(fecha_elaboracion);
+      const { year, month } = normalizeYearMonth(ym.year, ym.month);
+      const prefix = `ECA-${year}-${month}-RCP-`;
+      const like = `${prefix}%`;
+      await client.query("LOCK TABLE public.reconducciones IN EXCLUSIVE MODE");
+      const r = await client.query(
+        `
+        SELECT COALESCE(MAX(
+          CASE
+            WHEN oficio ~ '^ECA-\\d{4}-\\d{2}-RCP-\\d{4}$' THEN RIGHT(oficio, 4)::int
+            ELSE NULL
+          END
+        ), 0) AS max_num
+        FROM public.reconducciones
+        WHERE oficio LIKE $1
+        `,
+        [like]
+      );
+      const nextNum = Number(r.rows?.[0]?.max_num || 0) + 1;
+      oficio = `${prefix}${String(nextNum).padStart(4, "0")}`;
+    }
 
     const cab = await client.query(
       `INSERT INTO public.reconducciones
@@ -205,7 +382,6 @@ router.post("/", async (req, res) => {
 
     const reconId = cab.rows[0].id;
 
-    const lados = Array.isArray(b.lados) ? b.lados : [];
     for (const l of lados) {
       const lado = normalizeLado(l.lado);
       if (!lado) continue;
@@ -297,8 +473,32 @@ router.put("/:id", async (req, res) => {
 
     const b = req.body || {};
     const actorId = getActorId(req) || req.user?.id || null;
+    const role = getRole(req);
+    const isL00117 = await isUserL00117(req);
+    const allowAll = canSeeAllAreas(role, isL00117);
+    const areaIds = getAreaIds(req);
 
     await client.query("BEGIN");
+
+    if (!allowAll) {
+      if (!areaIds) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ error: "Sin permisos para esta área" });
+      }
+      const perm = await client.query(
+        `SELECT 1
+           FROM public.reconducciones_lados l
+          WHERE l.id_reconduccion = $1
+            AND l.id_dgeneral = $2
+            AND l.id_dauxiliar = $3
+          LIMIT 1`,
+        [id, areaIds.idDg, areaIds.idDa]
+      );
+      if (!perm.rowCount) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ error: "Sin permisos para esta área" });
+      }
+    }
 
     const current = await client.query(
       "SELECT id, estatus FROM public.reconducciones WHERE id = $1 FOR UPDATE",
@@ -341,6 +541,10 @@ router.put("/:id", async (req, res) => {
     ]);
 
     const lados = Array.isArray(b.lados) ? b.lados : [];
+    if (!allowAll && !validateLadosArea(lados, areaIds)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "Sin permisos para esta área" });
+    }
     for (const l of lados) {
       const lado = normalizeLado(l.lado);
       if (!lado) continue;

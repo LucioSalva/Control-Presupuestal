@@ -12,6 +12,8 @@
   const fSegmento = document.getElementById("fSegmento");
   const fVista = document.getElementById("fVista");
   const fArea = document.getElementById("fArea");
+  const fDauxiliar = document.getElementById("fDauxiliar");
+  const fCapitulo = document.getElementById("fCapitulo");
   const fPartida = document.getElementById("fPartida");
   const lblSegmento = document.getElementById("lblSegmento");
   const btnAplicar = document.getElementById("btnAplicar");
@@ -25,6 +27,7 @@
   const kpiReconducciones = document.getElementById("kpiReconducciones");
   const kpiSaldo = document.getElementById("kpiSaldo");
 
+  const theadCapitulos = document.getElementById("theadCapitulos");
   const tbodyCapitulos = document.getElementById("tbodyCapitulos");
   const tbodyDetalle = document.getElementById("tbodyDetalle");
   const modalDetalleEl = document.getElementById("modalDetalle");
@@ -98,6 +101,29 @@
     if (kpiSaldo) kpiSaldo.textContent = money(kpis.saldo_disponible);
   }
 
+  function setKpisFromRows(rows) {
+    const totals = rows.reduce(
+      (acc, row) => {
+        acc.presupuesto += Number(row.presupuesto || 0);
+        acc.suficiencia += Number(row.suficiencia || 0);
+        acc.comprometido += Number(row.comprometido || 0);
+        acc.devengado += Number(row.devengado || 0);
+        acc.reconducciones += Number(row.reconducciones || 0);
+        acc.saldo_disponible += Number(row.saldo_disponible || 0);
+        return acc;
+      },
+      {
+        presupuesto: 0,
+        suficiencia: 0,
+        comprometido: 0,
+        devengado: 0,
+        reconducciones: 0,
+        saldo_disponible: 0,
+      },
+    );
+    setKpis(totals);
+  }
+
   function renderCapitulos(rows) {
     if (!tbodyCapitulos) return;
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -130,15 +156,16 @@
       .join("");
   }
 
-  function renderDetalle(rows) {
-    if (!tbodyDetalle) return;
+  function renderDetalle(rows, target) {
+    const tbody = target || tbodyDetalle;
+    if (!tbody) return;
     if (!Array.isArray(rows) || rows.length === 0) {
-      tbodyDetalle.innerHTML =
+      tbody.innerHTML =
         '<tr><td colspan="9" class="text-center text-muted py-3">Sin detalle.</td></tr>';
       return;
     }
 
-    tbodyDetalle.innerHTML = rows
+    tbody.innerHTML = rows
       .map((row) => {
         return `
           <tr>
@@ -222,19 +249,110 @@
   }
 
   function getFilters() {
+    const areaValue = String(fArea?.value || "");
+    const areaOption = fArea?.options?.[fArea?.selectedIndex] || null;
+    const areaClave =
+      areaValue.startsWith("clave:")
+        ? areaValue.replace("clave:", "")
+        : String(areaOption?.dataset?.clave || "");
+    const areaId = areaValue.startsWith("clave:") ? "" : areaValue;
+    const capitulo = normalizeCapitulo(fCapitulo?.value);
+
     return {
       periodo: fPeriodo?.value || "ANUAL",
       anio: fAnio?.value || new Date().getFullYear(),
       segmento: fSegmento?.value || "1",
       vista: fVista?.value || "CAPITULO",
-      id_dgeneral: fArea?.value || "",
+      id_dgeneral: areaId,
+      id_dauxiliar: String(fDauxiliar?.value || ""),
+      dg_clave: areaClave,
+      capitulo,
       partida: String(fPartida?.value || "").trim(),
     };
+  }
+
+  function normalizeCapitulo(value) {
+    const clean = String(value || "").replace(/[^\d]/g, "");
+    if (!clean) return "";
+    const num = Number(clean);
+    if (!Number.isFinite(num)) return "";
+    if (clean.length >= 4) return String(Math.floor(num / 1000) * 1000);
+    return String(num);
+  }
+
+  function setTableHeader(view) {
+    if (!theadCapitulos) return;
+    if (view === "PARTIDA") {
+      theadCapitulos.innerHTML = `
+        <tr>
+          <th>Partida</th>
+          <th>Descripción</th>
+          <th class="text-end">Presupuesto</th>
+          <th class="text-end">Suficiencia</th>
+          <th class="text-end">Comprometido</th>
+          <th class="text-end">Devengado</th>
+          <th class="text-end">Reconducciones</th>
+          <th class="text-end">Saldo</th>
+          <th class="text-end">% Ejercido</th>
+        </tr>
+      `;
+      return;
+    }
+    theadCapitulos.innerHTML = `
+      <tr>
+        <th>Capítulo</th>
+        <th class="text-end">Presupuesto</th>
+        <th class="text-end">Suficiencia</th>
+        <th class="text-end">Comprometido</th>
+        <th class="text-end">Devengado</th>
+        <th class="text-end">Reconducciones</th>
+        <th class="text-end">Saldo</th>
+        <th class="text-end">% Ejercido</th>
+        <th class="text-center">Detalle</th>
+      </tr>
+    `;
   }
 
   async function loadAreas() {
     if (!fArea) return;
     const data = await fetchJson(`${API}/api/catalogos/dgeneral`);
+    if (!data || !Array.isArray(data)) return;
+    const byClave = new Map();
+    data.forEach((row) => {
+      const clave = String(row?.clave || "").trim();
+      const desc = String(row?.dependencia || "").trim();
+      const id = Number(row?.id);
+      if (!clave || !id) return;
+      if (!byClave.has(clave)) byClave.set(clave, []);
+      byClave.get(clave).push({ id, clave, desc });
+    });
+
+    const claves = Array.from(byClave.keys()).sort((a, b) => a.localeCompare(b));
+    const options = claves
+      .map((clave) => {
+        const rows = byClave.get(clave) || [];
+        const group = [];
+        if (rows.length > 1) {
+          group.push(
+            `<option value="clave:${clave}" data-clave="${clave}">${clave} - (Todas)</option>`,
+          );
+        }
+        rows
+          .sort((a, b) => a.desc.localeCompare(b.desc))
+          .forEach((row) => {
+            group.push(
+              `<option value="${row.id}" data-clave="${row.clave}">${row.clave} - ${row.desc}</option>`,
+            );
+          });
+        return group.join("");
+      })
+      .join("");
+    fArea.insertAdjacentHTML("beforeend", options);
+  }
+
+  async function loadDauxiliares() {
+    if (!fDauxiliar) return;
+    const data = await fetchJson(`${API}/api/catalogos/dauxiliar`);
     if (!data || !Array.isArray(data)) return;
     const options = data
       .map((row) => {
@@ -246,21 +364,40 @@
       })
       .filter(Boolean)
       .join("");
-    fArea.insertAdjacentHTML("beforeend", options);
+    fDauxiliar.insertAdjacentHTML("beforeend", options);
   }
 
   async function loadResumen() {
+    const filters = getFilters();
+    if (filters.vista === "PARTIDA") {
+      if (!filters.capitulo) {
+        await Swal.fire(
+          "Falta capítulo",
+          "Captura un capítulo para listar las partidas.",
+          "warning",
+        );
+        return;
+      }
+      setTableHeader("PARTIDA");
+      await loadPartidas(filters);
+      return;
+    }
+
+    setTableHeader("CAPITULO");
     if (tbodyCapitulos) {
       tbodyCapitulos.innerHTML =
         '<tr><td colspan="9" class="text-center text-muted py-4">Cargando...</td></tr>';
     }
-    const filters = getFilters();
     const params = new URLSearchParams();
     params.set("periodo", filters.periodo);
     params.set("anio", filters.anio);
     params.set("segmento", filters.segmento);
     params.set("vista", filters.vista);
     if (filters.id_dgeneral) params.set("id_dgeneral", filters.id_dgeneral);
+    if (filters.id_dauxiliar) params.set("id_dauxiliar", filters.id_dauxiliar);
+    if (filters.dg_clave && !filters.id_dgeneral)
+      params.set("dg_clave", filters.dg_clave);
+    if (filters.capitulo) params.set("capitulo", filters.capitulo);
     if (filters.partida) params.set("partida", filters.partida);
 
     const data = await fetchJson(
@@ -269,6 +406,30 @@
     if (!data) return;
     setKpis(data.kpis || {});
     renderCapitulos(data.rows || []);
+  }
+
+  async function loadPartidas(filters) {
+    if (tbodyCapitulos) {
+      tbodyCapitulos.innerHTML =
+        '<tr><td colspan="9" class="text-center text-muted py-4">Cargando...</td></tr>';
+    }
+    const params = new URLSearchParams();
+    params.set("periodo", filters.periodo);
+    params.set("anio", filters.anio);
+    params.set("segmento", filters.segmento);
+    params.set("capitulo", filters.capitulo);
+    if (filters.id_dgeneral) params.set("id_dgeneral", filters.id_dgeneral);
+    if (filters.id_dauxiliar) params.set("id_dauxiliar", filters.id_dauxiliar);
+    if (filters.dg_clave && !filters.id_dgeneral)
+      params.set("dg_clave", filters.dg_clave);
+    if (filters.partida) params.set("partida", filters.partida);
+
+    const data = await fetchJson(
+      `${API}/api/dashboard/partidas-detalle?${params.toString()}`,
+    );
+    if (!data) return;
+    renderDetalle(data.rows || [], tbodyCapitulos);
+    setKpisFromRows(data.rows || []);
   }
 
   async function loadDetalle(capitulo) {
@@ -285,6 +446,9 @@
     params.set("segmento", filters.segmento);
     params.set("capitulo", String(capitulo));
     if (filters.id_dgeneral) params.set("id_dgeneral", filters.id_dgeneral);
+    if (filters.id_dauxiliar) params.set("id_dauxiliar", filters.id_dauxiliar);
+    if (filters.dg_clave && !filters.id_dgeneral)
+      params.set("dg_clave", filters.dg_clave);
     if (filters.partida) params.set("partida", filters.partida);
 
     const data = await fetchJson(
@@ -312,6 +476,10 @@
       params.set("anio", filters.anio);
       params.set("segmento", filters.segmento);
       if (filters.id_dgeneral) params.set("id_dgeneral", filters.id_dgeneral);
+      if (filters.id_dauxiliar) params.set("id_dauxiliar", filters.id_dauxiliar);
+      if (filters.dg_clave && !filters.id_dgeneral)
+        params.set("dg_clave", filters.dg_clave);
+      if (filters.capitulo) params.set("capitulo", filters.capitulo);
       if (filters.partida) params.set("partida", filters.partida);
       const url = `dashboard_partidas_grafica.html?${params.toString()}`;
       window.open(url, "_blank", "noopener");
@@ -337,7 +505,7 @@
 
   initDefaults();
   bindEvents();
-  loadAreas()
+  Promise.all([loadAreas(), loadDauxiliares()])
     .then(() => loadResumen())
     .catch((e) => Swal.fire("Error", e.message, "error"));
 })();

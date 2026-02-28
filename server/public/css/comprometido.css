@@ -46,27 +46,30 @@ body{
   left:0;right:0;
   min-height:40px;
   z-index:1029;
-  background:#f8f9fa!important;
-  border-bottom:1px solid #dee2e6;
+  background:#691c32!important;
+  border-bottom:1px solid #5a1629;
 }
 
 .navbar-light .nav-link{
-  color:#495057!important;
-  padding:.5rem .85rem;
-  border-radius:.25rem;
-  margin:0 .2rem;
-  font-size:.85rem;
+  color:#ffffff!important;
+  padding:12px 20px;
+  border-radius:0;
+  margin:0;
+  font-size:14px;
+  font-weight:700;
   white-space:nowrap;
+  background:#691c32;
+  border-right:1px solid #5a1629;
 }
 
 .navbar-light .nav-link.active{
-  background-color:#691c32;
+  background-color:#5a1629;
   color:#fff!important;
 }
 
 .navbar-light .nav-link:hover{
-  background-color:#e9ecef;
-  color:#691c32!important;
+  background-color:#5a1629;
+  color:#ffffff!important;
 }
 
 .navbar-light .nav-link.active:hover{

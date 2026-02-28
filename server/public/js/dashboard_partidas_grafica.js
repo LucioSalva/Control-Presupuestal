@@ -11,6 +11,7 @@
   const fAnio = document.getElementById("fAnio");
   const fSegmento = document.getElementById("fSegmento");
   const fArea = document.getElementById("fArea");
+  const fDauxiliar = document.getElementById("fDauxiliar");
   const fPartida = document.getElementById("fPartida");
   const fNivel = document.getElementById("fNivel");
   const fCapitulo = document.getElementById("fCapitulo");
@@ -157,6 +158,7 @@
       anio: fAnio?.value || new Date().getFullYear(),
       segmento: fSegmento?.value || "1",
       id_dgeneral: fArea?.value || "",
+      id_dauxiliar: fDauxiliar?.value || "",
       partida,
       nivel: fNivel?.value || "CAPITULO",
       capitulo: normalizePartida(fCapitulo?.value),
@@ -191,6 +193,23 @@
       .filter(Boolean)
       .join("");
     fArea.insertAdjacentHTML("beforeend", options);
+  }
+
+  async function loadDauxiliares() {
+    if (!fDauxiliar) return;
+    const data = await fetchJson(`${API}/api/catalogos/dauxiliar`);
+    if (!data || !Array.isArray(data)) return;
+    const options = data
+      .map((row) => {
+        const id = Number(row?.id);
+        const clave = String(row?.clave || "").trim();
+        const desc = String(row?.dependencia || "").trim();
+        if (!id) return "";
+        return `<option value="${id}">${clave} - ${desc}</option>`;
+      })
+      .filter(Boolean)
+      .join("");
+    fDauxiliar.insertAdjacentHTML("beforeend", options);
   }
 
   function buildDataset(rows, metrica, nivel) {
@@ -295,6 +314,7 @@
     params.set("anio", filters.anio);
     params.set("segmento", filters.segmento);
     if (filters.id_dgeneral) params.set("id_dgeneral", filters.id_dgeneral);
+    if (filters.id_dauxiliar) params.set("id_dauxiliar", filters.id_dauxiliar);
     if (filters.partida) params.set("partida", filters.partida);
 
     let rows = [];
@@ -350,13 +370,17 @@
     const anio = params.get("anio");
     const segmento = params.get("segmento");
     const idDg = params.get("id_dgeneral");
+    const idDa = params.get("id_dauxiliar");
     const partida = params.get("partida");
+    const capitulo = params.get("capitulo");
 
     if (periodo) fPeriodo.value = periodo;
     if (anio) fAnio.value = anio;
     if (segmento) fSegmento.value = segmento;
     if (idDg) fArea.value = idDg;
+    if (idDa) fDauxiliar.value = idDa;
     if (partida) fPartida.value = partida;
+    if (capitulo) fCapitulo.value = capitulo;
   }
 
   function initDefaults() {
@@ -371,7 +395,7 @@
 
   initDefaults();
   bindEvents();
-  loadAreas()
+  Promise.all([loadAreas(), loadDauxiliares()])
     .then(() => {
       applyQueryDefaults();
       buildSegmentoOptions(fPeriodo.value);

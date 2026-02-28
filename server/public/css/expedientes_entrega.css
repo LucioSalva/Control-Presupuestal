@@ -29,3 +29,21 @@
 .expedientes-entrega-page .table-responsive {
   max-height: 420px;
 }
+
+.expedientes-entrega-page .entregas-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+  width: min(920px, 100%);
+}
+
+.expedientes-entrega-page .entregas-filter-wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 640px) {
+  .expedientes-entrega-page .entregas-filter-wide {
+    grid-column: span 1;
+  }
+}

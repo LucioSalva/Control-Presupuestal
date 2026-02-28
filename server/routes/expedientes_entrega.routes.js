@@ -46,12 +46,76 @@ function normalizeEstatus(v) {
   return s === "CANCELADO" ? "CANCELADO" : "ENTREGADO";
 }
 
+function parseFolioString(folio) {
+  const s = String(folio || "").trim().toUpperCase();
+  const m = s.match(/^(\d{2})-(\d+)(?:\s+D-(\d{2}))?$/);
+  if (!m) return null;
+  return {
+    mes: m[1],
+    consecutivo: Number(m[2]),
+    base: `${m[1]}-${m[2]}`,
+    diferido: m[3] ? Number(m[3]) : null,
+  };
+}
+
+function validateFolioForMes(folio, mes) {
+  const parsed = parseFolioString(folio);
+  if (!parsed) return false;
+  const mm = String(mes || "").padStart(2, "0");
+  return parsed.mes === mm;
+}
+
 function getSearchRegex(tipo) {
   if (tipo === "SUF") return /^ECA-\d{4}-\d{2}-SP-\d{4}$/;
   if (tipo === "COMP") return /^ECA-\d{4}-\d{2}-CP-\d{4}$/;
   if (tipo === "DEV") return /^ECA-\d{6}-DG-\d{4}$/;
   return null;
 }
+
+router.get("/next-folio", async (req, res) => {
+  try {
+    const anio = Number(req.query.anio || 0);
+    const mes = Number(req.query.mes || 0);
+    if (!Number.isFinite(anio) || anio <= 0) {
+      return res.status(400).json({ error: "Año inválido" });
+    }
+    if (!Number.isFinite(mes) || mes < 1 || mes > 12) {
+      return res.status(400).json({ error: "Mes inválido" });
+    }
+    const baseQuery = String(req.query.base || "").trim().toUpperCase();
+    const mm = String(mes).padStart(2, "0");
+
+    const r = await query(
+      "SELECT folio FROM expedientes_entrega WHERE anio = $1 AND mes = $2",
+      [anio, mes]
+    );
+
+    let maxConsec = 0;
+    let maxDiferido = 0;
+
+    for (const row of r.rows || []) {
+      const parsed = parseFolioString(row.folio);
+      if (!parsed || parsed.mes !== mm) continue;
+      if (Number.isFinite(parsed.consecutivo) && parsed.consecutivo > maxConsec) {
+        maxConsec = parsed.consecutivo;
+      }
+      if (baseQuery && parsed.base === baseQuery && parsed.diferido != null) {
+        if (parsed.diferido > maxDiferido) maxDiferido = parsed.diferido;
+      }
+    }
+
+    const nextConsecutivo = maxConsec + 1;
+    const base = `${mm}-${String(nextConsecutivo).padStart(2, "0")}`;
+    const resp = { base, next_consecutivo: nextConsecutivo };
+    if (baseQuery) {
+      resp.next_diferido = String(maxDiferido + 1).padStart(2, "0");
+    }
+    return res.json(resp);
+  } catch (err) {
+    console.error("[GET expedientes-entrega/next-folio] error:", err);
+    return res.status(500).json({ error: "Error generando folio" });
+  }
+});
 
 router.get("/origen", async (req, res) => {
   try {
@@ -61,6 +125,7 @@ router.get("/origen", async (req, res) => {
     }
 
     const search = String(req.query.search || "").trim();
+    const folio = String(req.query.folio || "").trim();
     const role = getRole(req);
     const where = [];
     const params = [];
@@ -203,6 +268,7 @@ router.get("/", async (req, res) => {
     const anio = Number(req.query.anio || 0);
     const mes = Number(req.query.mes || 0);
     const search = String(req.query.search || "").trim();
+    const folio = String(req.query.folio || "").trim();
     const role = getRole(req);
 
     const where = [];
@@ -210,16 +276,29 @@ router.get("/", async (req, res) => {
     let i = 1;
 
     if (Number.isFinite(anio) && anio > 0) {
-      where.push(`anio = $${i++}`);
+      where.push(`ee.anio = $${i++}`);
       params.push(anio);
     }
     if (Number.isFinite(mes) && mes > 0) {
-      where.push(`mes = $${i++}`);
+      where.push(`ee.mes = $${i++}`);
       params.push(mes);
+    }
+    if (folio) {
+      where.push(`ee.folio ILIKE $${i++}`);
+      params.push(folio);
     }
     if (search) {
       where.push(
-        `(folio ILIKE $${i} OR dependencia ILIKE $${i} OR concepto ILIKE $${i})`
+        `(
+          ee.folio ILIKE $${i}
+          OR COALESCE(NULLIF(ee.dependencia, ''), s.dependencia, c.dependencia, d.dependencia) ILIKE $${i}
+          OR COALESCE(
+            NULLIF(ee.concepto, ''),
+            s.meta, s.clave_programatica, s.dependencia,
+            c.meta, c.clave_programatica, c.dependencia,
+            d.meta, d.clave_programatica, d.dependencia
+          ) ILIKE $${i}
+        )`
       );
       params.push(`%${search}%`);
       i++;
@@ -227,47 +306,60 @@ router.get("/", async (req, res) => {
 
     if (role === "AREA") {
       if (req.user?.id_dgeneral != null) {
-        where.push(`id_dgeneral = $${i++}`);
+        where.push(
+          `COALESCE(ee.id_dgeneral, s.id_dgeneral, c.id_dgeneral, d.id_dgeneral) = $${i++}`
+        );
         params.push(req.user.id_dgeneral);
       }
       if (req.user?.id_dauxiliar != null) {
-        where.push(`id_dauxiliar = $${i++}`);
+        where.push(
+          `(COALESCE(ee.id_dauxiliar, s.id_dauxiliar, c.id_dauxiliar, d.id_dauxiliar) = $${i++}
+            OR COALESCE(ee.id_dauxiliar, s.id_dauxiliar, c.id_dauxiliar, d.id_dauxiliar) IS NULL)`
+        );
         params.push(req.user.id_dauxiliar);
       }
     }
 
     let sql = `
       SELECT
-        id,
-        anio,
-        mes,
-        id_suficiencia,
-        id_comprometido,
-        id_devengado,
-        id_dgeneral,
-        id_dauxiliar,
-        partida_clave,
-        folio,
-        dependencia,
-        concepto,
-        importe,
-        entrego_comprometido,
-        entrego_devengado,
-        fecha_entrega_tesoreria,
-        fecha_recibido_presupuesto,
-        estatus,
-        observaciones,
-        creado_por,
-        creado_en,
-        actualizado_en
-      FROM expedientes_entrega
+        ee.id,
+        ee.anio,
+        ee.mes,
+        ee.id_suficiencia,
+        ee.id_comprometido,
+        ee.id_devengado,
+        ee.id_dgeneral,
+        ee.id_dauxiliar,
+        ee.partida_clave,
+        ee.folio,
+        COALESCE(NULLIF(ee.dependencia, ''), s.dependencia, c.dependencia, d.dependencia) AS dependencia,
+        COALESCE(
+          NULLIF(ee.concepto, ''),
+          s.meta, s.clave_programatica, s.dependencia,
+          c.meta, c.clave_programatica, c.dependencia,
+          d.meta, d.clave_programatica, d.dependencia
+        ) AS concepto,
+        ee.importe,
+        ee.entrego_comprometido,
+        ee.entrego_devengado,
+        ee.fecha_entrega_tesoreria,
+        ee.fecha_recibido_presupuesto,
+        ee.estatus,
+        ee.observaciones,
+        ee.creado_por,
+        ee.creado_en,
+        ee.actualizado_en
+      FROM expedientes_entrega ee
+      LEFT JOIN suficiencias s ON ee.id_suficiencia = s.id
+      LEFT JOIN comprometidos c ON ee.id_comprometido = c.id
+      LEFT JOIN devengados d ON ee.id_devengado = d.id
     `;
 
     if (where.length) {
       sql += ` WHERE ${where.join(" AND ")}`;
     }
 
-    sql += " ORDER BY creado_en DESC, id DESC LIMIT 200";
+    sql += " ORDER BY ee.creado_en DESC, ee.id DESC LIMIT 200";
 
     const r = await query(sql, params);
     return res.json({ ok: true, rows: r.rows });
@@ -286,30 +378,38 @@ router.get("/:id", async (req, res) => {
     const r = await query(
       `
       SELECT
-        id,
-        anio,
-        mes,
-        id_suficiencia,
-        id_comprometido,
-        id_devengado,
-        id_dgeneral,
-        id_dauxiliar,
-        partida_clave,
-        folio,
-        dependencia,
-        concepto,
-        importe,
-        entrego_comprometido,
-        entrego_devengado,
-        fecha_entrega_tesoreria,
-        fecha_recibido_presupuesto,
-        estatus,
-        observaciones,
-        creado_por,
-        creado_en,
-        actualizado_en
-      FROM expedientes_entrega
-      WHERE id = $1
+        ee.id,
+        ee.anio,
+        ee.mes,
+        ee.id_suficiencia,
+        ee.id_comprometido,
+        ee.id_devengado,
+        ee.id_dgeneral,
+        ee.id_dauxiliar,
+        ee.partida_clave,
+        ee.folio,
+        COALESCE(NULLIF(ee.dependencia, ''), s.dependencia, c.dependencia, d.dependencia) AS dependencia,
+        COALESCE(
+          NULLIF(ee.concepto, ''),
+          s.meta, s.clave_programatica, s.dependencia,
+          c.meta, c.clave_programatica, c.dependencia,
+          d.meta, d.clave_programatica, d.dependencia
+        ) AS concepto,
+        ee.importe,
+        ee.entrego_comprometido,
+        ee.entrego_devengado,
+        ee.fecha_entrega_tesoreria,
+        ee.fecha_recibido_presupuesto,
+        ee.estatus,
+        ee.observaciones,
+        ee.creado_por,
+        ee.creado_en,
+        ee.actualizado_en
+      FROM expedientes_entrega ee
+      LEFT JOIN suficiencias s ON ee.id_suficiencia = s.id
+      LEFT JOIN comprometidos c ON ee.id_comprometido = c.id
+      LEFT JOIN devengados d ON ee.id_devengado = d.id
+      WHERE ee.id = $1
       LIMIT 1
       `,
       [id]
@@ -338,24 +438,17 @@ router.post("/", async (req, res) => {
     }
 
     const folio = String(b.folio || "").trim();
-    const dependencia = String(b.dependencia || "").trim();
-    const concepto = String(b.concepto || "").trim();
+    const dependencia = String(b.dependencia ?? "").trim();
+    const concepto = String(b.concepto ?? "").trim();
     const importe = toNumOrZero(b.importe);
 
-    if (!folio || !dependencia || !concepto) {
-      return res.status(400).json({ error: "Faltan datos visibles (folio/dependencia/concepto)" });
-    }
-    if (!(importe > 0)) {
-      return res.status(400).json({ error: "El importe debe ser mayor a 0" });
+    if (!folio || !validateFolioForMes(folio, mes)) {
+      return res.status(400).json({ error: "Folio inválido para el periodo" });
     }
 
     const id_suficiencia = toNumOrNull(b.id_suficiencia);
     const id_comprometido = toNumOrNull(b.id_comprometido);
     const id_devengado = toNumOrNull(b.id_devengado);
-
-    if (!id_suficiencia && !id_comprometido && !id_devengado) {
-      return res.status(400).json({ error: "Selecciona un origen válido" });
-    }
 
     const payload = {
       anio,
@@ -468,24 +561,17 @@ router.patch("/:id", async (req, res) => {
     }
 
     const folio = String(b.folio || "").trim();
-    const dependencia = String(b.dependencia || "").trim();
-    const concepto = String(b.concepto || "").trim();
+    const dependencia = String(b.dependencia ?? "").trim();
+    const concepto = String(b.concepto ?? "").trim();
     const importe = toNumOrZero(b.importe);
 
-    if (!folio || !dependencia || !concepto) {
-      return res.status(400).json({ error: "Faltan datos visibles (folio/dependencia/concepto)" });
-    }
-    if (!(importe > 0)) {
-      return res.status(400).json({ error: "El importe debe ser mayor a 0" });
+    if (!folio || !validateFolioForMes(folio, mes)) {
+      return res.status(400).json({ error: "Folio inválido para el periodo" });
     }
 
     const id_suficiencia = toNumOrNull(b.id_suficiencia);
     const id_comprometido = toNumOrNull(b.id_comprometido);
     const id_devengado = toNumOrNull(b.id_devengado);
-
-    if (!id_suficiencia && !id_comprometido && !id_devengado) {
-      return res.status(400).json({ error: "Selecciona un origen válido" });
-    }
 
     const payload = [
       anio,

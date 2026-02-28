@@ -148,8 +148,10 @@ router.get("/partidas-resumen", async (req, res) => {
       buildPeriodConfig(req.query?.periodo, req.query?.anio, req.query?.segmento);
 
     const idDgeneral = parseIntParam(req.query?.id_dgeneral);
+    const dgClave = normalizeKey(req.query?.dg_clave);
     const idDauxiliar = parseIntParam(req.query?.id_dauxiliar);
     const partida = normalizePartida(req.query?.partida);
+    const capitulo = parseIntParam(req.query?.capitulo);
 
     const params = [];
     let idx = 1;
@@ -161,20 +163,31 @@ router.get("/partidas-resumen", async (req, res) => {
     const startParam = addParam(startDate);
     const endParam = addParam(endDate);
     const anioParam = addParam(anio);
-    const dgParam = Number.isFinite(idDgeneral) ? addParam(idDgeneral) : null;
+    const dgParam = Number.isFinite(idDgeneral) && !dgClave ? addParam(idDgeneral) : null;
+    const dgClaveParam = dgClave ? addParam(dgClave) : null;
     const daParam = Number.isFinite(idDauxiliar) ? addParam(idDauxiliar) : null;
     const partidaParam = partida ? addParam(partida) : null;
+    const capParam = Number.isFinite(capitulo) ? addParam(capitulo) : null;
 
     const pbpWhere = [
       `pbp.ejercicio = ${anioParam}`,
       dgParam ? `pbp.id_dgeneral = ${dgParam}` : null,
+      dgClaveParam
+        ? `pbp.id_dgeneral IN (SELECT id FROM public.dgeneral WHERE TRIM(clave) = ${dgClaveParam})`
+        : null,
       daParam ? `pbp.id_dauxiliar = ${daParam}` : null,
       partidaParam ? `TRIM(pa.clave) = ${partidaParam}` : null,
     ].filter(Boolean);
 
     const dateFilter = (alias) =>
       `COALESCE(${alias}.fecha, ${alias}.created_at)::date BETWEEN ${startParam} AND ${endParam}`;
-    const dgFilter = (alias) => (dgParam ? `AND ${alias}.id_dgeneral = ${dgParam}` : "");
+    const dgFilter = (alias) => {
+      if (dgParam) return `AND ${alias}.id_dgeneral = ${dgParam}`;
+      if (dgClaveParam) {
+        return `AND ${alias}.id_dgeneral IN (SELECT id FROM public.dgeneral WHERE TRIM(clave) = ${dgClaveParam})`;
+      }
+      return "";
+    };
     const daFilter = (alias) =>
       daParam ? `AND ${alias}.id_dauxiliar = ${daParam}` : "";
     const partidaFilter = (alias, field) =>
@@ -281,6 +294,7 @@ router.get("/partidas-resumen", async (req, res) => {
       LEFT JOIN comprometido c ON c.capitulo = b.capitulo
       LEFT JOIN devengado d ON d.capitulo = b.capitulo
       LEFT JOIN reconducciones rm ON rm.capitulo = b.capitulo
+      ${capParam ? `WHERE b.capitulo = ${capParam}` : ""}
       ORDER BY b.capitulo;
     `;
 
@@ -345,6 +359,7 @@ router.get("/partidas-detalle", async (req, res) => {
       buildPeriodConfig(req.query?.periodo, req.query?.anio, req.query?.segmento);
 
     const idDgeneral = parseIntParam(req.query?.id_dgeneral);
+    const dgClave = normalizeKey(req.query?.dg_clave);
     const idDauxiliar = parseIntParam(req.query?.id_dauxiliar);
     const partida = normalizePartida(req.query?.partida);
 
@@ -359,20 +374,30 @@ router.get("/partidas-detalle", async (req, res) => {
     const endParam = addParam(endDate);
     const anioParam = addParam(anio);
     const capParam = addParam(capitulo);
-    const dgParam = Number.isFinite(idDgeneral) ? addParam(idDgeneral) : null;
+    const dgParam = Number.isFinite(idDgeneral) && !dgClave ? addParam(idDgeneral) : null;
+    const dgClaveParam = dgClave ? addParam(dgClave) : null;
     const daParam = Number.isFinite(idDauxiliar) ? addParam(idDauxiliar) : null;
     const partidaParam = partida ? addParam(partida) : null;
 
     const pbpWhere = [
       `pbp.ejercicio = ${anioParam}`,
       dgParam ? `pbp.id_dgeneral = ${dgParam}` : null,
+      dgClaveParam
+        ? `pbp.id_dgeneral IN (SELECT id FROM public.dgeneral WHERE TRIM(clave) = ${dgClaveParam})`
+        : null,
       daParam ? `pbp.id_dauxiliar = ${daParam}` : null,
       partidaParam ? `TRIM(pa.clave) = ${partidaParam}` : null,
     ].filter(Boolean);
 
     const dateFilter = (alias) =>
       `COALESCE(${alias}.fecha, ${alias}.created_at)::date BETWEEN ${startParam} AND ${endParam}`;
-    const dgFilter = (alias) => (dgParam ? `AND ${alias}.id_dgeneral = ${dgParam}` : "");
+    const dgFilter = (alias) => {
+      if (dgParam) return `AND ${alias}.id_dgeneral = ${dgParam}`;
+      if (dgClaveParam) {
+        return `AND ${alias}.id_dgeneral IN (SELECT id FROM public.dgeneral WHERE TRIM(clave) = ${dgClaveParam})`;
+      }
+      return "";
+    };
     const daFilter = (alias) =>
       daParam ? `AND ${alias}.id_dauxiliar = ${daParam}` : "";
     const partidaFilter = (alias, field) =>

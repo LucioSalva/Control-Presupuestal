@@ -55,6 +55,48 @@
     return t ? { Authorization: `Bearer ${t}` } : {};
   };
 
+  let CURRENT_USER = null;
+  let CURRENT_ROLES_NORM = [];
+  let CURRENT_DGENERAL_ID = null;
+  let CURRENT_DAUXILIAR_ID = null;
+  let CURRENT_DGENERAL_CLAVE = null;
+  let CURRENT_DAUXILIAR_CLAVE = null;
+
+  function loadCurrentUser() {
+    try {
+      const raw = localStorage.getItem("cp_usuario");
+      if (!raw) {
+        window.location.href = "login.html";
+        return;
+      }
+      CURRENT_USER = JSON.parse(raw);
+      const roles = Array.isArray(CURRENT_USER.roles) ? CURRENT_USER.roles : [];
+      CURRENT_ROLES_NORM = roles.map((r) => String(r || "").trim().toUpperCase());
+      CURRENT_DGENERAL_ID = Number(CURRENT_USER.id_dgeneral || 0) || null;
+      CURRENT_DAUXILIAR_ID = Number(CURRENT_USER.id_dauxiliar || 0) || null;
+      CURRENT_DGENERAL_CLAVE = String(CURRENT_USER.dgeneral_clave || "").trim().toUpperCase() || null;
+      CURRENT_DAUXILIAR_CLAVE = String(CURRENT_USER.dauxiliar_clave || "").trim().toUpperCase() || null;
+    } catch {
+      window.location.href = "login.html";
+    }
+  }
+
+  function isGodUser() {
+    return CURRENT_ROLES_NORM.includes("GOD");
+  }
+
+  function isAdminUser() {
+    return CURRENT_ROLES_NORM.includes("ADMIN");
+  }
+
+  function isL00117User() {
+    return CURRENT_DGENERAL_CLAVE === "L00" && CURRENT_DAUXILIAR_CLAVE === "117";
+  }
+
+  function canSeeAllAreas() {
+    return isGodUser() || isAdminUser() || isL00117User();
+  }
+
   const el = {
     filtroEstatus: document.getElementById("filtro-estatus"),
     tablaBody: document.getElementById("tabla-recon-body"),
@@ -174,6 +216,61 @@
     return data;
   }
 
+  let qrTimer = null;
+
+  function buildQrPayloadRecon() {
+    const id = state.reconId != null ? String(state.reconId) : "";
+    const folio = String(el.rcOficio.value || "").trim();
+    const fecha = String(el.rcFecha.value || "").trim();
+    const tipo = String(el.rcTipo.value || "").trim();
+    const ejercicio = String(el.rcEjercicio.value || "").trim();
+    const mes = String(el.rcMes.value || "").trim();
+    const totalOrigen = String(el.totalOrigen?.textContent || "").trim();
+    const totalDestino = String(el.totalDestino?.textContent || "").trim();
+    if (!id && !folio && !fecha && !tipo && !ejercicio && !mes) return "";
+    return JSON.stringify({
+      tipo: "RCP",
+      id,
+      folio,
+      fecha,
+      tipo_movimiento: tipo,
+      ejercicio,
+      mes,
+      total_origen: totalOrigen,
+      total_destino: totalDestino,
+    });
+  }
+
+  async function renderQrRecon() {
+    const container = document.getElementById("qr-recon");
+    if (!container) return;
+    const text = buildQrPayloadRecon();
+    if (!text || !window.QRCode?.toDataURL) {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+      return;
+    }
+    try {
+      const dataUrl = await window.QRCode.toDataURL(text, {
+        width: 120,
+        margin: 1,
+      });
+      const img = new Image();
+      img.src = dataUrl;
+      img.alt = "QR";
+      container.innerHTML = "";
+      container.appendChild(img);
+    } catch {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+    }
+  }
+
+  function scheduleQrRender() {
+    if (qrTimer) clearTimeout(qrTimer);
+    qrTimer = setTimeout(() => {
+      renderQrRecon();
+    }, 120);
+  }
+
   const num = (v) => {
     const raw = String(v ?? "").trim();
     if (raw === "") return 0;
@@ -252,6 +349,17 @@
   function setSelectValue(select, value) {
     if (!select) return;
     select.value = value ?? "";
+  }
+
+  function setSelectToSingleOption(select, value, label) {
+    if (!select) return;
+    select.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = value || "";
+    opt.textContent = label || "—";
+    select.appendChild(opt);
+    if (value) select.value = value;
+    select.disabled = true;
   }
 
   function clearTable(body) {
@@ -593,11 +701,10 @@
   }
 
   function validateHeader() {
-    const oficio = el.rcOficio.value.trim();
     const fecha = el.rcFecha.value;
     const tipo = el.rcTipo.value;
-    if (!oficio || !fecha || !tipo) {
-      uiWarn("Captura oficio, fecha y tipo de movimiento");
+    if (!fecha || !tipo) {
+      uiWarn("Captura fecha y tipo de movimiento");
       return false;
     }
     const ejercicio = numOrNull(el.rcEjercicio.value);
@@ -660,6 +767,15 @@
     return [];
   }
 
+  function findCatalogRow(list, idValue, claveValue) {
+    const byId = list.find((x) => String(x.id) === String(idValue));
+    if (byId) return byId;
+    if (!claveValue) return null;
+    return list.find(
+      (x) => String(x.clave || "").trim().toUpperCase() === String(claveValue).trim().toUpperCase()
+    );
+  }
+
   async function loadCatalogos() {
     const headers = authHeaders();
     const [dg, da, programas, proyectos, fuentes, partidas] = await Promise.all([
@@ -703,6 +819,24 @@
       s.fuente.innerHTML = fuenteOpts;
       s.proyecto.innerHTML = proyectoOpts;
     });
+
+    if (!canSeeAllAreas()) {
+      const dgRow = findCatalogRow(state.catalogos.dgeneral, CURRENT_DGENERAL_ID, CURRENT_DGENERAL_CLAVE);
+      const daRow = findCatalogRow(state.catalogos.dauxiliar, CURRENT_DAUXILIAR_ID, CURRENT_DAUXILIAR_CLAVE);
+      ["ORIGEN", "DESTINO"].forEach((side) => {
+        const s = sideEls[side];
+        setSelectToSingleOption(
+          s.dgeneral,
+          dgRow ? String(dgRow.id) : "",
+          dgRow ? `${dgRow.clave} - ${dgRow.dependencia}` : "—"
+        );
+        setSelectToSingleOption(
+          s.dauxiliar,
+          daRow ? String(daRow.id) : "",
+          daRow ? `${daRow.clave} - ${daRow.dependencia}` : "—"
+        );
+      });
+    }
   }
 
   async function loadSaldosGlobal() {
@@ -767,8 +901,13 @@
     el.rcJustificacion.value = "";
     ["ORIGEN", "DESTINO"].forEach((side) => {
       const s = sideEls[side];
-      setSelectValue(s.dgeneral, "");
-      setSelectValue(s.dauxiliar, "");
+      if (!canSeeAllAreas()) {
+        setSelectValue(s.dgeneral, CURRENT_DGENERAL_ID || "");
+        setSelectValue(s.dauxiliar, CURRENT_DAUXILIAR_ID || "");
+      } else {
+        setSelectValue(s.dgeneral, "");
+        setSelectValue(s.dauxiliar, "");
+      }
       setSelectValue(s.programa, "");
       setSelectValue(s.fuente, "");
       setSelectValue(s.proyecto, "");
@@ -785,6 +924,7 @@
       addMetaRow(side);
     });
     updateTotals();
+    scheduleQrRender();
   }
 
   async function loadRecon(id) {
@@ -844,6 +984,7 @@
         metas.forEach((m) => addMetaRow(side, m));
       });
       updateTotals();
+      scheduleQrRender();
     } catch (err) {
       uiError(err.message || "Error cargando reconducción");
     }
@@ -852,7 +993,7 @@
   async function guardarRecon() {
     if (!validateHeader()) return;
     const payload = {
-      oficio: el.rcOficio.value.trim(),
+      oficio: el.rcOficio.value.trim() || null,
       fecha_elaboracion: el.rcFecha.value || null,
       tipo_movimiento: el.rcTipo.value || null,
       justificacion: el.rcJustificacion.value || null,
@@ -878,8 +1019,10 @@
         });
         setReconId(resp?.cabecera?.id);
         setStatusBadge(resp?.cabecera?.estatus || "BORRADOR");
+        if (resp?.cabecera?.oficio) el.rcOficio.value = resp.cabecera.oficio;
       }
       await loadRecientes();
+      scheduleQrRender();
       uiSuccess("Reconducción guardada");
     } catch (err) {
       uiError(err.message || "Error guardando reconducción");
@@ -1017,10 +1160,13 @@
     el.btnCancelar.addEventListener("click", cancelarRecon);
     attachSideEvents("ORIGEN");
     attachSideEvents("DESTINO");
+    document.addEventListener("input", scheduleQrRender);
+    document.addEventListener("change", scheduleQrRender);
   }
 
   async function init() {
     try {
+      loadCurrentUser();
       await loadCatalogos();
       await loadSaldosGlobal();
       resetForm();

@@ -74,13 +74,24 @@
               <label for="fVista" class="form-label">Vista</label>
               <select id="fVista" class="form-select">
                 <option value="CAPITULO">Capítulo</option>
+                <option value="PARTIDA">Partidas</option>
               </select>
             </div>
             <div class="col-12 col-md-6 col-lg-2">
-              <label for="fArea" class="form-label">Área</label>
+              <label for="fArea" class="form-label">DG</label>
               <select id="fArea" class="form-select">
                 <option value="">Todas</option>
               </select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-2">
+              <label for="fDauxiliar" class="form-label">DA</label>
+              <select id="fDauxiliar" class="form-select">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-2">
+              <label for="fCapitulo" class="form-label">Capítulo</label>
+              <input id="fCapitulo" type="text" class="form-control" placeholder="Ej. 2000" />
             </div>
             <div class="col-12 col-md-6 col-lg-2">
               <label for="fPartida" class="form-label">Partida</label>
@@ -126,7 +137,7 @@
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 dp-table">
-              <thead>
+              <thead id="theadCapitulos">
                 <tr>
                   <th>Capítulo</th>
                   <th class="text-end">Presupuesto</th>

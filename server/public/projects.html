@@ -46,7 +46,6 @@
 
 
   <main class="projects-main container">
-    <!-- ROW KPI -->
     <div class="row g-3 mb-3 mt-5" id="kpi-row">
       <div class="col-12 col-md-3">
         <div class="card-kpi d-flex justify-content-between align-items-center">
@@ -97,7 +96,57 @@
       </div>
     </div>
 
-    <!-- CARD PRINCIPAL: LISTADO DE PROYECTOS -->
+    <div class="row g-3 mb-4" id="kpi-row-2">
+      <div class="col-12 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Reconducido total</div>
+            <div id="kpi-reconducido" class="value">—</div>
+          </div>
+          <div class="display-6">
+            <i class="bi bi-arrow-repeat"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Sobregiros</div>
+            <div id="kpi-sobregiros" class="value">—</div>
+          </div>
+          <div class="display-6">
+            <i class="bi bi-exclamation-triangle"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">Alertas de sobregiro</h6>
+          </div>
+          <div class="card-body">
+            <div id="overdraft-summary" class="text-secondary small mb-2">—</div>
+            <ul id="overdraft-list" class="list-group list-group-flush small"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">Top 5 por gasto</h6>
+          </div>
+          <div class="card-body">
+            <ul id="top-spend-list" class="list-group list-group-flush small"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card card-proyectos shadow-sm border-0">
       <div class="card-header bg-white">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
@@ -116,6 +165,41 @@
             </button>
           </div>
         </div>
+
+        <div class="row g-2 mt-3 align-items-end">
+          <div class="col-12 col-md-3">
+            <label class="form-label small text-secondary mb-1">DG</label>
+            <select id="filter-dg" class="form-select form-select-sm">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label small text-secondary mb-1">DA</label>
+            <select id="filter-da" class="form-select form-select-sm">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-2">
+            <label class="form-label small text-secondary mb-1">Ejercicio</label>
+            <input id="filter-year" type="number" min="2000" max="2100" class="form-control form-control-sm"
+              placeholder="2026">
+          </div>
+          <div class="col-12 col-md-2 d-grid">
+            <button id="btn-apply-filters" class="btn btn-sm btn-primary">
+              <i class="bi bi-funnel"></i> Aplicar
+            </button>
+          </div>
+          <div class="col-12 col-md-2 d-grid">
+            <button id="btn-clear-filters" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i> Limpiar
+            </button>
+          </div>
+          <div class="col-12 col-md-2 d-grid">
+            <button id="btn-export" class="btn btn-sm btn-outline-success">
+              <i class="bi bi-file-earmark-arrow-down"></i> Exportar
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="card-body p-0">
@@ -127,13 +211,14 @@
                 <th class="text-end">Partidas</th>
                 <th class="text-end">Presupuesto</th>
                 <th class="text-end">Gastado</th>
+                <th class="text-end">Reconducido</th>
                 <th class="text-end">Saldo</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="tbody-projects">
               <tr>
-                <td colspan="6" class="text-center py-4 text-secondary">
+                <td colspan="7" class="text-center py-4 text-secondary">
                   <div class="spinner-border spinner-border-sm me-2" role="status"></div>
                   Cargando proyectos…
                 </td>
@@ -146,6 +231,94 @@
       <div class="card-footer small text-secondary d-flex justify-content-between">
         <span id="summary-label">0 proyecto(s) mostrados.</span>
         <span>Actualizado automáticamente.</span>
+      </div>
+    </div>
+
+    <div id="project-detail-card" class="card shadow-sm border-0 mt-4 d-none">
+      <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+          <h5 id="detail-title" class="mb-0">Detalle de proyecto</h5>
+          <small id="detail-subtitle" class="text-secondary">—</small>
+        </div>
+        <div class="d-flex gap-2">
+          <button id="btn-open-project" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-box-arrow-up-right"></i> Abrir proyecto
+          </button>
+          <button id="btn-close-detail" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x-lg"></i> Cerrar
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Presupuesto</div>
+              <div id="detail-presupuesto" class="value">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Gastado</div>
+              <div id="detail-gastado" class="value">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Reconducido</div>
+              <div id="detail-reconducido" class="value">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Saldo</div>
+              <div id="detail-saldo" class="value">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <h6 class="text-secondary">Detalle por partida</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-light-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>Partida</th>
+                    <th class="text-end">Presupuesto</th>
+                    <th class="text-end">Gastado</th>
+                    <th class="text-end">Reconducido</th>
+                    <th class="text-end">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody id="detail-by-partida"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-6">
+            <h6 class="text-secondary">Comparativo mensual</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-light-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>Mes</th>
+                    <th class="text-end">Presupuesto</th>
+                    <th class="text-end">Gastado</th>
+                    <th class="text-end">Reconducido</th>
+                    <th class="text-end">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody id="detail-by-month"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <h6 class="text-secondary">Metas del proyecto</h6>
+          <div id="detail-metas" class="row g-2"></div>
+        </div>
       </div>
     </div>
   </main>

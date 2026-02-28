@@ -43,7 +43,22 @@
             <h5 class="mb-1">Registro de Entregas</h5>
             <div class="text-muted small">Selecciona un expediente y registra su entrega mensual</div>
           </div>
-          <div class="d-flex gap-2">
+          <div class="d-flex flex-wrap align-items-end gap-2">
+            <div style="min-width: 160px;">
+              <label class="form-label small mb-1">Folio (MM-XX)</label>
+              <input id="inputFolio" type="text" class="form-control form-control-sm" readonly />
+            </div>
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="checkbox" id="chkFolioDiferido" />
+              <label class="form-check-label small" for="chkFolioDiferido">Diferido</label>
+            </div>
+            <div id="wrapFolioDiferido" style="min-width: 90px;">
+              <label class="form-label small mb-1">D-XX</label>
+              <select id="selectFolioDiferido" class="form-select form-select-sm"></select>
+            </div>
+            <button id="btnGenerarFolio" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-arrow-repeat me-1"></i>Generar
+            </button>
             <button id="btnLimpiarEntrega" class="btn btn-outline-secondary btn-sm">
               <i class="bi bi-eraser me-1"></i>Nuevo
             </button>
@@ -110,22 +125,6 @@
             </div>
           </div>
           <div class="col-lg-4">
-            <label class="form-label small">Folio</label>
-            <input id="inputFolio" type="text" class="form-control form-control-sm readonly" readonly />
-          </div>
-          <div class="col-lg-8">
-            <label class="form-label small">Dependencia</label>
-            <input id="inputDependencia" type="text" class="form-control form-control-sm readonly" readonly />
-          </div>
-          <div class="col-lg-8">
-            <label class="form-label small">Concepto</label>
-            <input id="inputConcepto" type="text" class="form-control form-control-sm readonly" readonly />
-          </div>
-          <div class="col-lg-4">
-            <label class="form-label small">Importe Total</label>
-            <input id="inputImporte" type="text" class="form-control form-control-sm readonly" readonly />
-          </div>
-          <div class="col-lg-4">
             <label class="form-label small">Fecha Entrega Tesorería</label>
             <input id="inputFechaEntrega" type="date" class="form-control form-control-sm" />
           </div>
@@ -161,7 +160,7 @@
           <table class="table table-sm table-striped align-middle">
             <thead class="table-light">
               <tr>
-                <th>Folio</th>
+                <th id="thOrigenFolio">Folio</th>
                 <th>Dependencia</th>
                 <th>Concepto</th>
                 <th class="text-end">Importe</th>
@@ -181,42 +180,67 @@
             <div class="form-section-title">Entregas Registradas</div>
             <div class="text-muted small">Consulta por periodo o folio</div>
           </div>
-          <div class="d-flex flex-wrap gap-2">
-            <input id="filtroAnio" type="number" class="form-control form-control-sm" style="max-width: 120px;"
-              placeholder="Año" />
-            <select id="filtroMes" class="form-select form-select-sm" style="max-width: 160px;">
-              <option value="">Mes (todos)</option>
-              <option value="1">Enero</option>
-              <option value="2">Febrero</option>
-              <option value="3">Marzo</option>
-              <option value="4">Abril</option>
-              <option value="5">Mayo</option>
-              <option value="6">Junio</option>
-              <option value="7">Julio</option>
-              <option value="8">Agosto</option>
-              <option value="9">Septiembre</option>
-              <option value="10">Octubre</option>
-              <option value="11">Noviembre</option>
-              <option value="12">Diciembre</option>
-            </select>
-            <input id="filtroSearch" type="text" class="form-control form-control-sm" placeholder="Buscar..." />
-            <button id="btnRecargarListado" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-arrow-repeat me-1"></i>Recargar
-            </button>
+          <div class="entregas-filters">
+            <div class="entregas-filter">
+              <label class="form-label small mb-1">Año</label>
+              <input id="filtroAnio" type="number" class="form-control form-control-sm" placeholder="Año" />
+            </div>
+            <div class="entregas-filter">
+              <label class="form-label small mb-1">Mes</label>
+              <select id="filtroMes" class="form-select form-select-sm">
+                <option value="">Mes (todos)</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+              </select>
+            </div>
+            <div class="entregas-filter entregas-filter-wide">
+              <label class="form-label small mb-1">Buscar por No. de folio</label>
+              <div class="input-group input-group-sm">
+                <input id="filtroFolio" type="text" class="form-control form-control-sm"
+                  placeholder="Ej. 02-01 o ECA-2026-02-CP-0001" />
+                <button id="btnBuscarFolio" class="btn btn-primary btn-sm" type="button">
+                  <i class="bi bi-search me-1"></i>Buscar
+                </button>
+              </div>
+            </div>
+            <div class="entregas-filter entregas-filter-wide">
+              <label class="form-label small mb-1">Buscar por texto</label>
+              <input id="filtroSearch" type="text" class="form-control form-control-sm"
+                placeholder="Dependencia o concepto" />
+            </div>
+            <div class="entregas-filter">
+              <label class="form-label small mb-1">&nbsp;</label>
+              <button id="btnRecargarListado" class="btn btn-outline-secondary btn-sm w-100">
+                <i class="bi bi-arrow-repeat me-1"></i>Recargar
+              </button>
+            </div>
           </div>
         </div>
         <div class="table-responsive mt-3">
           <table class="table table-sm table-hover align-middle">
             <thead class="table-light">
               <tr>
-                <th>Periodo</th>
+                <th>No.</th>
                 <th>Folio</th>
                 <th>Dependencia</th>
+                <th>Concepto</th>
+                <th class="text-center">Comprometido</th>
+                <th class="text-center">Devengado</th>
                 <th class="text-end">Importe</th>
-                <th>Estatus</th>
-                <th>Entrega</th>
-                <th>Recibido</th>
-                <th class="text-center">Acción</th>
+                <th>Fecha de Entregado en Tesorería</th>
+                <th>Fecha de Recibido en Presupuesto</th>
+                <th class="text-center">Checks de Entrega</th>
+                <th>Observaciones</th>
               </tr>
             </thead>
             <tbody id="tbodyEntregas"></tbody>

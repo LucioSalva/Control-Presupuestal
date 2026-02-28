@@ -280,6 +280,27 @@ router.get("/", async (req, res) => {
   }
 });
 
+async function limpiarPresupuestoBase(_req, res) {
+  const client = await getClient();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "TRUNCATE TABLE public.presupuesto_base_partidas RESTART IDENTITY",
+    );
+    await client.query("COMMIT");
+    return res.json({ ok: true });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("[PRESUPUESTO_BASE_PARTIDAS][LIMPIAR]", error);
+    return res.status(500).json({ error: "Error al limpiar presupuesto base" });
+  } finally {
+    client.release();
+  }
+}
+
+router.post("/limpiar", limpiarPresupuestoBase);
+router.delete("/limpiar", limpiarPresupuestoBase);
+
 router.post("/upload-excel", upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Debes adjuntar un archivo en el campo file" });

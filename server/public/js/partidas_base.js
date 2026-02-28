@@ -341,6 +341,49 @@
     }
   }
 
+  async function limpiarBase() {
+    await Swal.fire(
+      "Advertencia",
+      "Esta accion eliminara todos los registros de presupuesto base.",
+      "warning",
+    );
+
+    const step1 = await Swal.fire({
+      title: "Estas seguro?",
+      text: "Si continuas no podras recuperar la informacion.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Estoy seguro",
+      cancelButtonText: "No estoy seguro",
+      reverseButtons: true,
+    });
+
+    if (!step1.isConfirmed) return;
+
+    const step2 = await Swal.fire({
+      title: "Confirmar borrado",
+      text: "Se eliminara todo el presupuesto base.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Confirmar",
+      cancelButtonText: "Cancelar",
+      reverseButtons: true,
+    });
+
+    if (!step2.isConfirmed) return;
+
+    await fetchJson(`${API}/api/presupuesto-base-partidas/limpiar`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      },
+    });
+
+    await Swal.fire("Listo", "La tabla fue limpiada.", "success");
+    await cargarListado();
+  }
+
   function limpiarFiltros() {
     const ids = ["fEjercicio", "fDgeneral", "fDauxiliar", "fFuente", "fPartida"];
     ids.forEach((id) => {
@@ -368,6 +411,12 @@
     document.getElementById("btnRecargar")?.addEventListener("click", () => {
       cargarListado().catch((error) => {
         Swal.fire("Error", error.message || "No se pudo recargar el listado", "error");
+      });
+    });
+
+    document.getElementById("btnLimpiarBase")?.addEventListener("click", () => {
+      limpiarBase().catch((error) => {
+        Swal.fire("Error", error.message || "No se pudo limpiar la base", "error");
       });
     });
 

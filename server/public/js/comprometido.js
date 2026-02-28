@@ -42,6 +42,11 @@
   // ---------------------------
   const $byName = (name) => document.querySelector(`[name="${name}"]`);
 
+  const getVal = (name) => {
+    const el = $byName(name);
+    return el ? el.value : "";
+  };
+
   const setVal = (name, value) => {
     const el = $byName(name);
     if (!el) return;
@@ -85,6 +90,61 @@
       throw new Error(msg);
     }
     return data;
+  }
+
+  let qrTimer = null;
+
+  function buildQrPayloadComp(payload) {
+    const folio = String(payload?.no_comprometido || "").trim();
+    const fecha = String(payload?.fecha || "").trim();
+    const dependencia = String(payload?.dependencia || "").trim();
+    const dependenciaAux = String(payload?.dependencia_aux || "").trim();
+    const folioSuf = String(payload?.no_suficiencia || "").trim();
+    const idProyecto = String(payload?.id_proyecto ?? "").trim();
+    const idFuente = String(payload?.id_fuente ?? "").trim();
+    const total = safeNumber(payload?.total);
+    if (!folio && !fecha && !dependencia && !dependenciaAux && !folioSuf) return "";
+    return JSON.stringify({
+      tipo: "CP",
+      folio,
+      folio_suficiencia: folioSuf,
+      fecha,
+      dependencia,
+      dependencia_aux: dependenciaAux,
+      id_proyecto: idProyecto,
+      id_fuente: idFuente,
+      total,
+    });
+  }
+
+  async function renderQrComp(payload) {
+    const container = document.getElementById("qr-comp");
+    if (!container) return;
+    const text = buildQrPayloadComp(payload);
+    if (!text || !window.QRCode?.toDataURL) {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+      return;
+    }
+    try {
+      const dataUrl = await window.QRCode.toDataURL(text, {
+        width: 120,
+        margin: 1,
+      });
+      const img = new Image();
+      img.src = dataUrl;
+      img.alt = "QR";
+      container.innerHTML = "";
+      container.appendChild(img);
+    } catch {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+    }
+  }
+
+  function scheduleQrRender(payload) {
+    if (qrTimer) clearTimeout(qrTimer);
+    qrTimer = setTimeout(() => {
+      renderQrComp(payload);
+    }, 120);
   }
 
   function getQueryId() {
@@ -619,6 +679,9 @@
       safeNumber(payload.cantidad_pago).toFixed(2),
     );
 
+    scheduleQrRender(payload);
+
+
     setReadonlyVal("meta", payload.meta || "");
     setReadonlyVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
     setReadonlyVal("iva", safeNumber(payload.iva).toFixed(2));
@@ -751,10 +814,19 @@
     };
 
     const normalizeCell = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
-    const sizeHeader = 9;
-    const sizeSmall = 7;
-    const sizeTiny = 6;
-    const sizeDG = 12;
+    const sizeDG = 20;
+    const sizeClaveProg = 9;
+    const sizeClaveProgNombre = 9;
+    const sizeFuenteClave = 7;
+    const sizeFuenteNombre = 7;
+    const sizeFecha = 7;
+    const sizeRolesLabel = 7;
+    const sizeFirmas = 7;
+    const sizeDetalle = 7;
+    const sizeTotales = 7;
+    const sizeCantidadLetra = 6;
+    const sizeMeta = 7;
+    const sizeFolios = 7;
 
     // Fuente para apariencias
     try {
@@ -786,7 +858,7 @@
     setTextByPattern(
       ["clave", "programática"],
       normalizeCell(payload.clave_programatica || ""),
-      sizeHeader,
+      sizeClaveProg,
       PDFLib?.TextAlignment?.Center,
     );
     const proyLabel = getProyectoLabel(payload.id_proyecto) || "";
@@ -794,7 +866,7 @@
     setTextByPattern(
       ["nombre", "clave", "programática"],
       claveProgDesc,
-      sizeHeader,
+      sizeClaveProgNombre,
       PDFLib?.TextAlignment?.Center,
     );
 
@@ -807,42 +879,77 @@
       fuenteClave = String(c || "").trim();
       fuenteDesc = rest.join(" - ").trim();
     }
-    setTextByPattern(["fuente", "financiamiento"], fuenteClave, sizeSmall, PDFLib?.TextAlignment?.Center);
-    setTextByPattern(["nombre", "f.f"], fuenteDesc, sizeSmall, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["fuente", "financiamiento"], fuenteClave, sizeFuenteClave, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["nombre", "f.f"], fuenteDesc, sizeFuenteNombre, PDFLib?.TextAlignment?.Center);
 
     // Fecha
     try {
       const iso = payload.fecha;
       const [y, m, d] = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-") : ["", "", ""];
-      setTextByPattern(["fechadia"], d, sizeSmall);
-      setTextByPattern(["fechames"], m, sizeSmall);
-      setTextByPattern(["fechayear"], y, sizeSmall);
+      setTextByPattern(["fechadia"], d, sizeFecha);
+      setTextByPattern(["fechames"], m, sizeFecha);
+      setTextByPattern(["fechayear"], y, sizeFecha);
     } catch {}
 
     // Encabezados de solicitante y firmantes
     const roles = await (async () => {
-      if (!window.Swal) return {};
+      const getRolesStore = () => {
+        try {
+          const raw = localStorage.getItem("cp_comp_roles") || "{}";
+          const obj = JSON.parse(raw);
+          return {
+            enlace_label: "",
+            enlace_firma: "",
+            area_label: "",
+            area_firma: "",
+            direccion_firma: "",
+            ...(obj && typeof obj === "object" ? obj : {}),
+          };
+        } catch {
+          return {
+            enlace_label: "",
+            enlace_firma: "",
+            area_label: "",
+            area_firma: "",
+            direccion_firma: "",
+          };
+        }
+      };
+      const saveRolesStore = (map) => {
+        try {
+          localStorage.setItem("cp_comp_roles", JSON.stringify(map || {}));
+        } catch {}
+      };
+      const roles = getRolesStore();
+      const missing = [
+        "enlace_label",
+        "enlace_firma",
+        "area_label",
+        "area_firma",
+        "direccion_firma",
+      ].filter((k) => !String(roles[k] || "").trim());
+      if (!window.Swal || !missing.length) return roles;
       const html = `
         <div class="text-start">
           <p class="mb-2">Captura encabezados y firmantes (Comprometido):</p>
           <div class="row g-2">
             <div class="col-8">
               <label class="form-label small">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
-              <input type="text" class="form-control form-control-sm" id="roles_enlace_label" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA">
+              <input type="text" class="form-control form-control-sm" id="roles_enlace_label" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA" value="${roles.enlace_label || ""}">
             </div>
             <div class="col-4">
               <label class="form-label small">Firmante Enlace</label>
-              <input type="text" class="form-control form-control-sm" id="roles_enlace_firma" placeholder="Nombre del firmante">
+              <input type="text" class="form-control form-control-sm" id="roles_enlace_firma" placeholder="Nombre del firmante" value="${roles.enlace_firma || ""}">
             </div>
           </div>
           <div class="row g-2 mt-2">
             <div class="col-8">
               <label class="form-label small">ÁREA SOLICITANTE</label>
-              <input type="text" class="form-control form-control-sm" id="roles_area_label" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS...">
+              <input type="text" class="form-control form-control-sm" id="roles_area_label" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS..." value="${roles.area_label || ""}">
             </div>
             <div class="col-4">
               <label class="form-label small">Firmante Área</label>
-              <input type="text" class="form-control form-control-sm" id="roles_area_firma" placeholder="Nombre del firmante">
+              <input type="text" class="form-control form-control-sm" id="roles_area_firma" placeholder="Nombre del firmante" value="${roles.area_firma || ""}">
             </div>
           </div>
           <div class="row g-2 mt-2">
@@ -852,7 +959,7 @@
             </div>
             <div class="col-4">
               <label class="form-label small">Firmante Dirección</label>
-              <input type="text" class="form-control form-control-sm" id="roles_direccion_firma" placeholder="Nombre del firmante">
+              <input type="text" class="form-control form-control-sm" id="roles_direccion_firma" placeholder="Nombre del firmante" value="${roles.direccion_firma || ""}">
             </div>
           </div>
         </div>`;
@@ -865,13 +972,18 @@
         showCancelButton: true,
       });
       if (!res.isConfirmed) throw new Error("Cancelado por el usuario.");
-      return {
-        enlace_label: String(document.getElementById("roles_enlace_label")?.value || "").trim(),
-        enlace_firma: String(document.getElementById("roles_enlace_firma")?.value || "").trim(),
-        area_label: String(document.getElementById("roles_area_label")?.value || "").trim(),
-        area_firma: String(document.getElementById("roles_area_firma")?.value || "").trim(),
-        direccion_firma: String(document.getElementById("roles_direccion_firma")?.value || "").trim(),
-      };
+      roles.enlace_label =
+        String(document.getElementById("roles_enlace_label")?.value || "").trim();
+      roles.enlace_firma =
+        String(document.getElementById("roles_enlace_firma")?.value || "").trim();
+      roles.area_label =
+        String(document.getElementById("roles_area_label")?.value || "").trim();
+      roles.area_firma =
+        String(document.getElementById("roles_area_firma")?.value || "").trim();
+      roles.direccion_firma =
+        String(document.getElementById("roles_direccion_firma")?.value || "").trim();
+      saveRolesStore(roles);
+      return roles;
     })();
 
     const collectCategoryFields = () => {
@@ -895,9 +1007,9 @@
 
     try {
       const cats = collectCategoryFields();
-      if (roles.enlace_label) cats.enlace.forEach((nm) => setTextSafe(nm, roles.enlace_label, sizeSmall, PDFLib?.TextAlignment?.Center));
-      if (roles.area_label) cats.area.forEach((nm) => setTextSafe(nm, roles.area_label, sizeSmall, PDFLib?.TextAlignment?.Center));
-      cats.direccion.forEach((nm) => setTextSafe(nm, depGeneralName, sizeSmall, PDFLib?.TextAlignment?.Center));
+      if (roles.enlace_label) cats.enlace.forEach((nm) => setTextSafe(nm, roles.enlace_label, sizeRolesLabel, PDFLib?.TextAlignment?.Center));
+      if (roles.area_label) cats.area.forEach((nm) => setTextSafe(nm, roles.area_label, sizeRolesLabel, PDFLib?.TextAlignment?.Center));
+      cats.direccion.forEach((nm) => setTextSafe(nm, depGeneralName, sizeRolesLabel, PDFLib?.TextAlignment?.Center));
     } catch {}
 
     const findFirmasByName = () => {
@@ -917,9 +1029,9 @@
 
     try {
       const m = findFirmasByName();
-      m.firma1.forEach((nm) => roles.enlace_firma && setTextSafe(nm, roles.enlace_firma, sizeSmall, PDFLib?.TextAlignment?.Center));
-      m.firma2.forEach((nm) => roles.area_firma && setTextSafe(nm, roles.area_firma, sizeSmall, PDFLib?.TextAlignment?.Center));
-      m.firma3.forEach((nm) => roles.direccion_firma && setTextSafe(nm, roles.direccion_firma, sizeSmall, PDFLib?.TextAlignment?.Center));
+      m.firma1.forEach((nm) => roles.enlace_firma && setTextSafe(nm, roles.enlace_firma, sizeFirmas, PDFLib?.TextAlignment?.Center));
+      m.firma2.forEach((nm) => roles.area_firma && setTextSafe(nm, roles.area_firma, sizeFirmas, PDFLib?.TextAlignment?.Center));
+      m.firma3.forEach((nm) => roles.direccion_firma && setTextSafe(nm, roles.direccion_firma, sizeFirmas, PDFLib?.TextAlignment?.Center));
     } catch {}
 
     // Detalle de partidas (tabla)
@@ -942,28 +1054,132 @@
     const linesDesc = padLines(detalleRows.map((r) => cut(String(r?.descripcion || ""), 52)), MAX_ROWS);
     const linesImp = padLines(detalleRows.map((r) => safeNumber(r?.importe).toFixed(2)), MAX_ROWS);
 
-    setTextSafe("No", linesNo.join("\n"), sizeSmall);
-    setTextSafe("CLAVE", linesClave.join("\n"), sizeSmall);
-    setTextSafe("CONCEPTO DE PARTIDA", linesConcepto.join("\n"), sizeSmall);
-    setTextSafe("JUSTIFICACIÓN", linesJust.join("\n"), sizeSmall);
-    setTextSafe("DESCRIPCIÓN", linesDesc.join("\n"), sizeSmall);
-    setTextSafe("IMPORTE", linesImp.join("\n"), sizeSmall);
+    setTextSafe("No", linesNo.join("\n"), sizeDetalle);
+    setTextSafe("CLAVE", linesClave.join("\n"), sizeDetalle);
+    setTextSafe("CONCEPTO DE PARTIDA", linesConcepto.join("\n"), sizeDetalle);
+    setTextSafe("JUSTIFICACIÓN", linesJust.join("\n"), sizeDetalle);
+    setTextSafe("DESCRIPCIÓN", linesDesc.join("\n"), sizeDetalle);
+    setTextSafe("IMPORTE", linesImp.join("\n"), sizeDetalle);
 
     // Totales y meta
-    setTextSafe("subtotal", safeNumber(payload.subtotal).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
-    setTextSafe("IVA", safeNumber(payload.iva).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
-    setTextSafe("ISR", safeNumber(payload.isr).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
-    setTextSafe("IEPS", safeNumber(payload.ieps).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
-    setTextSafe("PENSION", safeNumber(payload.pension_total).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
-    setTextSafe("total", safeNumber(payload.total).toFixed(2), sizeSmall, PDFLib?.TextAlignment?.Right);
-    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "", sizeTiny);
-    setTextSafe("Meta", payload.meta || "", sizeSmall);
+    setTextSafe("subtotal", safeNumber(payload.subtotal).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
+    setTextSafe("IVA", safeNumber(payload.iva).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
+    setTextSafe("ISR", safeNumber(payload.isr).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
+    setTextSafe("IEPS", safeNumber(payload.ieps).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
+    setTextSafe("PENSION", safeNumber(payload.pension_total).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
+    setTextSafe("total", safeNumber(payload.total).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
+    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "", sizeCantidadLetra);
+    setTextSafe("Meta", payload.meta || "", sizeMeta);
+
+    try {
+      const fields = form.getFields();
+      const setSizeByName = (name, size) => {
+        try {
+          const f = form.getTextField(name);
+          if (typeof f.setFontSize === "function") f.setFontSize(size);
+        } catch {}
+      };
+      const setSizeByNames = (names, size) => {
+        for (const nm of names || []) setSizeByName(nm, size);
+      };
+      const setSizeByPattern = (frags, size) => {
+        const lowerFrags = (frags || []).map((s) => String(s || "").toLowerCase());
+        for (const f of fields) {
+          try {
+            const nm = String(f.getName() || "");
+            const nmLower = nm.toLowerCase();
+            if (lowerFrags.every((frag) => nmLower.includes(frag))) {
+              if (typeof f.setFontSize === "function") f.setFontSize(size);
+            }
+          } catch {}
+        }
+      };
+      setSizeByPattern(["dependencia", "general"], sizeDG);
+      setSizeByPattern(["clave", "programática"], sizeClaveProg);
+      setSizeByPattern(["nombre", "clave", "programática"], sizeClaveProgNombre);
+      setSizeByPattern(["fuente", "financiamiento"], sizeFuenteClave);
+      setSizeByPattern(["nombre", "f.f"], sizeFuenteNombre);
+      setSizeByPattern(["fechadia"], sizeFecha);
+      setSizeByPattern(["fechames"], sizeFecha);
+      setSizeByPattern(["fechayear"], sizeFecha);
+      setSizeByPattern(["firma1"], sizeFirmas);
+      setSizeByPattern(["firma2"], sizeFirmas);
+      setSizeByPattern(["firma3"], sizeFirmas);
+      setSizeByPattern(["subtotal"], sizeTotales);
+      setSizeByPattern(["iva"], sizeTotales);
+      setSizeByPattern(["isr"], sizeTotales);
+      setSizeByPattern(["ieps"], sizeTotales);
+      setSizeByPattern(["pension"], sizeTotales);
+      setSizeByPattern(["total"], sizeTotales);
+      setSizeByPattern(["cantidad", "letra"], sizeCantidadLetra);
+      setSizeByPattern(["meta"], sizeMeta);
+      setSizeByPattern(["no", "comprometido"], sizeFolios);
+      setSizeByNames(
+        [
+          "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+          "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
+        ],
+        sizeClaveProg,
+      );
+      setSizeByNames(
+        [
+          "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+          "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
+        ],
+        sizeClaveProgNombre,
+      );
+      setSizeByNames(["FUENTE DE FINANCIAMIENTO"], sizeFuenteClave);
+      setSizeByNames(["NOMBRE F.F"], sizeFuenteNombre);
+      setSizeByNames(["fechadia", "fechames", "fechayear"], sizeFecha);
+      setSizeByNames(
+        [
+          "No",
+          "CLAVE",
+          "CONCEPTO DE PARTIDA",
+          "JUSTIFICACIÓN",
+          "DESCRIPCIÓN",
+          "IMPORTE",
+        ],
+        sizeDetalle,
+      );
+      setSizeByNames(
+        ["subtotal", "IVA", "ISR", "IEPS", "PENSION", "total"],
+        sizeTotales,
+      );
+      setSizeByNames(["CANTIDAD CON LETRA:", "Meta"], sizeCantidadLetra);
+      setSizeByNames(["Meta"], sizeMeta);
+    } catch {}
+
+    try {
+      const font =
+        (PDFLib?.StandardFonts &&
+          (await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica))) ||
+        undefined;
+      form.updateFieldAppearances(font);
+    } catch {}
 
     try {
       form.flatten();
     } catch (e) {
       console.warn("[COMP][PDF] flatten falló:", e?.message || e);
     }
+
+    try {
+      const qrText = buildQrPayloadComp(payload);
+      if (qrText && window.QRCode?.toDataURL) {
+        const dataUrl = await window.QRCode.toDataURL(qrText, {
+          width: 330,
+          margin: 1,
+        });
+        const bytes = await fetch(dataUrl).then((r) => r.arrayBuffer());
+        const img = await pdfDoc.embedPng(bytes);
+        const page = pdfDoc.getPages()[0];
+        const size = 110;
+        const x = page.getWidth() - size - 135;
+        const y = page.getHeight() - size - 240;
+        page.drawImage(img, { x, y, width: size, height: size });
+      }
+    } catch {}
 
     const outBytes = await pdfDoc.save();
     const blob = new Blob([outBytes], { type: "application/pdf" });
@@ -999,7 +1215,7 @@
       "COMPROMETIDO";
     a.download = `${folio}.pdf`;
     try {
-      setTextByPattern(["no", "comprometido"], String(payload.no_comprometido || ""), sizeSmall, PDFLib?.TextAlignment?.Center);
+      setTextByPattern(["no", "comprometido"], String(payload.no_comprometido || ""), sizeFolios, PDFLib?.TextAlignment?.Center);
     } catch {}
     document.body.appendChild(a);
     a.click();
@@ -1171,6 +1387,9 @@
     const state = { payload: null };
 
     const hasInitial = !!getQueryId();
+
+    document.addEventListener("input", () => scheduleQrRender(state.payload));
+    document.addEventListener("change", () => scheduleQrRender(state.payload));
 
 if (hasSwal() && hasInitial) {
   Swal.fire({

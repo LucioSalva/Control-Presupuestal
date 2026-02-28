@@ -3,7 +3,7 @@ body {
   min-height: 100vh;
   margin: 0;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, #1f2937, #111827);
+  background: #ecd798;
 }
 
 /* Contenedor centrado */
@@ -22,6 +22,10 @@ body {
   border-radius: 18px;
   overflow: hidden;
   animation: fadeUp .6s ease-out;
+  box-shadow:
+    inset 0 8px 18px rgba(0,0,0,.18),
+    inset 0 -8px 18px rgba(255,255,255,.55),
+    0 8px 24px rgba(0,0,0,.12);
 }
 
 @keyframes fadeUp {
@@ -54,6 +58,29 @@ body {
   border-radius: 14px;
   height: 52px;
   font-weight: 600;
+}
+
+.btn-primary{
+  background-color: #691c32 !important;
+  border-color: #691c32 !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover{
+  background-color: #5a1629 !important;
+  border-color: #5a1629 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-secondary{
+  border-color: #691c32 !important;
+  color: #691c32 !important;
+}
+
+.btn-outline-secondary:hover{
+  background-color: #691c32 !important;
+  border-color: #691c32 !important;
+  color: #ffffff !important;
 }
 
 /* Alert */

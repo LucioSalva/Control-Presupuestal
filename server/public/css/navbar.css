@@ -1,7 +1,7 @@
 :root {
-  --cp-gold: #bc955c;
-  --cp-gold-dark: #bc955c; /* mismo color, sin contraste */
-  --cp-text: #495057;
+  --cp-gold: #691c32;
+  --cp-gold-dark: #5a1629;
+  --cp-text: #ffffff;
   --cp-nav-main-h: 56px;
   --cp-nav-tabs-h: 44px;
 }
@@ -10,10 +10,53 @@ body {
   padding-top: calc(var(--cp-nav-main-h) + var(--cp-nav-tabs-h));
 }
 
+.btn-primary,
+.btn-success,
+.btn-info,
+.btn-warning,
+.btn-secondary,
+.btn-dark {
+  background-color: var(--cp-gold) !important;
+  border-color: var(--cp-gold) !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover,
+.btn-success:hover,
+.btn-info:hover,
+.btn-warning:hover,
+.btn-secondary:hover,
+.btn-dark:hover {
+  background-color: var(--cp-gold-dark) !important;
+  border-color: var(--cp-gold-dark) !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-info,
+.btn-outline-warning,
+.btn-outline-secondary,
+.btn-outline-dark {
+  border-color: var(--cp-gold) !important;
+  color: var(--cp-gold) !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-success:hover,
+.btn-outline-info:hover,
+.btn-outline-warning:hover,
+.btn-outline-secondary:hover,
+.btn-outline-dark:hover {
+  background-color: var(--cp-gold) !important;
+  border-color: var(--cp-gold) !important;
+  color: #ffffff !important;
+}
+
 /* CONTENEDOR DE TABS */
 .cp-tabs-nav {
-  background: #ffffff !important;
-  border-bottom: 2px solid var(--cp-gold);
+  background: var(--cp-gold) !important;
+  border-bottom: 2px solid var(--cp-gold-dark);
   padding: 0;
   position: fixed;
   top: var(--cp-nav-main-h);
@@ -39,15 +82,15 @@ body {
 /* TAB NORMAL */
 .cp-tabs-nav .nav-link {
   border-radius: 0 !important;
-  background: #ffffff !important;
-  color: var(--cp-text) !important;
+  background: var(--cp-gold) !important;
+  color: #ffffff !important;
 
   padding: 12px 20px !important;
   font-size: 14px !important;
   font-weight: 700 !important;
 
   border: none !important;
-  border-right: 1px solid #e0e0e0 !important;
+  border-right: 1px solid var(--cp-gold-dark) !important;
 
   box-shadow: none !important;
   transition:
@@ -62,16 +105,16 @@ body {
 
 /* HOVER */
 .cp-tabs-nav .nav-link:hover {
-  background: #f5f5f5 !important;
-  color: var(--cp-gold) !important;
+  background: var(--cp-gold-dark) !important;
+  color: #ffffff !important;
 }
 
 /* ✅ ACTIVA (LA BUENA) */
 .cp-tabs-nav .nav-link.active {
-  background: var(--cp-gold) !important;
+  background: var(--cp-gold-dark) !important;
   color: #ffffff !important;
 
-  border-right: 1px solid var(--cp-gold) !important;
+  border-right: 1px solid var(--cp-gold-dark) !important;
   box-shadow: none !important;
 }
 
@@ -106,7 +149,7 @@ body {
 }
 
 .cp-main-nav .navbar-brand {
-  color: #000 !important; /* si lo quieres negro como en tu captura */
+  color: #ffffff !important;
   font-weight: 700;
 }
 

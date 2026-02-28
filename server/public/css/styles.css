@@ -3,6 +3,8 @@
    ========================= */
 :root {
   --cp-bg: #f5f5f5;
+  --cp-vino: #691c32;
+  --cp-vino-dark: #5a1629;
 
   --cp-font-mobile: 12px;
   --cp-font-tablet: 13px;
@@ -30,6 +32,45 @@ body {
   margin: 0;
   /* OJO: el padding-top lo controla navbar.css
      para que no haya conflicto con las barras fijas */
+}
+
+.btn-primary,
+.btn-success,
+.btn-info,
+.btn-warning,
+.btn-secondary {
+  background-color: var(--cp-vino) !important;
+  border-color: var(--cp-vino) !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover,
+.btn-success:hover,
+.btn-info:hover,
+.btn-warning:hover,
+.btn-secondary:hover {
+  background-color: var(--cp-vino-dark) !important;
+  border-color: var(--cp-vino-dark) !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-info,
+.btn-outline-warning,
+.btn-outline-secondary {
+  border-color: var(--cp-vino) !important;
+  color: var(--cp-vino) !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-success:hover,
+.btn-outline-info:hover,
+.btn-outline-warning:hover,
+.btn-outline-secondary:hover {
+  background-color: var(--cp-vino) !important;
+  border-color: var(--cp-vino) !important;
+  color: #ffffff !important;
 }
 
 /* Contenedor principal de formularios */
@@ -147,4 +188,116 @@ body {
     max-width: 100%;
     padding: 0;
   }
+}
+
+.theme-projects {
+  background: #f7f5f2;
+}
+
+.projects-main {
+  padding-bottom: 40px;
+}
+
+.card-kpi {
+  background: #ffffff;
+  border: 1px solid #e6e6e6;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+  min-height: 92px;
+}
+
+.card-kpi .title {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.card-kpi .value {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.table-light-custom thead th {
+  background: #f1f3f5;
+}
+
+.table-light-custom tbody td {
+  vertical-align: middle;
+}
+
+.badge-saldo-negativo {
+  background: #dc3545;
+  color: #ffffff;
+}
+
+.badge-saldo-positivo {
+  background: #198754;
+  color: #ffffff;
+}
+
+.row-saldo-negativo {
+  background: rgba(220, 53, 69, 0.05);
+}
+
+.pill-project {
+  letter-spacing: 0.3px;
+}
+
+.mini-kpi {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e9ecef;
+}
+
+.mini-kpi .label {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.mini-kpi .value {
+  font-weight: 700;
+}
+
+.meta-card {
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.meta-card .meta-title {
+  font-weight: 600;
+}
+
+.meta-card .meta-sub {
+  font-size: 0.8rem;
+}
+
+.cp-qr-card {
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 6px;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.cp-qr-label {
+  font-size: 10px;
+  color: #6c757d;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.cp-qr-img img {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+}
+
+.cp-qr-empty {
+  font-size: 10px;
+  color: #adb5bd;
 }
