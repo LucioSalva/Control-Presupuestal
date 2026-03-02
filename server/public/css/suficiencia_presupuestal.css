@@ -144,13 +144,13 @@ svg {
 
 .form-title {
   text-align: center;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
 .sub-title {
   text-align: center;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ======================================================
@@ -177,7 +177,7 @@ svg {
 
 .table.formato th {
   background: #e9ecef;
-  font-weight: 800;
+  font-weight: 700;
   white-space: normal;
   word-break: keep-all;
 }

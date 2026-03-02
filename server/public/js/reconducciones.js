@@ -97,6 +97,15 @@
     return isGodUser() || isAdminUser() || isL00117User();
   }
 
+  function isAllowedReconDay() {
+    const day = new Date().getDay();
+    return day >= 1 && day <= 4;
+  }
+
+  function isReconAccessAllowed() {
+    return isL00117User() || isAllowedReconDay();
+  }
+
   const el = {
     filtroEstatus: document.getElementById("filtro-estatus"),
     tablaBody: document.getElementById("tabla-recon-body"),
@@ -196,6 +205,15 @@
   const uiSuccess = (m, t = "Listo") => uiAlert(m, "success", t);
   const uiError = (m, t = "Error") => uiAlert(m, "error", t);
   const uiWarn = (m, t = "Atención") => uiAlert(m, "warning", t);
+
+  function disableReconUI() {
+    const controls = Array.from(
+      document.querySelectorAll("input, select, textarea, button")
+    );
+    controls.forEach((c) => {
+      c.disabled = true;
+    });
+  }
 
   async function fetchJson(url, options = {}) {
     const r = await fetch(url, options);
@@ -1167,6 +1185,13 @@
   async function init() {
     try {
       loadCurrentUser();
+      if (!isReconAccessAllowed()) {
+        await uiWarn(
+          "Reconducciones está habilitado únicamente de lunes a jueves. El área L00 117 es la excepción."
+        );
+        disableReconUI();
+        return;
+      }
       await loadCatalogos();
       await loadSaldosGlobal();
       resetForm();

@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap");
+
 /* =========================
    VARIABLES (CSS moderno)
    ========================= */
@@ -30,8 +32,19 @@ body {
   font-size: var(--cp-font-mobile);
   background-color: var(--cp-bg);
   margin: 0;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400;
   /* OJO: el padding-top lo controla navbar.css
      para que no haya conflicto con las barras fijas */
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
 }
 
 .btn-primary,
@@ -86,7 +99,7 @@ body {
 /* Títulos y textos */
 .form-title {
   text-align: center;
-  font-weight: bold;
+  font-weight: 700;
   text-transform: uppercase;
   font-size: 14px;
 }
@@ -104,7 +117,7 @@ body {
 
 .table-header {
   background-color: #e9ecef;
-  font-weight: bold;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -210,6 +223,7 @@ body {
 .card-kpi .title {
   font-size: 0.85rem;
   color: #6c757d;
+  font-weight: 700;
 }
 
 .card-kpi .value {
@@ -253,6 +267,7 @@ body {
 .mini-kpi .label {
   font-size: 0.75rem;
   color: #6c757d;
+  font-weight: 700;
 }
 
 .mini-kpi .value {
@@ -267,7 +282,7 @@ body {
 }
 
 .meta-card .meta-title {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .meta-card .meta-sub {
@@ -285,10 +300,14 @@ body {
 .cp-qr-label {
   font-size: 10px;
   color: #6c757d;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.2px;
   text-transform: uppercase;
   margin-bottom: 4px;
+}
+
+.kpi-title {
+  font-weight: 700;
 }
 
 .cp-qr-img img {
