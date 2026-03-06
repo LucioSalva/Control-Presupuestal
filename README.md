@@ -41,6 +41,15 @@ Proveer una plataforma unificada para el **registro, consulta, análisis y contr
 
 ---
 
+## 🔐 Regla Partidas Mil y Capítulo Mil
+
+- Visualización exclusiva para DG L00 con DA 117 y DG E00
+- Catálogos, dashboards y detalles filtran partidas 1xxx para otras áreas
+- IVA no aplica a partidas mil en suficiencias; otras partidas conservan IVA
+- Intentos no autorizados quedan registrados en auditoría de accesos
+
+---
+
 ## 🛠️ Arquitectura Tecnológica
 
 ### Frontend

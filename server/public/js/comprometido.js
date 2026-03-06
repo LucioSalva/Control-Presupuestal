@@ -7,6 +7,7 @@
   // ---------------------------
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnRecargar = document.getElementById("btn-recargar");
+  const btnNuevoComp = document.getElementById("btn-nuevo-comp");
   const detalleBody = document.getElementById("detalleBody");
 
   const tipoDocumento = window.location.pathname.includes("devengado")
@@ -94,6 +95,12 @@
 
   let qrTimer = null;
 
+  function canRenderQrComp(payload) {
+    const id = Number(payload?.id_comprometido || 0);
+    const folio = String(payload?.no_comprometido || "").trim();
+    return id > 0 || folio !== "";
+  }
+
   function buildQrPayloadComp(payload) {
     const folio = String(payload?.no_comprometido || "").trim();
     const fecha = String(payload?.fecha || "").trim();
@@ -120,6 +127,10 @@
   async function renderQrComp(payload) {
     const container = document.getElementById("qr-comp");
     if (!container) return;
+    if (!canRenderQrComp(payload)) {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+      return;
+    }
     const text = buildQrPayloadComp(payload);
     if (!text || !window.QRCode?.toDataURL) {
       container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
@@ -453,9 +464,14 @@
       const id = Number(p.id);
       if (!Number.isFinite(id)) return;
 
-      const clave = String(p.clave ?? "").trim();
+      let clave = String(p.clave ?? "").trim();
       const conac = String(p.conac ?? "").trim();
       const desc = String(p.descripcion ?? "").trim();
+
+      const digits = clave.replace(/[^\d]/g, "");
+      if (digits && digits.length <= 10) {
+        clave = digits.padStart(10, "0");
+      }
 
       const claveConac = conac ? `${clave} ${conac}` : clave;
       const label = `${claveConac} - ${desc}`.trim();
@@ -679,7 +695,7 @@
       safeNumber(payload.cantidad_pago).toFixed(2),
     );
 
-    scheduleQrRender(payload);
+    if (canRenderQrComp(payload)) scheduleQrRender(payload);
 
 
     setReadonlyVal("meta", payload.meta || "");
@@ -1233,6 +1249,7 @@
       document.getElementById("txtNumeroSuf");
 
     if (btnDescargarPdf) btnDescargarPdf.type = "button";
+    if (btnNuevoComp) btnNuevoComp.type = "button";
     updateDownloadLock(state);
 
     btnBuscarSuf?.addEventListener("click", async (e) => {
@@ -1255,6 +1272,22 @@
         console.error("[COMPROMETIDO] buscar suf error:", err);
         await uiError(err?.message || "Error en la búsqueda", "Buscar");
       }
+    });
+
+    btnNuevoComp?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const ok = await uiConfirm({
+        title: "Nuevo",
+        html: `
+          <div style="font-size:13px; text-align:left;">
+            Se perderán los cambios no guardados. ¿Deseas limpiar el formulario?
+          </div>
+        `,
+        confirmText: "Sí, limpiar",
+        cancelText: "Cancelar",
+      });
+      if (!ok) return;
+      window.location.href = window.location.pathname;
     });
 
     txtNumeroSuf?.addEventListener("keydown", (e) => {
@@ -1341,6 +1374,7 @@
           "Guardado",
         );
         updateDownloadLock(state);
+        scheduleQrRender(state.payload);
       } catch (err) {
         console.error("[COMPROMETIDO] save error:", err);
         await uiError(err?.message || "Error al guardar comprometido");
@@ -1387,9 +1421,6 @@
     const state = { payload: null };
 
     const hasInitial = !!getQueryId();
-
-    document.addEventListener("input", () => scheduleQrRender(state.payload));
-    document.addEventListener("change", () => scheduleQrRender(state.payload));
 
 if (hasSwal() && hasInitial) {
   Swal.fire({

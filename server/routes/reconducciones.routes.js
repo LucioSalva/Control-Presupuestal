@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import { query, getClient } from "../db.js";
 import { computeSaldo, getActorId } from "../utils/helpers.js";
 
@@ -26,6 +27,180 @@ async function isUserL00117(req) {
 
 function canSeeAllAreas(role, isL00117) {
   return role !== "AREA" || isL00117;
+}
+
+function normalizeClave(input) {
+  return String(input ?? "").trim().toUpperCase();
+}
+
+async function getUserAreaClaves(req) {
+  const ids = getAreaIds(req);
+  if (!ids) return null;
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [ids.idDg]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [ids.idDa]),
+  ]);
+  const dg = normalizeClave(rDg.rows?.[0]?.clave || "");
+  const da = normalizeClave(rDa.rows?.[0]?.clave || "");
+  if (!dg || !da) return null;
+  return { dg, da };
+}
+
+function buildClave() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 6; i += 1) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+async function ensureReconClaveTable(client = null) {
+  const q = `
+    CREATE TABLE IF NOT EXISTS public.reconducciones_claves (
+      id serial PRIMARY KEY,
+      clave varchar(6) NOT NULL,
+      dg_clave varchar(3) NOT NULL,
+      da_clave varchar(3) NOT NULL,
+      created_at timestamp without time zone NOT NULL DEFAULT NOW(),
+      created_by integer,
+      status varchar(10) NOT NULL DEFAULT 'ACTIVA',
+      used_at timestamp without time zone,
+      used_by integer
+    )
+  `;
+  if (client) {
+    await client.query(q);
+    await client.query(
+      `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS dg_clave varchar(3) NOT NULL DEFAULT ''`
+    );
+    await client.query(
+      `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS da_clave varchar(3) NOT NULL DEFAULT ''`
+    );
+    await client.query(
+      `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS status varchar(10) NOT NULL DEFAULT 'ACTIVA'`
+    );
+    await client.query(
+      `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS used_at timestamp without time zone`
+    );
+    await client.query(
+      `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS used_by integer`
+    );
+    await client.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS reconducciones_claves_clave_key ON public.reconducciones_claves (clave)`
+    );
+    return;
+  }
+  await query(q);
+  await query(
+    `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS dg_clave varchar(3) NOT NULL DEFAULT ''`
+  );
+  await query(
+    `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS da_clave varchar(3) NOT NULL DEFAULT ''`
+  );
+  await query(
+    `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS status varchar(10) NOT NULL DEFAULT 'ACTIVA'`
+  );
+  await query(
+    `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS used_at timestamp without time zone`
+  );
+  await query(
+    `ALTER TABLE public.reconducciones_claves ADD COLUMN IF NOT EXISTS used_by integer`
+  );
+  await query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS reconducciones_claves_clave_key ON public.reconducciones_claves (clave)`
+  );
+}
+
+async function ensureReconSessionTable(client = null) {
+  const q = `
+    CREATE TABLE IF NOT EXISTS public.reconducciones_sesiones (
+      token varchar(64) PRIMARY KEY,
+      id_dgeneral integer NOT NULL,
+      id_dauxiliar integer NOT NULL,
+      created_at timestamp without time zone NOT NULL DEFAULT NOW(),
+      created_by integer,
+      activo boolean NOT NULL DEFAULT true
+    )
+  `;
+  if (client) {
+    await client.query(q);
+    return;
+  }
+  await query(q);
+}
+
+function buildSessionToken() {
+  return crypto.randomBytes(24).toString("hex").toUpperCase();
+}
+
+async function generateReconClaveForArea(actorId, dgClave, daClave) {
+  const client = await getClient();
+  try {
+    await client.query("BEGIN");
+    await ensureReconClaveTable(client);
+    let clave = "";
+    for (let i = 0; i < 5; i += 1) {
+      const next = buildClave();
+      const r = await client.query(
+        `INSERT INTO public.reconducciones_claves (clave, dg_clave, da_clave, created_by, status)
+         VALUES ($1, $2, $3, $4, 'ACTIVA')
+         ON CONFLICT (clave) DO NOTHING
+         RETURNING clave`,
+        [next, dgClave, daClave, actorId || null]
+      );
+      if (r.rowCount > 0) {
+        clave = next;
+        break;
+      }
+    }
+    if (!clave) throw new Error("No se pudo generar clave");
+    await client.query("COMMIT");
+    return clave;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function requireL00117(req, res, next) {
+  const ok = await isUserL00117(req);
+  if (!ok) {
+    return res.status(403).json({ error: "Solo L00 117 puede acceder." });
+  }
+  next();
+}
+
+async function requireReconSession(req, res, next) {
+  const isL00117 = await isUserL00117(req);
+  if (isL00117) {
+    return next();
+  }
+  const provided = String(req.headers["x-recon-session"] || "").trim();
+  if (!provided) {
+    return res.status(403).json({ error: "Sesión requerida." });
+  }
+  const areaIds = getAreaIds(req);
+  if (!areaIds) {
+    return res.status(403).json({ error: "Área inválida." });
+  }
+  await ensureReconSessionTable();
+  const r = await query(
+    `SELECT token
+       FROM public.reconducciones_sesiones
+      WHERE token = $1
+        AND activo = true
+        AND id_dgeneral = $2
+        AND id_dauxiliar = $3
+      LIMIT 1`,
+    [provided, areaIds.idDg, areaIds.idDa]
+  );
+  if (r.rowCount === 0) {
+    return res.status(403).json({ error: "Sesión inválida." });
+  }
+  next();
 }
 
 function getAreaIds(req) {
@@ -113,6 +288,114 @@ function getYearMonthFromFecha(fecha) {
   }
   return { year: null, month: null };
 }
+
+router.post("/clave/generar-area", requireL00117, async (req, res) => {
+  try {
+    const dg = normalizeClave(req.body?.dg);
+    const da = normalizeClave(req.body?.da);
+    if (!dg || !da) {
+      return res.status(400).json({ error: "Área requerida." });
+    }
+    const actorId = getActorId(req) || req.user?.id || null;
+    const clave = await generateReconClaveForArea(actorId, dg, da);
+    return res.json({ clave, dg, da });
+  } catch (err) {
+    console.error("POST /api/reconducciones/clave/generar", err);
+    return res.status(500).json({ error: "Error generando clave" });
+  }
+});
+
+router.post("/clave/generar", requireL00117, async (req, res) => {
+  try {
+    const dg = normalizeClave(req.body?.dg);
+    const da = normalizeClave(req.body?.da);
+    if (!dg || !da) {
+      return res.status(400).json({ error: "Área requerida." });
+    }
+    const actorId = getActorId(req) || req.user?.id || null;
+    const clave = await generateReconClaveForArea(actorId, dg, da);
+    return res.json({ clave, dg, da });
+  } catch (err) {
+    console.error("POST /api/reconducciones/clave/generar", err);
+    return res.status(500).json({ error: "Error generando clave" });
+  }
+});
+
+router.get("/clave/listar", requireL00117, async (req, res) => {
+  try {
+    await ensureReconClaveTable();
+    const r = await query(
+      `SELECT clave, dg_clave, da_clave, status, created_at, used_at
+         FROM public.reconducciones_claves
+        ORDER BY id DESC
+        LIMIT 100`
+    );
+    return res.json(r.rows);
+  } catch (err) {
+    console.error("GET /api/reconducciones/clave/listar", err);
+    return res.status(500).json({ error: "Error listando claves" });
+  }
+});
+
+router.post("/clave/validar", async (req, res) => {
+  try {
+    const provided = normalizeClave(req.body?.clave);
+    if (!provided) return res.status(400).json({ error: "Clave requerida." });
+    const area = await getUserAreaClaves(req);
+    if (!area) {
+      return res.status(403).json({ ok: false, error: "Área inválida." });
+    }
+    await ensureReconClaveTable();
+    await ensureReconSessionTable();
+    const actorId = getActorId(req) || req.user?.id || null;
+    const r = await query(
+      `UPDATE public.reconducciones_claves
+          SET status = 'USADA',
+              used_at = now(),
+              used_by = $2
+        WHERE clave = $1
+          AND status = 'ACTIVA'
+          AND dg_clave = $3
+          AND da_clave = $4
+        RETURNING clave, dg_clave, da_clave`,
+      [provided, actorId, area.dg, area.da]
+    );
+    if (r.rowCount === 0) {
+      const chk = await query(
+        `SELECT clave, dg_clave, da_clave, status
+           FROM public.reconducciones_claves
+          WHERE clave = $1
+          LIMIT 1`,
+        [provided]
+      );
+      if (chk.rowCount === 0) {
+        return res.status(403).json({ ok: false, error: "Clave inválida." });
+      }
+      const row = chk.rows[0];
+      if (
+        normalizeClave(row.dg_clave) !== area.dg ||
+        normalizeClave(row.da_clave) !== area.da
+      ) {
+        return res.status(403).json({ ok: false, error: "Clave no corresponde a tu área." });
+      }
+      return res.status(403).json({ ok: false, error: "Clave ya fue usada." });
+    }
+    const sessionToken = buildSessionToken();
+    const ids = getAreaIds(req);
+    await query(
+      `INSERT INTO public.reconducciones_sesiones
+        (token, id_dgeneral, id_dauxiliar, created_by, activo)
+       VALUES ($1, $2, $3, $4, true)`,
+      [sessionToken, ids.idDg, ids.idDa, actorId]
+    );
+    return res.json({ ok: true, token: sessionToken });
+  } catch (err) {
+    console.error("POST /api/reconducciones/clave/validar", err);
+    return res.status(500).json({ error: "Error validando clave" });
+  }
+});
+
+router.use(requireReconSession);
 
 router.get("/next-oficio", async (req, res) => {
   try {

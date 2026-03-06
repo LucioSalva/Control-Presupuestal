@@ -1,4 +1,4 @@
-// server/utils/helpers.js
+import { query } from "../db.js";
 
 // saldo = presupuesto - total_gastado + total_reconducido
 export function computeSaldo({
@@ -22,6 +22,46 @@ export function buildHttpError(message, statusCode = 400) {
 export function getActorId(req) {
   const actorId = Number(req.headers["x-user-id"] || 0);
   return Number.isFinite(actorId) && actorId > 0 ? actorId : null;
+}
+
+export function isPartidaMilKey(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits.length >= 4 && digits.startsWith("1");
+}
+
+export async function logUnauthorizedPartidasAccess(req, context = {}) {
+  try {
+    await query(
+      `CREATE TABLE IF NOT EXISTS public.auditoria_accesos (
+        id bigserial PRIMARY KEY,
+        actor_id integer,
+        id_dgeneral integer,
+        id_dauxiliar integer,
+        metodo text,
+        ruta text,
+        motivo text,
+        payload jsonb,
+        created_at timestamp without time zone DEFAULT now()
+      )`
+    );
+
+    const actorId = getActorId(req) || req.user?.id || null;
+    const idDg = Number(req.user?.id_dgeneral ?? null);
+    const idDa = Number(req.user?.id_dauxiliar ?? null);
+    const metodo = String(req.method || "").toUpperCase();
+    const ruta = String(req.originalUrl || req.path || "");
+    const motivo = String(context.motivo || "ACCESO_NO_AUTORIZADO");
+    const payload = context.data ? JSON.stringify(context.data) : null;
+
+    await query(
+      `INSERT INTO public.auditoria_accesos
+        (actor_id, id_dgeneral, id_dauxiliar, metodo, ruta, motivo, payload, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb, now())`,
+      [actorId, Number.isFinite(idDg) ? idDg : null, Number.isFinite(idDa) ? idDa : null, metodo, ruta, motivo, payload]
+    );
+  } catch (err) {
+    console.warn("[AUDITORIA_PARTIDAS] no se pudo registrar", err?.message || err);
+  }
 }
 
 /**

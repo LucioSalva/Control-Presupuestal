@@ -1,5 +1,9 @@
 import express from "express";
 import { query, getClient } from "../db.js";
+import {
+  isPartidaMilKey,
+  logUnauthorizedPartidasAccess,
+} from "../utils/helpers.js";
 
 const router = express.Router();
 
@@ -46,6 +50,57 @@ async function isUserE00(req) {
 function normalizeNumber(n, def = 0) {
   const v = Number(n);
   return Number.isFinite(v) ? v : def;
+}
+
+function parseDateSafe(value) {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function buildExpiresAt(baseDate) {
+  if (!baseDate) return null;
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    25,
+    23,
+    59,
+    59,
+    999,
+  );
+}
+
+function computeRemaining(expiresAt) {
+  if (!expiresAt) return { dias: null, horas: null };
+  const diff = expiresAt.getTime() - Date.now();
+  if (!Number.isFinite(diff) || diff <= 0) return { dias: 0, horas: 0 };
+  const dias = Math.floor(diff / 86400000);
+  const horas = Math.floor((diff % 86400000) / 3600000);
+  return { dias, horas };
+}
+
+function normalizeSufRow(row) {
+  if (!row) return row;
+  const base =
+    parseDateSafe(row.fecha) ||
+    parseDateSafe(row.created_at) ||
+    parseDateSafe(row.expires_at);
+  const expiresAt = buildExpiresAt(base);
+  if (!expiresAt) return row;
+  const estadoRaw = String(row.estado || "").trim().toUpperCase();
+  let estado = estadoRaw;
+  if (estadoRaw !== "CANCELADO") {
+    estado = Date.now() >= expiresAt.getTime() ? "CADUCADO" : "ACTIVO";
+  }
+  const remaining =
+    estado === "CANCELADO" ? { dias: 0, horas: 0 } : computeRemaining(expiresAt);
+  return {
+    ...row,
+    expires_at: expiresAt.toISOString(),
+    estado,
+    dias_restantes: remaining.dias,
+    horas_restantes: remaining.horas,
+  };
 }
 
 /* =====================================================
@@ -238,17 +293,18 @@ router.post("/", async (req, res) => {
     );
 
     await client.query("COMMIT");
+    const full = normalizeSufRow(rFull.rows?.[0] || null);
 
     return res.json({
       ok: true,
       id: idSuf,
       folio_num: rHead.rows[0].folio_num,
       no_suficiencia: rHead.rows[0].no_suficiencia,
-      created_at: rFull.rows?.[0]?.created_at ?? null,
-      expires_at: rFull.rows?.[0]?.expires_at ?? null,
-      estado: rFull.rows?.[0]?.estado ?? null,
-      dias_restantes: rFull.rows?.[0]?.dias_restantes ?? null,
-      horas_restantes: rFull.rows?.[0]?.horas_restantes ?? null,
+      created_at: full?.created_at ?? null,
+      expires_at: full?.expires_at ?? null,
+      estado: full?.estado ?? null,
+      dias_restantes: full?.dias_restantes ?? null,
+      horas_restantes: full?.horas_restantes ?? null,
     });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -277,7 +333,7 @@ router.get("/perm-ieps-pensiones", async (req, res) => {
 
 router.get("/dashboards-perm", async (req, res) => {
   try {
-    const allowed = await isUserL00117(req);
+    const allowed = (await isUserL00117(req)) || (await isUserE00(req));
     return res.json({ allowed: !!allowed });
   } catch (err) {
     console.error("[GET dashboards-perm] error:", err);
@@ -337,7 +393,8 @@ router.get("/buscar", async (req, res) => {
     `;
 
     const r = await query(sql, params);
-    return res.json({ ok: true, data: r.rows });
+    const data = (r.rows || []).map((row) => normalizeSufRow(row));
+    return res.json({ ok: true, data });
   } catch (err) {
     console.error("[GET buscar] error:", err);
     return res.status(500).json({
@@ -400,7 +457,8 @@ router.post("/:id/cancelar", async (req, res) => {
         [id],
       );
       await client.query("ROLLBACK");
-      return res.json({ ok: true, already: true, ...rView.rows?.[0] });
+      const viewRow = normalizeSufRow(rView.rows?.[0] || null);
+      return res.json({ ok: true, already: true, ...viewRow });
     }
 
     const whereUpdate = [`id = $1`];
@@ -434,7 +492,8 @@ router.post("/:id/cancelar", async (req, res) => {
     );
 
     await client.query("COMMIT");
-    return res.json({ ok: true, ...rView.rows?.[0] });
+    const viewRow = normalizeSufRow(rView.rows?.[0] || null);
+    return res.json({ ok: true, ...viewRow });
   } catch (err) {
     try {
       await client.query("ROLLBACK");
@@ -473,7 +532,8 @@ router.get("/historial", async (req, res) => {
     `;
 
     const r = await query(sql);
-    return res.json({ ok: true, data: r.rows });
+    const data = (r.rows || []).map((row) => normalizeSufRow(row));
+    return res.json({ ok: true, data });
   } catch (err) {
     console.error("[GET /api/suficiencias/historial] error:", err);
     return res.status(500).json({
@@ -519,7 +579,7 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "No encontrada" });
     }
 
-    const head = rHead.rows[0];
+    const head = normalizeSufRow(rHead.rows[0]);
 
     // 2) Detalle
     const rDet = await query(
@@ -529,10 +589,20 @@ router.get("/:id", async (req, res) => {
        ORDER BY renglon ASC`,
       [id],
     );
-
+    const detalleRows = Array.isArray(rDet.rows) ? rDet.rows : [];
+    const allowedMil = (await isUserL00117(req)) || (await isUserE00(req));
+    const detalle = allowedMil
+      ? detalleRows
+      : detalleRows.filter((row) => !isPartidaMilKey(row?.clave));
+    if (!allowedMil && detalle.length !== detalleRows.length) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "PARTIDAS_MIL_SUFI",
+        data: { id },
+      });
+    }
     return res.json({
       ...head,
-      detalle: rDet.rows || [],
+      detalle,
     });
   } catch (err) {
     console.error("[GET /api/suficiencias/:id] error:", err);

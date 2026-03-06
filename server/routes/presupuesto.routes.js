@@ -1,6 +1,12 @@
 import { Router } from "express";
 import { query, getClient } from "../db.js";
-import { computeSaldo, getProjectKeys, buildHttpError } from "../utils/helpers.js";
+import {
+  computeSaldo,
+  getProjectKeys,
+  buildHttpError,
+  isPartidaMilKey,
+  logUnauthorizedPartidasAccess,
+} from "../utils/helpers.js";
 
 const router = Router();
 
@@ -22,6 +28,18 @@ async function isUserL00117(req) {
   const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
   const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
   return dgClave === "L00" && daClave === "117";
+}
+
+async function isUserE00(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  if (!Number.isFinite(dgId)) return false;
+  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "E00";
+}
+
+async function canViewPartidasMil(req) {
+  return (await isUserL00117(req)) || (await isUserE00(req));
 }
 
 /* =====================================================
@@ -139,7 +157,18 @@ router.get("/detalles", async (req, res) => {
       [project, mes]
     );
 
-    res.json(r.rows);
+    const rows = Array.isArray(r.rows) ? r.rows : [];
+    const allowed = await canViewPartidasMil(req);
+    const filtered = allowed
+      ? rows
+      : rows.filter((row) => !isPartidaMilKey(row?.partida));
+    if (!allowed && filtered.length !== rows.length) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "PARTIDAS_MIL_DETALLES",
+        data: { project, mes },
+      });
+    }
+    res.json(filtered);
   } catch (e) {
     console.error("GET /api/detalles error:", e);
     res.status(500).json({ error: "Error obteniendo detalles" });
@@ -256,7 +285,18 @@ router.get("/gastos", async (req, res) => {
       [project]
     );
 
-    res.json(r.rows);
+    const rows = Array.isArray(r.rows) ? r.rows : [];
+    const allowed = await canViewPartidasMil(req);
+    const filtered = allowed
+      ? rows
+      : rows.filter((row) => !isPartidaMilKey(row?.partida));
+    if (!allowed && filtered.length !== rows.length) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "PARTIDAS_MIL_GASTOS",
+        data: { project },
+      });
+    }
+    res.json(filtered);
   } catch (e) {
     console.error("GET /api/gastos", e);
     res.status(500).json({ error: "Error obteniendo gastos" });

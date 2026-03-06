@@ -1,5 +1,9 @@
 import express from "express";
 import { query, getClient } from "../db.js";
+import {
+  isPartidaMilKey,
+  logUnauthorizedPartidasAccess,
+} from "../utils/helpers.js";
 
 const router = express.Router();
 
@@ -112,11 +116,21 @@ router.get("/buscar", async (req, res) => {
       `,
       [idDev]
     );
-
+    const detalleRows = Array.isArray(rDet.rows) ? rDet.rows : [];
+    const allowedMil = (await isUserL00117(req)) || (await isUserE00(req));
+    const detalle = allowedMil
+      ? detalleRows
+      : detalleRows.filter((row) => !isPartidaMilKey(row?.clave));
+    if (!allowedMil && detalle.length !== detalleRows.length) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "PARTIDAS_MIL_DEVENGADO",
+        data: { id_devengado: idDev, no_devengado: r.rows[0].no_devengado },
+      });
+    }
     return res.json({
       ok: true,
       ...r.rows[0],
-      detalle: rDet.rows,
+      detalle,
     });
   } catch (e) {
     console.error("[GET devengado buscar]", e);

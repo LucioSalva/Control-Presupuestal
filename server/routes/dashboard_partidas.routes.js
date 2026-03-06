@@ -1,16 +1,22 @@
 import { Router } from "express";
 import { query } from "../db.js";
+import { logUnauthorizedPartidasAccess } from "../utils/helpers.js";
 
 const router = Router();
 const ALLOWED_DG = "L00";
 const ALLOWED_DA = "117";
+const ALLOWED_DG_E00 = "E00";
 
 function normalizeKey(value) {
   return String(value || "").trim().toUpperCase();
 }
 
 function hasAccess(dg, da) {
-  return normalizeKey(dg) === ALLOWED_DG && normalizeKey(da) === ALLOWED_DA;
+  const dgKey = normalizeKey(dg);
+  const daKey = normalizeKey(da);
+  return (
+    (dgKey === ALLOWED_DG && daKey === ALLOWED_DA) || dgKey === ALLOWED_DG_E00
+  );
 }
 
 async function getUserDGDA(req) {
@@ -139,8 +145,12 @@ router.get("/partidas-resumen", async (req, res) => {
 
     const { dg, da } = await getUserDGDA(req);
     if (!hasAccess(dg, da)) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "ACCESO_DASHBOARD_PARTIDAS",
+        data: { dg, da },
+      });
       return res.status(403).json({
-        error: "Acceso denegado. Solo DG L00 con DA 117 puede acceder.",
+        error: "Acceso denegado. Solo DG L00 con DA 117 o DG E00 puede acceder.",
       });
     }
 
@@ -345,8 +355,12 @@ router.get("/partidas-detalle", async (req, res) => {
 
     const { dg, da } = await getUserDGDA(req);
     if (!hasAccess(dg, da)) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "ACCESO_DASHBOARD_PARTIDAS",
+        data: { dg, da },
+      });
       return res.status(403).json({
-        error: "Acceso denegado. Solo DG L00 con DA 117 puede acceder.",
+        error: "Acceso denegado. Solo DG L00 con DA 117 o DG E00 puede acceder.",
       });
     }
 

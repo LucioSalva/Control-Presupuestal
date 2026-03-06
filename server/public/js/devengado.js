@@ -7,6 +7,7 @@
   const btnGuardar = document.getElementById("btn-guardar");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnRecargar = document.getElementById("btn-recargar");
+  const btnNuevoDev = document.getElementById("btn-nuevo-dev");
   const btnCancelar = document.getElementById("btn-cancelar");
   const btnConfirmarGuardar = document.getElementById("btnConfirmarGuardar");
   const detalleBody = document.getElementById("detalleBody");
@@ -186,6 +187,11 @@
 
   let qrTimer = null;
 
+  function canRenderQrDev() {
+    const folio = String(getVal("no_devengado") || "").trim().toUpperCase();
+    return folio !== "" && folio !== "NUEVO";
+  }
+
   function buildQrPayloadDev() {
     const folio = String(getVal("no_devengado") || "").trim();
     const folioComp = String(getVal("no_comprometido") || "").trim();
@@ -210,6 +216,10 @@
   async function renderQrDev() {
     const container = document.getElementById("qr-dev");
     if (!container) return;
+    if (!canRenderQrDev()) {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+      return;
+    }
     const text = buildQrPayloadDev();
     if (!text || !window.QRCode?.toDataURL) {
       container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
@@ -259,6 +269,18 @@
   }
   function uiWarn(message, title = "Atención") {
     return uiAlert(message, "warning", title);
+  }
+  function uiConfirm(message, title = "Confirmar") {
+    if (!hasSwal()) return Promise.resolve(confirm(`${title}: ${message}`));
+    return window.Swal.fire({
+      title,
+      text: message,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, continuar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#BC955C",
+    }).then((r) => r.isConfirmed);
   }
 
   function getQueryId() {
@@ -1351,6 +1373,7 @@
   function bindEvents() {
     
     modalGuardar = new bootstrap.Modal(document.getElementById("modalGuardar"));
+    if (btnNuevoDev) btnNuevoDev.type = "button";
 
     btnGuardar?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1377,9 +1400,6 @@
 
       modalGuardar.show();
     });
-
-    document.addEventListener("input", scheduleQrRender);
-    document.addEventListener("change", scheduleQrRender);
 
     btnConfirmarGuardar?.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -1427,6 +1447,16 @@
       } catch (err) {
         await uiError(err?.message || "No se pudo recargar");
       }
+    });
+
+    btnNuevoDev?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const ok = await uiConfirm(
+        "Se perderán los cambios no guardados. ¿Deseas limpiar el formulario?",
+        "Nuevo",
+      );
+      if (!ok) return;
+      window.location.href = window.location.pathname;
     });
 
     document

@@ -198,7 +198,9 @@ td .text-end.ro{justify-content:flex-end!important;}
 
 .form-container.doc-header .col-3:not(.text-center){
   display:flex;
-  justify-content:flex-end;
+  flex-direction:column;
+  align-items:stretch;
+  gap:6px;
 }
 
 .form-container.doc-header .no-box{

@@ -29,6 +29,7 @@
                 <li><a class="dropdown-item" href="devengado.html">Devengado</a></li>
                 <li><a class="dropdown-item" href="expedientes_entrega.html">Entregas Expedientes</a></li>
                 <li><a class="dropdown-item" href="reconducciones.html">Reconducciones</a></li>
+                <li id="navReconHistorial"><a class="dropdown-item" href="reconducciones_historial.html">Autorización Reconducciones</a></li>
               </ul>
             </li>
             <li class="nav-item dropdown">
@@ -97,6 +98,25 @@
     head.appendChild(link2);
   }
 
+  function applyReconHistorialVisibility() {
+    const li = document.getElementById("navReconHistorial");
+    if (!li) return;
+    try {
+      const raw = localStorage.getItem("cp_usuario");
+      if (!raw) {
+        li.classList.add("d-none");
+        return;
+      }
+      const user = JSON.parse(raw);
+      const dg = String(user?.dgeneral_clave || "").trim().toUpperCase();
+      const da = String(user?.dauxiliar_clave || "").trim().toUpperCase();
+      const isL00117 = dg === "L00" && da === "117";
+      if (!isL00117) li.classList.add("d-none");
+    } catch {
+      li.classList.add("d-none");
+    }
+  }
+
   async function applyDashboardsVisibility() {
     try {
       const t =
@@ -126,12 +146,14 @@
       mountNavbar();
       setActive();
       setFavicon();
+      applyReconHistorialVisibility();
       applyDashboardsVisibility();
     });
   } else {
     mountNavbar();
     setActive();
     setFavicon();
+    applyReconHistorialVisibility();
     applyDashboardsVisibility();
   }
 })();

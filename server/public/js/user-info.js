@@ -115,15 +115,12 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    const roles = Array.isArray(user?.roles) ? user.roles : [];
-    const rolesNorm = roles
-      .filter((r) => r != null)
-      .map((r) => String(r).trim().toUpperCase());
-    const isGod = rolesNorm.includes("GOD");
-    const canViewPartidas = isGod || (dgClave === "L00" && daClave === "117");
+    const canViewPartidas =
+      (dgClave === "L00" && daClave === "117") || dgClave === "E00";
     setPartidasVisible(canViewPartidas);
     setDashboardVisible(canViewPartidas);
-    const canViewExp = isGod || (dgClave === "L00" && daClave === "117");
+    const canViewExp =
+      (dgClave === "L00" && daClave === "117") || dgClave === "E00";
     setExpVisible(canViewExp);
   })();
 

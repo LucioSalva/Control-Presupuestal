@@ -81,6 +81,18 @@ const normalizeText = (v) => String(v || "").trim();
 
 const toNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
+const normalizeProjectDisplay = (value) => {
+  const raw = normalizeText(value).toUpperCase();
+  if (!raw) return "";
+  const digits = raw.replace(/[^0-9]/g, "");
+  const letters = raw.replace(/[^A-Z]/g, "");
+  if (!digits) return raw;
+  if (letters.length > 1) return raw;
+  const padded = digits.padStart(10, "0");
+  const conac = /^[0-9\s]+[A-Z]$/.test(raw) ? raw.slice(-1) : "";
+  return conac ? `${padded} ${conac}` : padded;
+};
+
 const parseProjectKey = (project) => {
   const raw = normalizeText(project).toUpperCase();
   const clave = raw.replace(/[^0-9]/g, "");
@@ -186,8 +198,9 @@ function renderTable() {
 
     const tr = document.createElement("tr");
     if (saldo < 0) tr.classList.add("row-saldo-negativo");
+    const projectLabel = p.project_display || p.project;
     tr.innerHTML = `
-      <td><span class="badge text-bg-dark pill-project">${p.project}</span></td>
+      <td><span class="badge text-bg-dark pill-project">${projectLabel}</span></td>
       <td class="text-end">${Number(p.partidas || 0)}</td>
       <td class="text-end">${money(p.presupuesto_total)}</td>
       <td class="text-end">${money(p.gastado_total)}</td>
@@ -264,8 +277,9 @@ function renderAlerts() {
     topSpend.slice(0, 5).forEach((p, idx) => {
       const li = document.createElement("li");
       li.className = "list-group-item d-flex justify-content-between align-items-center";
+      const projectLabel = p.project_display || p.project;
       li.innerHTML = `
-        <span>${idx + 1}. ${p.project}</span>
+        <span>${idx + 1}. ${projectLabel}</span>
         <span class="fw-semibold">${money(p.gastado_total)}</span>
       `;
       topSpendList.appendChild(li);
@@ -404,7 +418,8 @@ async function showProjectDetail(projectId) {
   const title = document.getElementById("detail-title");
   const subtitle = document.getElementById("detail-subtitle");
 
-  title.textContent = `Detalle de ${project.project}`;
+  const projectLabel = project.project_display || project.project;
+  title.textContent = `Detalle de ${projectLabel}`;
   const dgTxt = project.dgeneral_clave ? `DG ${project.dgeneral_clave}` : "DG —";
   const daTxt = project.dauxiliar_clave ? `DA ${project.dauxiliar_clave}` : "DA —";
   subtitle.textContent = `${dgTxt} · ${daTxt}`;
@@ -562,7 +577,7 @@ function exportCSV() {
   STATE.filtered.forEach((p) => {
     lines.push(
       [
-        p.project,
+        p.project_display || p.project,
         p.dgeneral_clave || "",
         p.dauxiliar_clave || "",
         Number(p.partidas || 0),
@@ -609,8 +624,12 @@ function applyFilter() {
 
   let list = [...STATE.projects];
 
-  if (resolved.term) {
-    list = list.filter((p) => String(p.project || "").toLowerCase().includes(term));
+    if (resolved.term) {
+      list = list.filter((p) => {
+        const raw = String(p.project || "").toLowerCase();
+        const display = String(p.project_display || "").toLowerCase();
+        return raw.includes(term) || display.includes(term);
+      });
   }
   if (resolved.dg) {
     list = list.filter((p) => String(p.id_dgeneral || "") === resolved.dg);
@@ -663,7 +682,10 @@ async function loadProjects() {
       }
     }
 
-    STATE.projects = projects;
+    STATE.projects = projects.map((p) => ({
+      ...p,
+      project_display: normalizeProjectDisplay(p.project),
+    }));
     applyFilter();
   } catch (e) {
     console.error(e);

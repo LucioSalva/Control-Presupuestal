@@ -50,9 +50,18 @@
     sessionStorage.getItem("authToken") ||
     "";
 
+  let reconSession = "";
+  const setReconSession = (value) => {
+    reconSession = String(value || "").trim();
+  };
+  const hasReconSession = () => !!reconSession;
+
   const authHeaders = () => {
     const t = getToken();
-    return t ? { Authorization: `Bearer ${t}` } : {};
+    return {
+      ...(t ? { Authorization: `Bearer ${t}` } : {}),
+      ...(reconSession ? { "x-recon-session": reconSession } : {}),
+    };
   };
 
   let CURRENT_USER = null;
@@ -126,6 +135,7 @@
     btnAplicar: document.getElementById("btn-aplicar"),
     btnCancelar: document.getElementById("btn-cancelar"),
   };
+  const hasRecientes = !!(el.filtroEstatus && el.tablaBody);
 
   const sideEls = {
     ORIGEN: {
@@ -234,11 +244,96 @@
     return data;
   }
 
+  async function validarClaveAcceso(clave) {
+    try {
+      const payload = { clave: String(clave || "").trim().toUpperCase() };
+      const data = await fetchJson(`${API}/api/reconducciones/clave/validar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      const tokenValue = String(data?.token || "").trim();
+      if (!data?.ok || !tokenValue) return false;
+      setReconSession(tokenValue);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function solicitarClaveAcceso() {
+    if (!hasSwal()) {
+      const input = prompt("Clave de acceso para Reconducciones");
+      if (!input) return false;
+      const clave = String(input).trim().toUpperCase();
+      const ok = await validarClaveAcceso(clave);
+      return ok;
+    }
+    const result = await window.Swal.fire({
+      title: "Clave de acceso",
+      text: "Captura la clave de 6 caracteres",
+      input: "text",
+      inputAttributes: {
+        autocapitalize: "characters",
+        maxlength: 6,
+      },
+      inputPlaceholder: "Ej. AB12CD",
+      showCancelButton: true,
+      confirmButtonText: "Validar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#BC955C",
+      preConfirm: (value) => {
+        const v = String(value || "").trim().toUpperCase();
+        if (!v) {
+          window.Swal.showValidationMessage("Escribe la clave");
+          return null;
+        }
+        if (v.length !== 6) {
+          window.Swal.showValidationMessage("La clave debe tener 6 caracteres");
+          return null;
+        }
+        return v;
+      },
+    });
+    if (!result.isConfirmed) return false;
+    const clave = String(result.value || "").trim().toUpperCase();
+    const ok = await validarClaveAcceso(clave);
+    if (ok) return true;
+    await uiError("Clave inválida");
+    return false;
+  }
+
+  async function ensureReconAccess() {
+    if (!isReconAccessAllowed()) {
+      await uiWarn(
+        "Reconducciones está habilitado de lunes a jueves. El área L00 117 es la excepción."
+      );
+      disableReconUI();
+      return false;
+    }
+    if (isL00117User()) return true;
+    if (hasReconSession()) return true;
+    let ok = false;
+    for (let i = 0; i < 3; i += 1) {
+      ok = await solicitarClaveAcceso();
+      if (ok) return true;
+      const again = await uiConfirm("¿Quieres intentar con otra clave?");
+      if (!again) break;
+    }
+    disableReconUI();
+    return false;
+  }
+
   let qrTimer = null;
+
+  function canRenderQrRecon() {
+    const id = Number(state.reconId || 0);
+    return id > 0;
+  }
 
   function buildQrPayloadRecon() {
     const id = state.reconId != null ? String(state.reconId) : "";
-    const folio = String(el.rcOficio.value || "").trim();
+    const folio = getOficioValue();
     const fecha = String(el.rcFecha.value || "").trim();
     const tipo = String(el.rcTipo.value || "").trim();
     const ejercicio = String(el.rcEjercicio.value || "").trim();
@@ -262,6 +357,10 @@
   async function renderQrRecon() {
     const container = document.getElementById("qr-recon");
     if (!container) return;
+    if (!canRenderQrRecon()) {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+      return;
+    }
     const text = buildQrPayloadRecon();
     if (!text || !window.QRCode?.toDataURL) {
       container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
@@ -345,6 +444,26 @@
   function setReconId(id) {
     state.reconId = id || null;
     el.rcId.textContent = id ? String(id) : "—";
+  }
+
+  function getOficioValue() {
+    if (!el.rcOficio) return "";
+    const raw =
+      "value" in el.rcOficio
+        ? String(el.rcOficio.value || "")
+        : String(el.rcOficio.textContent || "");
+    const trimmed = raw.trim();
+    return trimmed === "—" || trimmed === "Se asignará al guardar" ? "" : trimmed;
+  }
+
+  function setOficioValue(value) {
+    if (!el.rcOficio) return;
+    const text = String(value || "").trim();
+    if ("value" in el.rcOficio) {
+      el.rcOficio.value = text;
+      return;
+    }
+    el.rcOficio.textContent = text || "Se asignará al guardar";
   }
 
   function buildMesPagoDate() {
@@ -875,6 +994,7 @@
   }
 
   async function loadRecientes() {
+    if (!hasRecientes) return;
     try {
       const data = await fetchJson(`${API}/api/reconducciones`, { headers: authHeaders() });
       state.recientes = Array.isArray(data) ? data : [];
@@ -885,6 +1005,7 @@
   }
 
   function renderRecientes() {
+    if (!hasRecientes) return;
     const estatus = String(el.filtroEstatus.value || "TODOS").toUpperCase();
     const rows = state.recientes.filter((r) => estatus === "TODOS" || String(r.estatus || "").toUpperCase() === estatus);
     el.tablaBody.innerHTML = rows
@@ -911,7 +1032,7 @@
   function resetForm() {
     setReconId(null);
     setStatusBadge("BORRADOR");
-    el.rcOficio.value = "";
+    setOficioValue("");
     el.rcFecha.value = "";
     el.rcTipo.value = "";
     el.rcEjercicio.value = "";
@@ -953,7 +1074,7 @@
       resetForm();
       setReconId(data?.cabecera?.id);
       setStatusBadge(data?.cabecera?.estatus || "BORRADOR");
-      el.rcOficio.value = data?.cabecera?.oficio || "";
+      setOficioValue(data?.cabecera?.oficio || "");
       el.rcFecha.value = data?.cabecera?.fecha_elaboracion ? String(data.cabecera.fecha_elaboracion).slice(0, 10) : "";
       el.rcTipo.value = data?.cabecera?.tipo_movimiento || "";
       el.rcEjercicio.value = data?.cabecera?.ejercicio || "";
@@ -1010,8 +1131,9 @@
 
   async function guardarRecon() {
     if (!validateHeader()) return;
+    const oficioActual = state.reconId ? getOficioValue() : "";
     const payload = {
-      oficio: el.rcOficio.value.trim() || null,
+      oficio: oficioActual ? oficioActual : null,
       fecha_elaboracion: el.rcFecha.value || null,
       tipo_movimiento: el.rcTipo.value || null,
       justificacion: el.rcJustificacion.value || null,
@@ -1037,7 +1159,7 @@
         });
         setReconId(resp?.cabecera?.id);
         setStatusBadge(resp?.cabecera?.estatus || "BORRADOR");
-        if (resp?.cabecera?.oficio) el.rcOficio.value = resp.cabecera.oficio;
+        if (resp?.cabecera?.oficio) setOficioValue(resp.cabecera.oficio);
       }
       await loadRecientes();
       scheduleQrRender();
@@ -1157,11 +1279,13 @@
   }
 
   function bindEvents() {
-    el.filtroEstatus.addEventListener("change", renderRecientes);
-    el.tablaBody.addEventListener("click", (ev) => {
-      const btn = ev.target.closest(".rc-btn-edit");
-      if (btn) loadRecon(btn.dataset.id);
-    });
+    if (hasRecientes) {
+      el.filtroEstatus.addEventListener("change", renderRecientes);
+      el.tablaBody.addEventListener("click", (ev) => {
+        const btn = ev.target.closest(".rc-btn-edit");
+        if (btn) loadRecon(btn.dataset.id);
+      });
+    }
     el.rcEjercicio.addEventListener("change", () => {
       updateSaldos("ORIGEN");
       updateSaldos("DESTINO");
@@ -1178,25 +1302,21 @@
     el.btnCancelar.addEventListener("click", cancelarRecon);
     attachSideEvents("ORIGEN");
     attachSideEvents("DESTINO");
-    document.addEventListener("input", scheduleQrRender);
-    document.addEventListener("change", scheduleQrRender);
   }
 
   async function init() {
     try {
       loadCurrentUser();
-      if (!isReconAccessAllowed()) {
-        await uiWarn(
-          "Reconducciones está habilitado únicamente de lunes a jueves. El área L00 117 es la excepción."
-        );
-        disableReconUI();
-        return;
-      }
+      const allow = await ensureReconAccess();
+      if (!allow) return;
       await loadCatalogos();
       await loadSaldosGlobal();
       resetForm();
       bindEvents();
       await loadRecientes();
+      const params = new URLSearchParams(window.location.search);
+      const id = Number(params.get("id"));
+      if (Number.isFinite(id) && id > 0) await loadRecon(id);
     } catch (err) {
       uiError(err.message || "Error inicializando reconducciones");
     }

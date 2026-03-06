@@ -11,6 +11,7 @@
   const btnSi = document.getElementById("btn-si-seguro");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnCancelarSuf = document.getElementById("btn-cancelar-suf");
+  const btnNuevoSuf = document.getElementById("btn-nuevo-suf");
   const sufEstadoBadge = document.getElementById("sufEstadoBadge");
   const sufRestanteText = document.getElementById("sufRestanteText");
   const sufCaducaText = document.getElementById("sufCaducaText");
@@ -40,8 +41,10 @@
   let dauxiliarInfo = null;
   let proyectosById = {};
   let partidasRows = [];
+  let partidasRowsAll = [];
   let partidasMap = {};
   let fuentesMap = {};
+  let fuentesRows = [];
 
   // ---------------------------
   // AUTH
@@ -123,6 +126,10 @@
 
   let qrTimer = null;
 
+  function canRenderQrSuf() {
+    return Number.isFinite(lastSavedId) && lastSavedId > 0;
+  }
+
   function buildQrPayloadSuf() {
     const folio = String(get("no_suficiencia") || "").trim();
     const fecha = String(get("fecha") || "").trim();
@@ -147,6 +154,10 @@
   async function renderQrSuf() {
     const container = document.getElementById("qr-suf");
     if (!container) return;
+    if (!canRenderQrSuf()) {
+      container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
+      return;
+    }
     const text = buildQrPayloadSuf();
     if (!text || !window.QRCode?.toDataURL) {
       container.innerHTML = `<div class="cp-qr-empty">Sin QR</div>`;
@@ -197,6 +208,18 @@
   const uiSuccess = (m, t = "Listo") => uiAlert(m, "success", t);
   const uiError = (m, t = "Error") => uiAlert(m, "error", t);
   const uiWarn = (m, t = "Atención") => uiAlert(m, "warning", t);
+  const uiConfirm = (message, title = "Confirmar") => {
+    if (!hasSwal()) return Promise.resolve(confirm(`${title}: ${message}`));
+    return window.Swal.fire({
+      title,
+      text: message,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, continuar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#BC955C",
+    }).then((r) => r.isConfirmed);
+  };
 
   const scheduledAlertKeys = new Set();
 
@@ -325,6 +348,11 @@
     return Math.max(0, Math.ceil(ms / 3600000));
   }
 
+  function remainingDays(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return 0;
+    return Math.max(0, Math.ceil(ms / 86400000));
+  }
+
   function getRemainingFromSaved(saved) {
     const expiresText = formatDateTime(saved?.expires_at);
     let days = Number(saved?.dias_restantes);
@@ -403,10 +431,10 @@
     if (!wasAlertShown(oneDayKey)) {
       const showOneDay = () => {
         if (wasAlertShown(oneDayKey)) return;
-        const hours = remainingHours(expiresMs - Date.now());
+        const days = remainingDays(expiresMs - Date.now());
         if (expiresMs <= Date.now()) return;
         uiWarn(
-          `⚠️ Mañana caduca tu suficiencia. Te faltan ${hours} horas.`,
+          `⚠️ Mañana caduca tu suficiencia. Te faltan ${days} días.`,
         ).then(() => markAlertShown(oneDayKey));
       };
       if (now >= oneDayAt && now < expiresMs) {
@@ -609,13 +637,16 @@
 
     const rows = Array.isArray(data?.rows) ? data.rows : [];
     partidasRows = rows.filter((r) => r && r.clave);
+    partidasRowsAll = partidasRows;
 
     partidasMap = {};
-    for (const r of partidasRows) {
+    for (const r of partidasRowsAll) {
       const clave = String(r.clave || "").trim();
       const desc = String(r.partida ?? r.descripcion ?? "").trim();
       if (clave) partidasMap[clave] = desc;
     }
+
+    await applyPartidaFilters();
   }
 
   // ---------------------------
@@ -632,7 +663,12 @@
       })
       .join("");
 
-    return `<option value="">-- Selecciona --</option>${opts}`;
+    let html = `<option value="">-- Selecciona --</option>${opts}`;
+    if (cur && !partidasRows.some((r) => String(r.clave || "").trim() === cur)) {
+      const desc = partidasMap[cur] || "NO DISPONIBLE";
+      html += `<option value="${cur}" selected>${cur} - ${desc}</option>`;
+    }
+    return html;
   }
 
   function refreshPartidaSelects() {
@@ -846,15 +882,25 @@
     return "MIXTO";
   }
 
+  function isPartidaMilValue(value) {
+    const digits = String(value ?? "").replace(/\D/g, "");
+    return digits.length >= 4 && digits.startsWith("1");
+  }
+
   function refreshTotales() {
     const detalle = buildDetalle();
     const subtotal = calcSubtotal(detalle);
+    const subtotalIva = detalle.reduce((acc, row) => {
+      const clave = row?.clave;
+      if (isPartidaMilValue(clave)) return acc;
+      return acc + safeNumber(row?.importe);
+    }, 0);
 
     let iva = 0;
     let isr = 0;
     let ieps = 0;
 
-    if (useIVA()) iva = subtotal * 0.16;
+    if (useIVA()) iva = subtotalIva * 0.16;
     if (useISR()) isr = subtotal * getIsrRate();
     if (useIEPS()) ieps = subtotal * getIepsRate();
 
@@ -1205,6 +1251,10 @@
       clave = String(claveRaw ?? "")
         .trim()
         .toUpperCase();
+      const digits = clave.replace(/[^\d]/g, "");
+      if (digits && digits.length <= 10) {
+        clave = digits.padStart(10, "0");
+      }
       conac = String(conac || "")
         .trim()
         .toUpperCase();
@@ -1253,6 +1303,7 @@
         ? data.rows
         : [];
 
+    fuentesRows = rows;
     fuentesMap = {};
     rows.forEach((x) => {
       const id = String(x.id ?? "").trim();
@@ -1262,14 +1313,6 @@
       const fuente = String(x.fuente ?? "").trim();
       fuentesMap[id] = { clave, fuente };
     });
-
-    setOptions(
-      "fuente",
-      rows,
-      (x) => x.id,
-      (x) =>
-        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`,
-    );
 
     window.fuentesMap = window.fuentesMap || {};
     window.fuentesMap = {};
@@ -1281,12 +1324,17 @@
         fuente: String(x.fuente ?? "").trim(),
       };
     });
+
+    await applyFuenteFilters();
   }
 
   function bindFuenteToHidden() {
     const sel = document.querySelector('[name="fuente"]');
     if (!sel) return;
-    sel.addEventListener("change", () => setVal("id_fuente", sel.value || ""));
+    sel.addEventListener("change", async () => {
+      setVal("id_fuente", sel.value || "");
+      await applyPartidaFilters();
+    });
     setVal("id_fuente", sel.value || "");
   }
 
@@ -1347,19 +1395,124 @@
     return dgRules[da] || new Set();
   }
 
-  function getAllowedFuenteSet() {
-    const dg = _norm(
-      document.querySelector('input[name="id_dgeneral"]')?.value,
-    );
-    const da = _norm(
-      document.querySelector('input[name="id_dauxiliar"]')?.value,
-    );
+  function getProyectoClaveDigits(idProyecto) {
+    const p = proyectosById[idProyecto];
+    let clave = String(p?.clave ?? "").trim().replace(/[^\d]/g, "");
+    if (clave) clave = clave.padStart(10, "0");
+    return clave;
+  }
+
+  async function getAllowedFuenteSet() {
+    const dg = _norm(dgeneralInfo?.clave);
+    const da = _normNum(dauxiliarInfo?.clave);
+    const idProyecto = Number(get("id_proyecto") || 0);
+    const proyClave = getProyectoClaveDigits(idProyecto);
+
+    if (!dg || !da || !proyClave) return null;
+
+    if (typeof window.getFuentesPermitidas === "function") {
+      const set = await window.getFuentesPermitidas({
+        dg,
+        da,
+        proyecto: proyClave,
+      });
+      if (set != null) return set;
+    }
 
     const key = `${dg}|${da}`;
     const allowed = DG_DA_FUENTES_FILTERS[key];
-
     if (!allowed) return null;
     return new Set(allowed.map(String));
+  }
+
+  async function applyFuenteFilters(keepId = "") {
+    const sel = document.querySelector('[name="fuente"]');
+    if (!sel) return;
+
+    const all = Array.isArray(fuentesRows) ? fuentesRows : [];
+    if (!all.length) return;
+
+    const allowed = await getAllowedFuenteSet();
+    const rows =
+      allowed === null
+        ? all
+        : all.filter((f) =>
+            allowed.has(String(f?.clave ?? "").trim()),
+          );
+
+    sel.innerHTML = `<option value="">-- Selecciona una fuente --</option>`;
+
+    if (!rows.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "— Sin fuentes permitidas para tu DG/DA —";
+      sel.appendChild(opt);
+    } else {
+      rows.forEach((f) => {
+        const opt = document.createElement("option");
+        opt.value = String(f.id ?? "");
+        opt.textContent = `${String(f.clave ?? "").trim()} - ${String(
+          f.fuente ?? "",
+        ).trim()}`;
+        sel.appendChild(opt);
+      });
+    }
+
+    const current =
+      keepId || String(get("fuente") || "").trim();
+    if (current && !Array.from(sel.options).some((o) => o.value === current)) {
+      const meta = fuentesMap[current];
+      const label = meta
+        ? `${String(meta.clave || "").trim()} - ${String(meta.fuente || "").trim()}`
+        : `ID ${current} - (NO DISPONIBLE)`;
+      const opt = document.createElement("option");
+      opt.value = current;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+
+    if (current) sel.value = current;
+    setVal("id_fuente", sel.value || "");
+    await applyPartidaFilters();
+  }
+
+  async function getAllowedPartidaSet() {
+    const dg = _norm(dgeneralInfo?.clave);
+    const da = _normNum(dauxiliarInfo?.clave);
+    const idProyecto = Number(get("id_proyecto") || 0);
+    const proyClave = getProyectoClaveDigits(idProyecto);
+    const fuenteId = String(get("fuente") || "").trim();
+    const fuenteClave = String(fuentesMap?.[fuenteId]?.clave || "")
+      .replace(/[^\d]/g, "")
+      .trim();
+
+    if (!dg || !da || !proyClave || !fuenteClave) return null;
+
+    if (typeof window.getPartidasPermitidas === "function") {
+      const set = await window.getPartidasPermitidas({
+        dg,
+        da,
+        proyecto: proyClave,
+        fuente: fuenteClave,
+      });
+      if (set != null) return set;
+    }
+
+    return null;
+  }
+
+  async function applyPartidaFilters() {
+    const all = Array.isArray(partidasRowsAll) ? partidasRowsAll : [];
+    if (!all.length) return;
+
+    const allowed = await getAllowedPartidaSet();
+    partidasRows = allowed === null
+      ? all
+      : all.filter((p) =>
+          allowed.has(String(p?.clave ?? "").trim()),
+        );
+
+    refreshPartidaSelects();
   }
 
   function applyProyectoFilters() {
@@ -1453,10 +1606,7 @@
     updateClaveProgramatica();
     syncMetaFromProyecto();
 
-    if (data.id_fuente != null) {
-      setVal("fuente", String(data.id_fuente));
-      setVal("id_fuente", String(data.id_fuente));
-    }
+    await applyFuenteFilters(String(data.id_fuente ?? ""));
 
     setVal("subtotal", moneyFormat(safeNumber(data.subtotal)));
     setVal("iva", moneyFormat(safeNumber(data.iva)));
@@ -2590,6 +2740,7 @@
     if (btnSi) btnSi.type = "button";
     if (btnDescargarPdf) btnDescargarPdf.type = "button";
     if (btnCancelarSuf) btnCancelarSuf.type = "button";
+    if (btnNuevoSuf) btnNuevoSuf.type = "button";
 
     btnAbrirBuscarSuf?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -2613,9 +2764,6 @@
         btnBuscarNumero?.click();
       }
     });
-
-    document.addEventListener("input", scheduleQrRender);
-    document.addEventListener("change", scheduleQrRender);
 
     btnGuardar?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -2658,6 +2806,16 @@
         console.error("[SP] cancelar error:", err);
         await uiError(err?.message || "Error al cancelar suficiencia");
       }
+    });
+
+    btnNuevoSuf?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const ok = await uiConfirm(
+        "Se perderán los cambios no guardados. ¿Deseas limpiar el formulario?",
+        "Nuevo",
+      );
+      if (!ok) return;
+      window.location.href = window.location.pathname;
     });
 
     document.addEventListener("change", async (e) => {
@@ -2703,10 +2861,11 @@
 
     document
       .querySelector('[name="id_proyecto"]')
-      ?.addEventListener("change", () => {
+      ?.addEventListener("change", async () => {
         updateClaveProgramatica();
         syncMetaFromProyecto();
         refreshTotales();
+        await applyFuenteFilters();
       });
 
     bindTaxEvents();
