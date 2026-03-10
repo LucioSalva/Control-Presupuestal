@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import path from "path";
 import fs from "fs/promises";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
 
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -27,6 +28,7 @@ import dashboardPartidasRouter from "./routes/dashboard_partidas.routes.js";
 import reconduccionesRouter from "./routes/reconducciones.routes.js";
 import adminAuditoriaRouter from "./routes/admin-auditoria.routes.js";
 import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
+import { logAuditEvent } from "./utils/helpers.js";
 
 
 dotenv.config();
@@ -70,6 +72,12 @@ app.use(
 // 2) Body size limit: evita payloads enormes
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+app.use((req, res, next) => {
+  req.cpTraceId = randomUUID();
+  res.setHeader("x-trace-id", req.cpTraceId);
+  next();
+});
 
 // 3) CORS: NO uses origin:true en producción.
 // Para local dejamos whitelist (ajusta si usas otro puerto)
@@ -193,6 +201,34 @@ async function authRequired(req, res, next) {
       id_dauxiliar: user.id_dauxiliar,
       roles: roles.map((x) => String(x).trim().toUpperCase()),
     };
+
+    try {
+      const method = String(req.method || "").toUpperCase();
+      const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+      const pathNoQuery = String(req.originalUrl || req.path || "").split("?")[0];
+      const isAuditApi = pathNoQuery.startsWith("/api/admin/auditoria");
+      if (isWrite && !isAuditApi) {
+        res.on("finish", () => {
+          try {
+            if (req._cpAuditLogged) return;
+            const sc = Number(res.statusCode || 0);
+            const ok = sc >= 200 && sc < 400;
+            const denied = sc === 401 || sc === 403;
+            if (!ok && !denied) return;
+            const seg = pathNoQuery.replace(/^\/api\/?/, "").split("/")[0] || "API";
+            const tipoBase = denied ? "AUTO_DENEGADO" : "AUTO";
+            const tipo = `${tipoBase}_${method}_${seg}`.toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+            logAuditEvent(req, {
+              tipo,
+              entidad: "HTTP",
+              entidad_id: null,
+              estado: `HTTP_${sc}`,
+              detalles: { auto: true, status: sc },
+            });
+          } catch {}
+        });
+      }
+    } catch {}
 
     next();
   } catch (e) {

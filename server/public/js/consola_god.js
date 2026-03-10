@@ -1,7 +1,15 @@
 (() => {
   "use strict";
 
-  const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
+  const API = (
+    window.API_URL ||
+    ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+    window.location.port &&
+    window.location.port !== "3000"
+      ? "http://localhost:3000"
+      : window.location.origin) ||
+    "http://localhost:3000"
+  ).replace(/\/$/, "");
   const POLL_MS = 5000;
   const MAX_ROWS = 3000;
   const EXPORT_MAX = 10000;
@@ -181,6 +189,32 @@
     }
   }
 
+  function detallesObj(r) {
+    if (r?.detalles == null) return null;
+    if (typeof r.detalles === "object") return r.detalles;
+    if (typeof r.detalles === "string") {
+      try {
+        const parsed = JSON.parse(r.detalles);
+        return parsed && typeof parsed === "object" ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function ipText(r) {
+    const d = detallesObj(r);
+    const ip = d?.ip == null ? "" : String(d.ip).trim();
+    return ip || "—";
+  }
+
+  function authMethodText(r) {
+    const d = detallesObj(r);
+    const m = d?.auth_method == null ? "" : String(d.auth_method).trim().toUpperCase();
+    return m || "—";
+  }
+
   function rowHtml(r) {
     const ruta = String(r?.ruta || "").trim();
     const metodo = String(r?.metodo || "").trim().toUpperCase();
@@ -195,6 +229,8 @@
         <td class="text-nowrap">${escapeHtml(actorText(r))}</td>
         <td class="text-nowrap">${escapeHtml(areaText(r))}</td>
         <td class="text-nowrap">${escapeHtml(r.estado || "—")}</td>
+        <td class="text-nowrap">${escapeHtml(ipText(r))}</td>
+        <td class="text-nowrap">${escapeHtml(authMethodText(r))}</td>
         <td class="text-nowrap">${escapeHtml(entidadText(r))}</td>
         <td class="text-nowrap">${escapeHtml(rutaFull || "—")}</td>
         <td class="cp-log-details" title="${escapeHtml(detalles)}">${escapeHtml(detalles || "—")}</td>
@@ -271,6 +307,26 @@
     const usuariosData = Array.isArray(usuarios?.data) ? usuarios.data : [];
 
     if (el.fTipo) {
+      const existing = new Set(
+        tiposData.map((t) => String(t || "").trim().toUpperCase()).filter((x) => x),
+      );
+
+      const authCombo = "AUTH_LOGIN,AUTH_LOGOUT";
+      const authTipos = ["AUTH_LOGIN", "AUTH_LOGOUT"];
+      if (!existing.has("AUTH_LOGIN") || !existing.has("AUTH_LOGOUT")) {
+        const optCombo = document.createElement("option");
+        optCombo.value = authCombo;
+        optCombo.textContent = "AUTH (LOGIN/LOGOUT)";
+        el.fTipo.appendChild(optCombo);
+      }
+      authTipos.forEach((t) => {
+        if (existing.has(t)) return;
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        el.fTipo.appendChild(opt);
+      });
+
       tiposData.forEach((t) => {
         const opt = document.createElement("option");
         opt.value = String(t || "").trim();
@@ -386,6 +442,8 @@
       usuario: actorText(r),
       area: areaText(r),
       estado: String(r.estado || ""),
+      ip: ipText(r),
+      auth_method: authMethodText(r),
       entidad: entidadText(r),
       ruta: `${String(r.metodo || "").toUpperCase()} ${String(r.ruta || "")}`.trim(),
       detalles: detallesText(r),
@@ -432,6 +490,8 @@
       usuario: "",
       area: "",
       estado: "",
+      ip: "",
+      auth_method: "",
       entidad: "",
       ruta: "",
       detalles: "",
@@ -528,4 +588,3 @@
     });
   });
 })();
-

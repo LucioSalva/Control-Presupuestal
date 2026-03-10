@@ -163,8 +163,14 @@ export async function logAuditEvent(req, event = {}) {
     const ruta = String(req.originalUrl || req.path || "");
 
     let detalles = null;
-    if (event?.detalles != null) {
-      detalles = JSON.stringify(event.detalles);
+    const traceId =
+      req.cpTraceId || req.traceId || (req.headers["x-trace-id"] ? String(req.headers["x-trace-id"]) : null);
+    const baseDetalles = event?.detalles;
+    if (baseDetalles != null) {
+      if (typeof baseDetalles === "object") detalles = JSON.stringify({ ...baseDetalles, trace_id: traceId });
+      else detalles = JSON.stringify({ value: baseDetalles, trace_id: traceId });
+    } else if (traceId) {
+      detalles = JSON.stringify({ trace_id: traceId });
     }
 
     await query(
@@ -187,6 +193,7 @@ export async function logAuditEvent(req, event = {}) {
         detalles,
       ]
     );
+    req._cpAuditLogged = true;
   } catch (err) {
     console.warn("[AUDITORIA_EVENTOS] no se pudo registrar", err?.message || err);
   }

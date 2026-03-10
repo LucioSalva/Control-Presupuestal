@@ -125,11 +125,34 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
 
   if (btnLogout) {
-    btnLogout.addEventListener("click", () => {
+    btnLogout.addEventListener("click", async () => {
+      const apiBase = (
+        window.API_URL ||
+        ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+        window.location.port &&
+        window.location.port !== "3000"
+          ? "http://localhost:3000"
+          : window.location.origin) ||
+        "http://localhost:3000"
+      ).replace(/\/$/, "");
+
+      try {
+        await fetch(`${apiBase}/api/logout`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      } catch {}
+
       localStorage.removeItem("cp_usuario");
       localStorage.removeItem("cp_token");
       localStorage.removeItem("cp_login_time");
       localStorage.removeItem("cp_current_project");
+      localStorage.removeItem("token");
+      localStorage.removeItem("authToken");
+      sessionStorage.removeItem("cp_usuario");
+      sessionStorage.removeItem("cp_token");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("authToken");
       window.location.replace("login.html");
     });
   }
