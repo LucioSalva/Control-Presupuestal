@@ -45,6 +45,31 @@ export async function logUnauthorizedPartidasAccess(req, context = {}) {
       )`
     );
 
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS actor_id integer`
+    );
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS id_dgeneral integer`
+    );
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS id_dauxiliar integer`
+    );
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS metodo text`
+    );
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS ruta text`
+    );
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS motivo text`
+    );
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS payload jsonb`
+    );
+    await query(
+      `ALTER TABLE public.auditoria_accesos ADD COLUMN IF NOT EXISTS created_at timestamp without time zone DEFAULT now()`
+    );
+
     const actorId = getActorId(req) || req.user?.id || null;
     const idDg = Number(req.user?.id_dgeneral ?? null);
     const idDa = Number(req.user?.id_dauxiliar ?? null);
@@ -59,8 +84,111 @@ export async function logUnauthorizedPartidasAccess(req, context = {}) {
        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb, now())`,
       [actorId, Number.isFinite(idDg) ? idDg : null, Number.isFinite(idDa) ? idDa : null, metodo, ruta, motivo, payload]
     );
+
+    await logAuditEvent(req, {
+      tipo: "DENEGADO",
+      entidad: "PARTIDAS",
+      entidad_id: null,
+      estado: "BLOQUEADO",
+      detalles: {
+        motivo,
+        ruta,
+        metodo,
+        data: context?.data ?? null,
+      },
+    });
   } catch (err) {
     console.warn("[AUDITORIA_PARTIDAS] no se pudo registrar", err?.message || err);
+  }
+}
+
+export async function ensureAuditoriaEventosSchema() {
+  await query(
+    `CREATE TABLE IF NOT EXISTS public.auditoria_eventos (
+      id bigserial PRIMARY KEY,
+      created_at timestamp without time zone DEFAULT now(),
+      tipo text NOT NULL,
+      entidad text,
+      entidad_id text,
+      estado text,
+      actor_id integer,
+      id_dgeneral integer,
+      id_dauxiliar integer,
+      metodo text,
+      ruta text,
+      detalles jsonb
+    )`
+  );
+
+  await query(
+    `ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS created_at timestamp without time zone DEFAULT now()`
+  );
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS tipo text`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS entidad text`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS entidad_id text`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS estado text`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS actor_id integer`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS id_dgeneral integer`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS id_dauxiliar integer`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS metodo text`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS ruta text`);
+  await query(`ALTER TABLE public.auditoria_eventos ADD COLUMN IF NOT EXISTS detalles jsonb`);
+
+  await query(
+    `CREATE INDEX IF NOT EXISTS idx_auditoria_eventos_created_at ON public.auditoria_eventos (created_at DESC)`
+  );
+  await query(
+    `CREATE INDEX IF NOT EXISTS idx_auditoria_eventos_tipo_created_at ON public.auditoria_eventos (tipo, created_at DESC)`
+  );
+  await query(
+    `CREATE INDEX IF NOT EXISTS idx_auditoria_eventos_actor_created_at ON public.auditoria_eventos (actor_id, created_at DESC)`
+  );
+}
+
+export async function logAuditEvent(req, event = {}) {
+  try {
+    await ensureAuditoriaEventosSchema();
+
+    const actorId = getActorId(req) || req.user?.id || null;
+    const idDg = Number(req.user?.id_dgeneral ?? null);
+    const idDa = Number(req.user?.id_dauxiliar ?? null);
+
+    const tipo = String(event?.tipo || "").trim().toUpperCase();
+    if (!tipo) return;
+
+    const entidad = event?.entidad == null ? null : String(event.entidad).trim().toUpperCase();
+    const entidadId = event?.entidad_id == null ? null : String(event.entidad_id).trim();
+    const estado = event?.estado == null ? null : String(event.estado).trim().toUpperCase();
+    const metodo = String(req.method || "").toUpperCase();
+    const ruta = String(req.originalUrl || req.path || "");
+
+    let detalles = null;
+    if (event?.detalles != null) {
+      detalles = JSON.stringify(event.detalles);
+    }
+
+    await query(
+      `
+      INSERT INTO public.auditoria_eventos
+        (tipo, entidad, entidad_id, estado, actor_id, id_dgeneral, id_dauxiliar, metodo, ruta, detalles, created_at)
+      VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb, now())
+      `,
+      [
+        tipo,
+        entidad,
+        entidadId,
+        estado,
+        actorId,
+        Number.isFinite(idDg) ? idDg : null,
+        Number.isFinite(idDa) ? idDa : null,
+        metodo,
+        ruta,
+        detalles,
+      ]
+    );
+  } catch (err) {
+    console.warn("[AUDITORIA_EVENTOS] no se pudo registrar", err?.message || err);
   }
 }
 

@@ -1,7 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { query, getClient } from "../db.js";
-import { computeSaldo, getActorId } from "../utils/helpers.js";
+import { computeSaldo, getActorId, logAuditEvent } from "../utils/helpers.js";
 
 const router = express.Router();
 
@@ -736,6 +736,23 @@ router.post("/", async (req, res) => {
     }
 
     await client.query("COMMIT");
+    await logAuditEvent(req, {
+      tipo: "RECONDUCCION",
+      entidad: "RECONDUCCIONES",
+      entidad_id: cab.rows[0].oficio,
+      estado: "BORRADOR",
+      detalles: {
+        id_reconduccion: reconId,
+        oficio: cab.rows[0].oficio,
+        tipo_movimiento: cab.rows[0].tipo_movimiento,
+        estatus: cab.rows[0].estatus,
+        ejercicio: cab.rows[0].ejercicio ?? null,
+        mes_pago_date: cab.rows[0].mes_pago_date ?? null,
+        lados: Array.isArray(lados) ? lados.length : 0,
+        recursos: Array.isArray(b.recursos) ? b.recursos.length : 0,
+        metas: Array.isArray(b.metas) ? b.metas.length : 0,
+      },
+    });
     return res.json({ ok: true, cabecera: cab.rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -899,6 +916,13 @@ router.put("/:id", async (req, res) => {
     }
 
     await client.query("COMMIT");
+    await logAuditEvent(req, {
+      tipo: "RECONDUCCION_EDITAR",
+      entidad: "RECONDUCCIONES",
+      entidad_id: String(id),
+      estado: "ACTUALIZADA",
+      detalles: { id_reconduccion: id },
+    });
     return res.json({ ok: true });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -934,6 +958,13 @@ router.post("/:id/enviar", async (req, res) => {
       return res.status(400).json({ error: "Solo se puede enviar desde BORRADOR" });
     }
 
+    await logAuditEvent(req, {
+      tipo: "RECONDUCCION_ENVIAR",
+      entidad: "RECONDUCCIONES",
+      entidad_id: r.rows[0].oficio ?? String(id),
+      estado: "ENVIADO",
+      detalles: { id_reconduccion: id, oficio: r.rows[0].oficio ?? null },
+    });
     return res.json({ ok: true, cabecera: r.rows[0] });
   } catch (err) {
     console.error("POST /api/reconducciones/:id/enviar", err);
@@ -1232,6 +1263,19 @@ router.post("/:id/aplicar", async (req, res) => {
     );
 
     await client.query("COMMIT");
+    await logAuditEvent(req, {
+      tipo: "RECONDUCCION_APLICAR",
+      entidad: "RECONDUCCIONES",
+      entidad_id: upd.rows[0].oficio ?? String(id),
+      estado: "APLICADO",
+      detalles: {
+        id_reconduccion: id,
+        oficio: upd.rows[0].oficio ?? null,
+        ejercicio: ejercicioFinal ?? null,
+        mes_pago_date: mesPagoFinal ?? null,
+        mes_pago: mesNombre ?? null,
+      },
+    });
     return res.json({ ok: true, cabecera: upd.rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -1270,6 +1314,13 @@ router.post("/:id/cancelar", async (req, res) => {
       return res.status(400).json({ error: "No se puede cancelar una reconducción aplicada" });
     }
 
+    await logAuditEvent(req, {
+      tipo: "RECONDUCCION_CANCELAR",
+      entidad: "RECONDUCCIONES",
+      entidad_id: r.rows[0].oficio ?? String(id),
+      estado: "CANCELADO",
+      detalles: { id_reconduccion: id, oficio: r.rows[0].oficio ?? null, motivo },
+    });
     return res.json({ ok: true, cabecera: r.rows[0] });
   } catch (err) {
     console.error("POST /api/reconducciones/:id/cancelar", err);

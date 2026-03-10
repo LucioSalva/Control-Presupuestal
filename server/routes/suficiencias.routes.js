@@ -2,8 +2,13 @@ import express from "express";
 import { query, getClient } from "../db.js";
 import {
   isPartidaMilKey,
+  logAuditEvent,
   logUnauthorizedPartidasAccess,
 } from "../utils/helpers.js";
+import {
+  canViewIepsPensionesByClaves,
+  sanitizeFinancialFieldsForLimitedView,
+} from "../utils/financial-fields-perm.js";
 
 const router = express.Router();
 
@@ -45,6 +50,26 @@ async function isUserE00(req) {
   const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
   const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
   return dgClave === "E00";
+}
+
+async function getUserDgDaClaves(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  const daId = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return { dg: "", da: "" };
+
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
+  ]);
+
+  const dg = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  const da = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
+  return { dg, da };
+}
+
+async function canViewIepsPensiones(req) {
+  const { dg, da } = await getUserDgDaClaves(req);
+  return canViewIepsPensionesByClaves(dg, da);
 }
 
 function normalizeNumber(n, def = 0) {
@@ -125,7 +150,7 @@ router.post("/", async (req, res) => {
   const client = await getClient();
   try {
     const b = req.body || {};
-    const allowIEPSPensiones = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowIEPSPensiones = await canViewIepsPensiones(req);
 
     const fechaBaseRaw = b.fecha ? new Date(b.fecha) : new Date();
     const fechaBase = Number.isNaN(fechaBaseRaw.getTime())
@@ -295,6 +320,25 @@ router.post("/", async (req, res) => {
     await client.query("COMMIT");
     const full = normalizeSufRow(rFull.rows?.[0] || null);
 
+    await logAuditEvent(req, {
+      tipo: "SUFICIENCIA",
+      entidad: "SUFICIENCIAS",
+      entidad_id: rHead.rows[0].no_suficiencia,
+      estado: full?.estado ?? "CREADA",
+      detalles: {
+        id_suficiencia: idSuf,
+        folio_num: rHead.rows[0].folio_num,
+        no_suficiencia: rHead.rows[0].no_suficiencia,
+        id_dgeneral: b.id_dgeneral ?? null,
+        id_dauxiliar: b.id_dauxiliar ?? null,
+        id_proyecto: b.id_proyecto ?? null,
+        id_fuente: b.id_fuente ?? null,
+        mes_pago: b.mes_pago ?? null,
+        total: total,
+        renglones: Array.isArray(b.detalle) ? b.detalle.length : 0,
+      },
+    });
+
     return res.json({
       ok: true,
       id: idSuf,
@@ -323,7 +367,7 @@ router.post("/", async (req, res) => {
    ===================================================== */
 router.get("/perm-ieps-pensiones", async (req, res) => {
   try {
-    const allowed = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowed = await canViewIepsPensiones(req);
     return res.json({ allowed: !!allowed });
   } catch (err) {
     console.error("[GET perm-ieps-pensiones] error:", err);
@@ -333,7 +377,7 @@ router.get("/perm-ieps-pensiones", async (req, res) => {
 
 router.get("/dashboards-perm", async (req, res) => {
   try {
-    const allowed = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowed = await canViewIepsPensiones(req);
     return res.json({ allowed: !!allowed });
   } catch (err) {
     console.error("[GET dashboards-perm] error:", err);
@@ -458,6 +502,13 @@ router.post("/:id/cancelar", async (req, res) => {
       );
       await client.query("ROLLBACK");
       const viewRow = normalizeSufRow(rView.rows?.[0] || null);
+      await logAuditEvent(req, {
+        tipo: "SUFICIENCIA_CANCELAR",
+        entidad: "SUFICIENCIAS",
+        entidad_id: String(id),
+        estado: "YA_CANCELADA",
+        detalles: { id_suficiencia: id, cancel_reason: cancelReason },
+      });
       return res.json({ ok: true, already: true, ...viewRow });
     }
 
@@ -493,6 +544,13 @@ router.post("/:id/cancelar", async (req, res) => {
 
     await client.query("COMMIT");
     const viewRow = normalizeSufRow(rView.rows?.[0] || null);
+    await logAuditEvent(req, {
+      tipo: "SUFICIENCIA_CANCELAR",
+      entidad: "SUFICIENCIAS",
+      entidad_id: String(id),
+      estado: "CANCELADA",
+      detalles: { id_suficiencia: id, cancel_reason: cancelReason },
+    });
     return res.json({ ok: true, ...viewRow });
   } catch (err) {
     try {
@@ -579,7 +637,11 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "No encontrada" });
     }
 
-    const head = normalizeSufRow(rHead.rows[0]);
+    const headRaw = normalizeSufRow(rHead.rows[0]);
+    const allowIEPSPensiones = await canViewIepsPensiones(req);
+    const head = allowIEPSPensiones
+      ? headRaw
+      : sanitizeFinancialFieldsForLimitedView(headRaw);
 
     // 2) Detalle
     const rDet = await query(
@@ -590,7 +652,7 @@ router.get("/:id", async (req, res) => {
       [id],
     );
     const detalleRows = Array.isArray(rDet.rows) ? rDet.rows : [];
-    const allowedMil = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowedMil = await canViewIepsPensiones(req);
     const detalle = allowedMil
       ? detalleRows
       : detalleRows.filter((row) => !isPartidaMilKey(row?.clave));

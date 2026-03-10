@@ -632,27 +632,6 @@ function initPasswordGeneratorModal() {
     }
   });
 
-    // Botón Cerrar sesión
-  const btnLogout = document.getElementById("btnLogout");
-  if (btnLogout) {
-    btnLogout.addEventListener("click", () => {
-      if (window.Swal) {
-        Swal.fire({
-          title: "¿Cerrar sesión?",
-          text: "Tu sesión se cerrará y deberás iniciar sesión nuevamente.",
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonText: "Sí, salir",
-          cancelButtonText: "Cancelar",
-        }).then((r) => {
-          if (r.isConfirmed) cerrarSesion();
-        });
-      } else {
-        cerrarSesion();
-      }
-    });
-  }
-
 }
 
 // =====================================================

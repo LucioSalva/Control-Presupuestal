@@ -23,6 +23,10 @@ function normUp(v) {
 function onlyDigits(v) {
   return normStr(v).replace(/[^\d]/g, "");
 }
+function pad10Digits(v) {
+  const d = onlyDigits(v);
+  return d ? d.padStart(10, "0") : "";
+}
 
 /**
  * Obtiene dg_clave y da_clave del usuario logueado (para rol AREA)
@@ -68,7 +72,7 @@ async function getProyectoClaveConacById(idProyecto) {
   const row = r.rows?.[0];
   if (!row) return null;
 
-  const proy_clave = onlyDigits(row.clave);
+  const proy_clave = pad10Digits(row.clave);
   const conac = normUp(row.conac);
   return { proy_clave, conac };
 }
@@ -103,7 +107,7 @@ router.get("/", async (req, res) => {
     }
 
     // --- PROY/CONAC
-    let proy_clave = onlyDigits(req.query.proy_clave);
+    let proy_clave = pad10Digits(req.query.proy_clave);
     let conac = normUp(req.query.conac);
 
     const idProyecto = req.query.id_proyecto ? Number(req.query.id_proyecto) : null;
@@ -126,11 +130,11 @@ router.get("/", async (req, res) => {
       `
       SELECT id, meta
       FROM public.metas
-      WHERE dg_clave   = $1
-        AND da_clave   = $2
-        AND proy_clave = $3
-        AND conac      = $4
-        AND activo     = TRUE
+      WHERE TRIM(UPPER(dg_clave)) = $1
+        AND TRIM(da_clave)        = $2
+        AND LPAD(REGEXP_REPLACE(TRIM(proy_clave), '\\D', '', 'g'), 10, '0') = $3
+        AND TRIM(UPPER(conac))    = $4
+        AND COALESCE(activo, TRUE) = TRUE
       ORDER BY id ASC
       `,
       [dg_clave, da_clave, proy_clave, conac]

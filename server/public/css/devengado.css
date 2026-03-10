@@ -1,8 +1,4 @@
 body{font-size:12px;background-color:#f5f5f5;margin:0;}
-.navbar{background:#691c32;position:fixed;top:0;left:0;right:0;min-height:50px;z-index:1030;}
-.navbar-light{position:fixed;top:50px;left:0;right:0;min-height:40px;z-index:1029;background:#691c32!important;border-bottom:1px solid #5a1629;}
-.navbar .navbar-brand,.navbar .nav-link,.navbar-light .nav-link{color:#ffffff!important;}
-.navbar-light .nav-link{padding:12px 20px;border-radius:0;margin:0;font-size:14px;font-weight:700;background:#691c32;border-right:1px solid #5a1629;white-space:nowrap;}
 .form-container{max-width:1000px;margin:20px auto;background:#fff;padding:20px 30px;border-radius:6px;box-shadow:0 0 6px rgba(0,0,0,.1);}
 .form-title{text-align:center;font-weight:700;text-transform:uppercase;font-size:14px;letter-spacing:.3px;}
 .sub-title{text-align:center;font-size:12px;font-weight:600;}
@@ -48,13 +44,6 @@ td input[name="cantidad_con_letra"].ro{display:block!important;}
 }
 
 @media (max-width:480px){
-  body{padding-top:140px;}
-  .navbar .container-fluid{display:flex;flex-direction:column;gap:6px;align-items:center;padding-top:6px;padding-bottom:6px;}
-  .logo-container{position:static;transform:none;text-align:center;margin:5px 0;order:3;width:100%;}
-  .navbar-light{top:100px;}
-  .navbar-light .container-fluid{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .navbar-light .navbar-nav{flex-wrap:nowrap!important;white-space:nowrap;}
-  .navbar-light .nav-link{padding:12px 16px;font-size:13px;}
   .form-container{padding:12px 12px;}
   .form-container.doc-header{padding:12px 12px!important;border-radius:12px!important;}
   .form-container.doc-header .row{row-gap:10px;}
@@ -64,20 +53,6 @@ td input[name="cantidad_con_letra"].ro{display:block!important;}
 }
 
 @media (min-width:600px) and (max-width:768px){
-  body{padding-top:140px;}
-  .navbar .container-fluid{display:flex;flex-direction:column;gap:6px;align-items:center;padding-top:6px;padding-bottom:6px;}
-  .logo-container{position:static;transform:none;text-align:center;margin:5px 0;order:3;width:100%;}
-  .navbar-light{top:100px;}
-  .navbar-light .navbar-nav{flex-wrap:wrap!important;}
   .form-container{padding:16px 16px;}
   .form-container.doc-header{padding:12px 16px!important;}
-}
-
-@media (max-width:992px){
-  body{padding-top:140px;}
-  .logo-container{position:static;transform:none;text-align:center;margin:5px 0;order:3;width:100%;}
-  .navbar .container-fluid{flex-direction:column;min-height:auto;}
-  .navbar-brand{order:1;}
-  .ms-auto{order:4;margin-left:0!important;margin-top:5px;}
-  .navbar-light{top:100px;}
 }

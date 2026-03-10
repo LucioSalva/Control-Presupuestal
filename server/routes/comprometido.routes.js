@@ -2,6 +2,7 @@ import express from "express";
 import { query, getClient } from "../db.js";
 import {
   isPartidaMilKey,
+  logAuditEvent,
   logUnauthorizedPartidasAccess,
 } from "../utils/helpers.js";
 
@@ -227,6 +228,21 @@ router.post("/", async (req, res) => {
     }
 
     await client.query("COMMIT");
+
+    await logAuditEvent(req, {
+      tipo: "COMPROMETIDO",
+      entidad: "COMPROMETIDOS",
+      entidad_id: rHead.rows[0].no_comprometido,
+      estado: "CREADO",
+      detalles: {
+        id_comprometido: idComp,
+        id_suficiencia: idSuf,
+        folio_num: rHead.rows[0].folio_num,
+        no_comprometido: rHead.rows[0].no_comprometido,
+        total: total,
+        renglones: Array.isArray(detalle) ? detalle.length : 0,
+      },
+    });
 
     return res.json({
       ok: true,
@@ -477,6 +493,19 @@ router.post("/:id/cerrar", async (req, res) => {
     );
 
     await client.query("COMMIT");
+
+    await logAuditEvent(req, {
+      tipo: "COMPROMETIDO_CERRAR",
+      entidad: "COMPROMETIDOS",
+      entidad_id: String(idComp),
+      estado: "CERRADO",
+      detalles: {
+        id_comprometido: idComp,
+        total_comprometido: totalComp,
+        devengado_acumulado: devAcum,
+        monto_liberado: saldo,
+      },
+    });
 
     return res.json({
       ok: true,

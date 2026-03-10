@@ -90,6 +90,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    const tbody = document.getElementById("tbody");
+    if (!tbody) return;
+
     if (!getToken()) {
       window.location.href = "login.html";
       return;
@@ -111,8 +114,9 @@
     const btnPrev = document.getElementById("btnPrev");
     const btnNext = document.getElementById("btnNext");
 
-    const tbody = document.getElementById("tbody");
     const countInfo = document.getElementById("countInfo");
+    if (!countInfo) return;
+    if (!page) return;
 
     // State
     let all = [];

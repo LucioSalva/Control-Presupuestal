@@ -2,6 +2,7 @@ import express from "express";
 import { query, getClient } from "../db.js";
 import {
   isPartidaMilKey,
+  logAuditEvent,
   logUnauthorizedPartidasAccess,
 } from "../utils/helpers.js";
 
@@ -413,6 +414,22 @@ router.post("/", async (req, res) => {
 
     await client.query("COMMIT");
 
+    await logAuditEvent(req, {
+      tipo: "DEVENGADO",
+      entidad: "DEVENGADOS",
+      entidad_id: rHead.rows[0].no_devengado,
+      estado: "CREADO",
+      detalles: {
+        id_devengado: idDev,
+        id_comprometido: idComp,
+        id_suficiencia: idSuf,
+        folio_num: rHead.rows[0].folio_num,
+        no_devengado: rHead.rows[0].no_devengado,
+        total: totalDev,
+        renglones: Array.isArray(detalle) ? detalle.length : 0,
+      },
+    });
+
     return res.json({
       ok: true,
       id: idDev,
@@ -488,6 +505,13 @@ router.patch("/:id/cancelar", async (req, res) => {
     );
 
     await client.query("COMMIT");
+    await logAuditEvent(req, {
+      tipo: "DEVENGADO_CANCELAR",
+      entidad: "DEVENGADOS",
+      entidad_id: String(idDev),
+      estado: "CANCELADO",
+      detalles: { id_devengado: idDev },
+    });
     return res.json({ ok: true, id: idDev });
   } catch (err) {
     try {

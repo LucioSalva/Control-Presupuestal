@@ -5,22 +5,26 @@
         <a class="navbar-brand fw-semibold" href="index.html">
           <i class="bi bi-currency-dollar me-2"></i>Control Presupuestal
         </a>
-        <div class="logo-container">
+        <div class="cp-logo-container">
           <img src="/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="navbar-logo">
         </div>
-        <div class="ms-auto d-flex gap-2 align-items-center">
-          <span id="userInfo" class="text-white fw-bold"></span>
-          <button id="btnLogout" class="btn btn-sm btn-outline-light bi bi-door-open">Cerrar sesión</button>
+        <div class="ms-auto d-flex gap-2 align-items-center cp-user-actions">
+          <span id="userInfo" class="cp-user text-white fw-bold text-truncate"></span>
+          <button id="btnLogout" class="btn btn-sm btn-outline-light">
+            <i class="bi bi-door-open me-1"></i>
+            <span class="d-none d-sm-inline">Cerrar sesión</span>
+            <span class="d-inline d-sm-none">Salir</span>
+          </button>
         </div>
       </div>
     </nav>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm cp-tabs-nav">
+    <nav class="navbar navbar-expand-lg shadow-sm cp-tabs-nav">
       <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#cpTabsNav" aria-controls="cpTabsNav" aria-expanded="false" aria-label="Abrir menú">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="cpTabsNav">
-          <ul class="navbar-nav me-auto mb-2 mb-lg-0 cp-tabs">
+          <ul class="navbar-nav me-auto cp-tabs">
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Operación</a>
               <ul class="dropdown-menu">
@@ -45,6 +49,13 @@
                 <li><a class="dropdown-item" href="dashboard_partidas.html">Dashboard Partidas</a></li>
                 <li><a class="dropdown-item" href="dashboard_partidas_grafica.html">Gráficas Partidas</a></li>
                 <li><a class="dropdown-item" href="suficiencia_historial.html">Historial de Suficiencias</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown d-none" id="cpNavGod">
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Panel GOD</a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="consola_god.html">Consola de monitoreo</a></li>
+                <li><a class="dropdown-item" href="admin-usuarios.html">Administración de Usuarios</a></li>
               </ul>
             </li>
           </ul>
@@ -127,7 +138,12 @@
         localStorage.getItem("authToken") ||
         sessionStorage.getItem("authToken") ||
         "";
-      const headers = t ? { Authorization: `Bearer ${t}` } : {};
+      if (!t) {
+        const li = document.getElementById("cpNavDashboards");
+        if (li) li.classList.add("d-none");
+        return;
+      }
+      const headers = { Authorization: `Bearer ${t}` };
       const r = await fetch("/api/suficiencias/dashboards-perm", { headers });
       const ok = r.ok ? await r.json() : { allowed: false };
       const allowed = !!ok?.allowed;
@@ -141,6 +157,25 @@
     }
   }
 
+  function applyGodVisibility() {
+    const li = document.getElementById("cpNavGod");
+    if (!li) return;
+    try {
+      const raw = localStorage.getItem("cp_usuario");
+      if (!raw) {
+        li.classList.add("d-none");
+        return;
+      }
+      const user = JSON.parse(raw);
+      const roles = Array.isArray(user?.roles) ? user.roles : [];
+      const rolesNorm = roles.map((r) => String(r || "").trim().toUpperCase());
+      if (rolesNorm.includes("GOD")) li.classList.remove("d-none");
+      else li.classList.add("d-none");
+    } catch {
+      li.classList.add("d-none");
+    }
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       mountNavbar();
@@ -148,6 +183,7 @@
       setFavicon();
       applyReconHistorialVisibility();
       applyDashboardsVisibility();
+      applyGodVisibility();
     });
   } else {
     mountNavbar();
@@ -155,5 +191,6 @@
     setFavicon();
     applyReconHistorialVisibility();
     applyDashboardsVisibility();
+    applyGodVisibility();
   }
 })();

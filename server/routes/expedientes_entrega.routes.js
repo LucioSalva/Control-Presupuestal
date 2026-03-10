@@ -1,5 +1,6 @@
 import express from "express";
 import { query, getClient } from "../db.js";
+import { getActorId, logAuditEvent } from "../utils/helpers.js";
 
 const router = express.Router();
 
@@ -526,6 +527,24 @@ router.post("/", async (req, res) => {
     const r = await client.query(sql, params);
     await client.query("COMMIT");
 
+    await logAuditEvent(req, {
+      tipo: "EXPEDIENTE_ENTREGA",
+      entidad: "EXPEDIENTES_ENTREGA",
+      entidad_id: String(r.rows[0].id),
+      estado: payload.estatus || "GUARDADO",
+      detalles: {
+        id_expediente_entrega: r.rows[0].id,
+        folio,
+        anio,
+        mes,
+        id_suficiencia,
+        id_comprometido,
+        id_devengado,
+        estatus: payload.estatus || null,
+        actor_id: getActorId(req) || req.user?.id || null,
+      },
+    });
+
     return res.json({ ok: true, id: r.rows[0].id });
   } catch (err) {
     try {
@@ -626,6 +645,25 @@ router.patch("/:id", async (req, res) => {
     await client.query("COMMIT");
 
     if (!r.rowCount) return res.status(404).json({ error: "Entrega no encontrada" });
+
+    await logAuditEvent(req, {
+      tipo: "EXPEDIENTE_ENTREGA_ACTUALIZAR",
+      entidad: "EXPEDIENTES_ENTREGA",
+      entidad_id: String(r.rows[0].id),
+      estado: payload[16] || "ACTUALIZADO",
+      detalles: {
+        id_expediente_entrega: r.rows[0].id,
+        folio,
+        anio,
+        mes,
+        id_suficiencia,
+        id_comprometido,
+        id_devengado,
+        estatus: payload[16] || null,
+        actor_id: getActorId(req) || req.user?.id || null,
+      },
+    });
+
     return res.json({ ok: true, id: r.rows[0].id });
   } catch (err) {
     try {

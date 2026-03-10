@@ -25,6 +25,7 @@ import partidasRouter from "./routes/partidas.routes.js";
 import presupuestoBasePartidasRouter from "./routes/presupuesto_base_partidas.routes.js";
 import dashboardPartidasRouter from "./routes/dashboard_partidas.routes.js";
 import reconduccionesRouter from "./routes/reconducciones.routes.js";
+import adminAuditoriaRouter from "./routes/admin-auditoria.routes.js";
 import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
 
 
@@ -72,13 +73,16 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 // 3) CORS: NO uses origin:true en producción.
 // Para local dejamos whitelist (ajusta si usas otro puerto)
+const API_PORT = Number(process.env.PORT) || 3000;
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:5500",
   "http://127.0.0.1:5500",
   "http://localhost:5502",
   "http://127.0.0.1:5502",
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
+  "http://localhost:4200",
+  "http://127.0.0.1:4200",
+  `http://localhost:${API_PORT}`,
+  `http://127.0.0.1:${API_PORT}`,
 ]);
 
 app.use(
@@ -233,6 +237,7 @@ app.use("/api", authRouter);
 
 // 🔥 CIERRE DE HUECO: admin usuarios YA NO va público
 app.use("/api/admin/usuarios", authRequired, requireGodOrAdmin, adminUsuariosRouter);
+app.use("/api/admin/auditoria", authRequired, requireGodOrAdmin, adminAuditoriaRouter);
 
 app.use("/api/suficiencias", authRequired, suficienciasRouter);
 app.use("/api/comprometido", authRequired, comprometidoRouter);

@@ -385,7 +385,7 @@ async function loadProjectMetas(project) {
       key.clave
     )}&conac=${encodeURIComponent(key.conac)}`;
     const data = await apiGet(path);
-    const metas = Array.isArray(data) ? data : [];
+    const metas = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
 
     if (!metas.length) {
       metasWrap.innerHTML = `<div class="col-12 text-secondary small">Sin metas registradas.</div>`;

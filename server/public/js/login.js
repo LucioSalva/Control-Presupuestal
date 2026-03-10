@@ -73,7 +73,7 @@
 
         // ✅ Redirección FINAL (una sola)
         if (rolesNorm.includes("GOD")) {
-          window.location.href = "admin-usuarios.html";
+          window.location.href = "consola_god.html";
           return;
         }
 

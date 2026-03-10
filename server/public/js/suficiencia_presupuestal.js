@@ -22,6 +22,8 @@
   const btnAddRow = document.getElementById("btn-add-row");
   const btnRemoveRow = document.getElementById("btn-remove-row");
   const detalleBody = document.getElementById("detalleBody");
+  const metaSelect = document.getElementById("metaSelect");
+  const metaHelp = document.getElementById("metaHelp");
 
   const modalEl = document.getElementById("modalConfirm");
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
@@ -45,6 +47,9 @@
   let partidasMap = {};
   let fuentesMap = {};
   let fuentesRows = [];
+  let metasRows = [];
+  let metasAllowedIds = new Set();
+  let metasRequestKey = "";
 
   // ---------------------------
   // AUTH
@@ -689,6 +694,20 @@
   }
 
   function rowTemplate(i) {
+    const justCell =
+      i === 1
+        ? `
+          <td id="justificacionTd" rowspan="1" style="width: 20%; vertical-align: top;">
+            <textarea class="form-control form-control-sm h-100"
+              id="justificacionGeneral"
+              name="justificacion_general"
+              placeholder="Justificación"
+              rows="6"
+              style="resize: none; min-height: 110px;"
+              autocomplete="off"></textarea>
+          </td>
+        `
+        : "";
     return `
       <tr data-row="${i}">
         <td style="width: 5%;">
@@ -709,11 +728,10 @@
             readonly>
         </td>
 
-        <td style="width: 20%;">
-          <input type="text" class="form-control form-control-sm" name="r${i}_justificacion" placeholder="Justificación">
-        </td>
+        ${justCell}
 
         <td style="width: 33%;">
+          <input type="hidden" name="r${i}_justificacion" value="">
           <input type="text" class="form-control form-control-sm" name="r${i}_descripcion" placeholder="Descripción">
         </td>
 
@@ -729,6 +747,13 @@
     `;
   }
 
+  function updateJustificacionRowspan() {
+    const td = document.getElementById("justificacionTd");
+    if (!td) return;
+    const n = rowCount();
+    td.setAttribute("rowspan", String(Math.max(1, n)));
+  }
+
   function addRow() {
     if (!detalleBody) return;
 
@@ -739,6 +764,9 @@
     }
 
     detalleBody.insertAdjacentHTML("beforeend", rowTemplate(next));
+    bindJustificacionGeneral();
+    updateJustificacionRowspan();
+    setVal(`r${next}_justificacion`, getJustificacionGeneralValue());
     attachMoneyInputs(detalleBody);
     refreshTotales();
   }
@@ -779,6 +807,7 @@
 
     detalleBody.lastElementChild?.remove();
     renumberRows();
+    updateJustificacionRowspan();
     refreshTotales();
   }
 
@@ -786,21 +815,61 @@
     if (!detalleBody) return;
     detalleBody.innerHTML = "";
     for (let i = 0; i < START_ROWS; i++) addRow();
+    bindJustificacionGeneral();
+    updateJustificacionRowspan();
+    syncJustificacionToRows();
   }
 
   // ---------------------------
   // Totales + letras
   // ---------------------------
+  function setJustificacionValidity(message = "") {
+    const justificacionGeneral = document.getElementById("justificacionGeneral");
+    if (!justificacionGeneral) return;
+    const msg = String(message || "").trim();
+    if (msg) {
+      justificacionGeneral.classList.add("is-invalid");
+      justificacionGeneral.setCustomValidity(msg);
+    } else {
+      justificacionGeneral.classList.remove("is-invalid");
+      justificacionGeneral.setCustomValidity("");
+    }
+  }
+
+  function getJustificacionGeneralValue() {
+    return String(get("justificacion_general") || "").trim();
+  }
+
+  function syncJustificacionToRows() {
+    const v = getJustificacionGeneralValue();
+    const n = rowCount();
+    for (let i = 1; i <= n; i++) {
+      setVal(`r${i}_justificacion`, v);
+    }
+  }
+
+  function bindJustificacionGeneral() {
+    const el = document.getElementById("justificacionGeneral");
+    if (!el) return;
+    if (el.dataset.bound === "1") return;
+    el.dataset.bound = "1";
+    el.addEventListener("input", () => {
+      setJustificacionValidity("");
+      syncJustificacionToRows();
+    });
+  }
+
   function buildDetalle() {
     const rows = [];
     const n = rowCount();
+    const justGeneral = getJustificacionGeneralValue();
 
     for (let i = 1; i <= n; i++) {
       rows.push({
         renglon: i,
         clave: get(`r${i}_clave`),
         concepto_partida: get(`r${i}_concepto`),
-        justificacion: get(`r${i}_justificacion`),
+        justificacion: justGeneral,
         descripcion: get(`r${i}_descripcion`),
         importe: moneyParse(get(`r${i}_importe`)),
       });
@@ -936,6 +1005,10 @@
       const pensionList = document.getElementById("pensionList");
       const iepsControls = document.getElementById("iepsControls");
       const pensionControls = document.getElementById("pensionControls");
+      const trIeps = document.querySelector('[name="ieps"]')?.closest("tr");
+      const trPension = document
+        .querySelector('[name="pension_total"]')
+        ?.closest("tr");
       const pensInputs = Array.from(
         document.querySelectorAll('[name^="pension"][name$="_tasa"]'),
       );
@@ -961,6 +1034,8 @@
       if (pensionList) pensionList.classList.add("d-none");
       if (iepsControls) iepsControls.classList.add("d-none");
       if (pensionControls) pensionControls.classList.add("d-none");
+      if (trIeps) trIeps.classList.add("d-none");
+      if (trPension) trPension.classList.add("d-none");
       refreshTotales();
     } catch (e) {
       console.warn("[SP] permisos IEPS/Pensiones:", e?.message || e);
@@ -1359,16 +1434,166 @@
     if (descEl) descEl.textContent = p?.descripcion || "—";
   }
 
-  function syncMetaFromProyecto() {
+  function setMetaHelp(text, cls = "text-muted") {
+    if (!metaHelp) return;
+    metaHelp.className = `form-text small mt-1 ${cls}`;
+    metaHelp.textContent = String(text || "");
+  }
+
+  function setMetaInvalid(message) {
+    if (!metaSelect) return;
+    metaSelect.classList.add("is-invalid");
+    metaSelect.setAttribute("aria-invalid", "true");
+    setMetaHelp(message || "Selecciona una meta válida.", "text-danger");
+  }
+
+  function setMetaValid(message = "") {
+    if (!metaSelect) return;
+    metaSelect.classList.remove("is-invalid");
+    metaSelect.removeAttribute("aria-invalid");
+    if (message) setMetaHelp(message, "text-muted");
+  }
+
+  function setMetaSelectOptions(rows, placeholder = "-- Selecciona una meta --") {
+    if (!metaSelect) return;
+    metaSelect.innerHTML = "";
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = placeholder;
+    metaSelect.appendChild(opt0);
+    rows.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = String(m.id);
+      opt.textContent = String(m.meta || "").trim() || "Meta";
+      metaSelect.appendChild(opt);
+    });
+  }
+
+  function applySelectedMetaToHidden() {
+    if (!metaSelect) return;
+    const id = String(metaSelect.value || "").trim();
+    if (!id) {
+      setVal("meta", "");
+      return;
+    }
+    const row = metasRows.find((m) => String(m.id) === id);
+    setVal("meta", row?.meta ? String(row.meta).trim() : "");
+  }
+
+  async function syncMetaFromProyecto(preferMetaText = "") {
     const idProyecto = Number(get("id_proyecto") || 0);
     const p = proyectosById[idProyecto];
-    const metaText = p?.descripcion ? String(p.descripcion).trim() : "";
-    setVal("meta", metaText);
+    const fallbackMetaText = p?.descripcion ? String(p.descripcion).trim() : "";
 
-    const selMeta = document.querySelector('[name="id_meta"]');
-    if (selMeta) {
-      selMeta.disabled = true;
-      selMeta.value = "";
+    if (!metaSelect) {
+      setVal("meta", fallbackMetaText);
+      return;
+    }
+
+    metaSelect.disabled = true;
+    setMetaSelectOptions([], "-- Selecciona un proyecto --");
+    setMetaValid("");
+    setVal("meta", "");
+    metasRows = [];
+    metasAllowedIds = new Set();
+
+    if (!Number.isFinite(idProyecto) || idProyecto <= 0 || !p) {
+      setMetaHelp("Selecciona un proyecto para cargar metas.");
+      return;
+    }
+
+    const user = getLoggedUser();
+    const dgClave = _norm(dgeneralInfo?.clave || user?.dgeneral_clave);
+    const daClave = _normNum(dauxiliarInfo?.clave || user?.dauxiliar_clave);
+    let proyClave = String(p?.clave ?? "")
+      .trim()
+      .replace(/[^\d]/g, "");
+    if (proyClave) proyClave = proyClave.padStart(10, "0");
+    const conac = _norm(p?.conac);
+    if (!dgClave || !daClave || !proyClave || !conac) {
+      metaSelect.disabled = true;
+      setMetaSelectOptions([], "— Sin metas registradas —");
+      setMetaInvalid("Proyecto sin clave/CONAC o dependencias inválidas.");
+      setVal("meta", fallbackMetaText);
+      return;
+    }
+    const key = `${dgClave}|${daClave}|${proyClave}|${conac}`;
+    metasRequestKey = key;
+
+    metaSelect.disabled = true;
+    setMetaSelectOptions([], "Cargando metas...");
+    setMetaHelp("Cargando metas del proyecto...");
+
+    try {
+      const qs = new URLSearchParams({
+        dg_clave: dgClave,
+        da_clave: daClave,
+        proy_clave: proyClave,
+        conac,
+        id_proyecto: String(idProyecto),
+      });
+      const resp = await fetchJson(`${API}/api/catalogos/metas?${qs.toString()}`, {
+        headers: { ...authHeaders() },
+      });
+
+      if (metasRequestKey !== key) return;
+
+      const rows = Array.isArray(resp)
+        ? resp
+        : Array.isArray(resp?.data)
+          ? resp.data
+          : [];
+
+      metasRows = rows
+        .map((r) => ({
+          id: String(r?.id ?? "").trim(),
+          meta: String(r?.meta ?? "").trim(),
+        }))
+        .filter((r) => r.id && r.meta);
+
+      metasAllowedIds = new Set(metasRows.map((m) => String(m.id)));
+
+      if (!metasRows.length) {
+        metaSelect.disabled = true;
+        setMetaSelectOptions([], "— Sin metas registradas —");
+        setMetaHelp("No hay metas registradas para este proyecto.");
+        setVal("meta", fallbackMetaText);
+        return;
+      }
+
+      metaSelect.disabled = false;
+      setMetaSelectOptions(metasRows, "-- Selecciona una meta --");
+      setMetaHelp("Selecciona la meta correspondiente a la solicitud.");
+
+      const preferred = String(preferMetaText || get("meta") || "").trim();
+      const preferredNorm = preferred.toLowerCase();
+      const match =
+        preferredNorm
+          ? metasRows.find((m) => String(m.meta || "").trim().toLowerCase() === preferredNorm)
+          : null;
+
+      if (match) {
+        metaSelect.value = String(match.id);
+        applySelectedMetaToHidden();
+        setMetaValid("");
+        return;
+      }
+
+      if (metasRows.length === 1) {
+        metaSelect.value = String(metasRows[0].id);
+        applySelectedMetaToHidden();
+        setMetaValid("");
+        return;
+      }
+
+      metaSelect.value = "";
+      setVal("meta", "");
+    } catch (e) {
+      if (metasRequestKey !== key) return;
+      metaSelect.disabled = true;
+      setMetaSelectOptions([], "— No se pudieron cargar metas —");
+      setMetaHelp("No se pudieron cargar las metas. Verifica tu sesión o intenta más tarde.", "text-danger");
+      setVal("meta", fallbackMetaText);
     }
   }
 
@@ -1604,7 +1829,7 @@
     setVal("id_proyecto", idProy);
 
     updateClaveProgramatica();
-    syncMetaFromProyecto();
+    await syncMetaFromProyecto(data.meta || "");
 
     await applyFuenteFilters(String(data.id_fuente ?? ""));
 
@@ -1622,6 +1847,7 @@
     const detalle = Array.isArray(data.detalle) ? data.detalle : [];
     if (detalleBody) {
       detalleBody.innerHTML = "";
+      const baseJust = detalle.find((r) => String(r?.justificacion || "").trim())?.justificacion || "";
       detalle.forEach((row, idx) => {
         const i = idx + 1;
         detalleBody.insertAdjacentHTML("beforeend", rowTemplate(i));
@@ -1643,13 +1869,19 @@
           `r${i}_concepto`,
           partidasMap[clave] || row.concepto_partida || "",
         );
-        setVal(`r${i}_justificacion`, row.justificacion || "");
+        setVal(`r${i}_justificacion`, String(baseJust || "").trim());
         setVal(`r${i}_descripcion`, row.descripcion || "");
         setVal(`r${i}_importe`, moneyFormat(safeNumber(row.importe)));
       });
 
       if (!detalle.length) initRows();
     }
+
+    setVal("justificacion_general", String(detalle.find((r) => String(r?.justificacion || "").trim())?.justificacion || "").trim());
+    bindJustificacionGeneral();
+    setJustificacionValidity("");
+    updateJustificacionRowspan();
+    syncJustificacionToRows();
 
     attachMoneyInputs(detalleBody);
     refreshTotales();
@@ -1755,6 +1987,15 @@
 
   async function save() {
     refreshTotales();
+    if (metaSelect && !metaSelect.disabled && metasRows.length) {
+      const idMeta = String(metaSelect.value || "").trim();
+      if (!idMeta) throw new Error("Selecciona una META antes de guardar.");
+      if (!metasAllowedIds.has(idMeta)) throw new Error("Meta inválida para tu DG/DA/Proyecto.");
+      applySelectedMetaToHidden();
+      const metaText = String(get("meta") || "").trim();
+      if (!metaText) throw new Error("La META seleccionada es inválida.");
+      setMetaValid("");
+    }
     const payloadBackend = buildPayload();
 
     if (!payloadBackend.id_usuario) {
@@ -2863,10 +3104,27 @@
       .querySelector('[name="id_proyecto"]')
       ?.addEventListener("change", async () => {
         updateClaveProgramatica();
-        syncMetaFromProyecto();
+        await syncMetaFromProyecto();
         refreshTotales();
         await applyFuenteFilters();
       });
+
+    metaSelect?.addEventListener("change", () => {
+      const id = String(metaSelect.value || "").trim();
+      if (!id) {
+        setVal("meta", "");
+        if (metasRows.length) setMetaInvalid("Selecciona una meta.");
+        return;
+      }
+      if (!metasAllowedIds.has(id)) {
+        metaSelect.value = "";
+        setVal("meta", "");
+        setMetaInvalid("Meta inválida para tu DG/DA/Proyecto.");
+        return;
+      }
+      applySelectedMetaToHidden();
+      setMetaValid("");
+    });
 
     bindTaxEvents();
 
@@ -3128,6 +3386,8 @@
     refreshTotales();
     updateClaveProgramatica();
     syncMetaFromProyecto();
+    bindJustificacionGeneral();
+    syncJustificacionToRows();
   }
 
   if (document.readyState === "loading") {

@@ -1,6 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap");
 
 :root {
+  --cp-vino: #691c32;
+  --cp-vino-dark: #5a1629;
   --cp-gold: #691c32;
   --cp-gold-dark: #5a1629;
   --cp-text: #ffffff;
@@ -29,8 +31,8 @@ h6 {
 .btn-warning,
 .btn-secondary,
 .btn-dark {
-  background-color: var(--cp-gold) !important;
-  border-color: var(--cp-gold) !important;
+  background-color: var(--cp-vino) !important;
+  border-color: var(--cp-vino) !important;
   color: #ffffff !important;
 }
 
@@ -40,8 +42,8 @@ h6 {
 .btn-warning:hover,
 .btn-secondary:hover,
 .btn-dark:hover {
-  background-color: var(--cp-gold-dark) !important;
-  border-color: var(--cp-gold-dark) !important;
+  background-color: var(--cp-vino-dark) !important;
+  border-color: var(--cp-vino-dark) !important;
   color: #ffffff !important;
 }
 
@@ -51,8 +53,8 @@ h6 {
 .btn-outline-warning,
 .btn-outline-secondary,
 .btn-outline-dark {
-  border-color: var(--cp-gold) !important;
-  color: var(--cp-gold) !important;
+  border-color: var(--cp-vino) !important;
+  color: var(--cp-vino) !important;
 }
 
 .btn-outline-primary:hover,
@@ -61,90 +63,100 @@ h6 {
 .btn-outline-warning:hover,
 .btn-outline-secondary:hover,
 .btn-outline-dark:hover {
-  background-color: var(--cp-gold) !important;
-  border-color: var(--cp-gold) !important;
+  background-color: var(--cp-vino) !important;
+  border-color: var(--cp-vino) !important;
   color: #ffffff !important;
 }
 
 /* CONTENEDOR DE TABS */
 .cp-tabs-nav {
-  background: var(--cp-gold) !important;
-  border-bottom: 2px solid var(--cp-gold-dark);
+  background: var(--cp-vino) !important;
+  border-bottom: 1px solid rgba(255,255,255,.14);
   padding: 0;
   position: fixed;
   top: var(--cp-nav-main-h);
   left: 0;
   right: 0;
   z-index: 1029;
-}
-
-/* UL */
-.cp-tabs-nav .navbar-nav.cp-tabs {
-  display: flex !important;
-  flex-direction: row !important;
-  gap: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-/* LI */
-.cp-tabs-nav .nav-item {
-  margin: 0 !important;
+  min-height: var(--cp-nav-tabs-h);
 }
 
 /* TAB NORMAL */
 .cp-tabs-nav .nav-link {
   border-radius: 0 !important;
-  background: var(--cp-gold) !important;
+  background: var(--cp-vino) !important;
   color: #ffffff !important;
 
-  padding: 12px 20px !important;
+  padding: 10px 16px !important;
   font-size: 14px !important;
   font-weight: 700 !important;
 
   border: none !important;
-  border-right: 1px solid var(--cp-gold-dark) !important;
-
   box-shadow: none !important;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-/* ÚLTIMA sin borde */
-.cp-tabs-nav .nav-item:last-child .nav-link {
-  border-right: none !important;
+.cp-tabs-nav .navbar-toggler {
+  border-color: rgba(255,255,255,.35);
+  margin: 6px 0;
 }
 
-/* HOVER */
+.cp-tabs-nav .navbar-toggler-icon {
+  filter: invert(1);
+}
+
+.cp-tabs-nav .dropdown-menu {
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.08);
+  padding: 8px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.16);
+}
+
 .cp-tabs-nav .nav-link:hover {
-  background: var(--cp-gold-dark) !important;
+  background: var(--cp-vino-dark) !important;
   color: #ffffff !important;
 }
 
-/* ✅ ACTIVA (LA BUENA) */
 .cp-tabs-nav .nav-link.active {
-  background: var(--cp-gold-dark) !important;
+  background: var(--cp-vino-dark) !important;
   color: #ffffff !important;
-
-  border-right: 1px solid var(--cp-gold-dark) !important;
   box-shadow: none !important;
 }
 
-/* ICONOS */
-.cp-tabs-nav .nav-link i {
-  font-size: 15px;
+@media (min-width: 992px) {
+  .cp-tabs-nav .navbar-nav.cp-tabs {
+    gap: 0 !important;
+    margin: 0 !important;
+  }
+
+  .cp-tabs-nav .nav-item {
+    margin: 0 !important;
+  }
+
+  .cp-tabs-nav .nav-link {
+    border-right: 1px solid rgba(255,255,255,.14) !important;
+  }
+
+  .cp-tabs-nav .nav-item:last-child .nav-link {
+    border-right: none !important;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .cp-tabs-nav .navbar-collapse {
+    padding: 6px 0 10px;
+  }
+
+  .cp-tabs-nav .nav-link {
+    border-radius: 10px !important;
+    margin: 2px 0;
+  }
 }
 
 /* 📱 MÓVIL: scroll horizontal limpio */
 @media (max-width: 480px) {
-  .cp-tabs-nav .navbar-nav.cp-tabs {
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-
   .cp-tabs-nav .nav-link {
-    padding: 12px 16px !important;
+    padding: 10px 14px !important;
     font-size: 13px !important;
   }
 }
@@ -153,25 +165,44 @@ h6 {
    NAVBAR PRINCIPAL (ARRIBA)
    ========================== */
 .cp-main-nav {
-  background: var(--cp-gold) !important;
+  background: var(--cp-vino) !important;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 1030;
+  min-height: var(--cp-nav-main-h);
 }
 
 .cp-main-nav .navbar-brand {
   color: #ffffff !important;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .cp-main-nav #userInfo {
   color: #fff !important; /* tu span text-white */
 }
 
+.cp-main-nav .container-fluid {
+  min-height: var(--cp-nav-main-h);
+  padding-top: 6px;
+  padding-bottom: 6px;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.cp-main-nav .cp-user-actions {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.cp-main-nav .cp-user {
+  max-width: min(360px, 34vw);
+}
+
 /* Contenedor del logo centrado */
-.cp-main-nav .logo-container {
+.cp-main-nav .cp-logo-container {
   flex: 1;
   display: flex;
   justify-content: center;
@@ -182,7 +213,7 @@ h6 {
 /* Tamaño del logo para que NO se desborde */
 .cp-main-nav .cp-logo,
 .cp-main-nav .navbar-logo {
-  height: 46px;        /* ajusta si quieres 40/50 */
+  height: 44px;
   width: auto;
   max-width: 260px;
   object-fit: contain;
@@ -200,5 +231,19 @@ h6 {
   .cp-main-nav .navbar-logo {
     height: 36px;
     max-width: 180px;
+  }
+}
+
+@media (max-width: 576px) {
+  .cp-main-nav .cp-user {
+    display: none;
+  }
+
+  .cp-main-nav .navbar-brand {
+    font-size: 0.95rem;
+  }
+
+  .cp-main-nav .navbar-logo {
+    max-width: 150px;
   }
 }
