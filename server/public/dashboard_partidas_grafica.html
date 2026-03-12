@@ -41,68 +41,81 @@
 
   <main class="container-fluid py-4">
     <div class="container-xxl">
-      <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
-        <div>
-          <h2 class="mb-1">Gráfica de Partidas</h2>
-          <div class="text-muted">Usa los filtros para analizar por periodo, área y partida</div>
+
+      <!-- ===== TOPBAR DE PÁGINA ===== -->
+      <div class="dpg-page-topbar d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="dpg-topbar-icon">
+            <i class="bi bi-pie-chart-fill"></i>
+          </div>
+          <div>
+            <h2 class="dpg-topbar-title">Gráfica de Partidas</h2>
+            <p class="dpg-topbar-subtitle mb-0">Usa los filtros para analizar por periodo, área y partida</p>
+          </div>
         </div>
-        <div class="d-flex gap-2">
-          <button id="btnActualizar" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+        <div class="btn-group" role="group" aria-label="Acciones de la gráfica">
+          <button id="btnActualizar" class="btn btn-outline-secondary" title="Actualizar datos">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            <span class="d-none d-sm-inline">Actualizar</span>
           </button>
         </div>
       </div>
 
-      <div class="card shadow-sm dp-card mb-3">
+      <!-- ===== CARD DE FILTROS ===== -->
+      <div class="card dpg-filters-card">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="bi bi-funnel-fill" style="color:#bc955c;"></i>
+          <span>Filtros de gráfica</span>
+        </div>
         <div class="card-body">
           <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-4 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fPeriodo" class="form-label">Periodo</label>
               <select id="fPeriodo" class="form-select"></select>
             </div>
-            <div class="col-12 col-md-4 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fAnio" class="form-label">Año</label>
               <input id="fAnio" type="number" class="form-control" min="2000" />
             </div>
-            <div class="col-12 col-md-4 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label id="lblSegmento" for="fSegmento" class="form-label">Mes</label>
               <select id="fSegmento" class="form-select"></select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fArea" class="form-label">DG</label>
               <select id="fArea" class="form-select">
                 <option value="">Todas</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fDauxiliar" class="form-label">DA</label>
               <select id="fDauxiliar" class="form-select">
                 <option value="">Todas</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fPartida" class="form-label">Partida</label>
               <input id="fPartida" type="text" class="form-control" placeholder="Ej. 5151" />
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fNivel" class="form-label">Nivel</label>
               <select id="fNivel" class="form-select">
                 <option value="CAPITULO">Capítulo</option>
                 <option value="PARTIDA">Partida</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fCapitulo" class="form-label">Capítulo</label>
               <input id="fCapitulo" type="text" class="form-control" placeholder="Ej. 5000" />
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
-              <label for="fTipo" class="form-label">Tipo</label>
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+              <label for="fTipo" class="form-label">Tipo gráfica</label>
               <select id="fTipo" class="form-select">
                 <option value="bar">Barras</option>
                 <option value="pie">Pastel</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fMetrica" class="form-label">Métrica</label>
               <select id="fMetrica" class="form-select">
                 <option value="presupuesto">Presupuesto</option>
@@ -113,16 +126,17 @@
                 <option value="porcentaje_ejercido">% Ejercido</option>
               </select>
             </div>
-            <div class="col-12 col-lg-2 d-grid">
-              <button id="btnAplicar" class="btn btn-primary">
-                <i class="bi bi-funnel me-1"></i>Aplicar
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2 d-grid">
+              <button id="btnAplicar" class="btn dpg-btn-apply">
+                <i class="bi bi-search me-1"></i>Aplicar filtros
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="card shadow-sm dp-card">
+      <!-- ===== CARD DE GRÁFICA ===== -->
+      <div class="card dpg-chart-card">
         <div class="card-body">
           <div class="chart-wrapper">
             <canvas id="chartPartidas"></canvas>
@@ -130,6 +144,7 @@
           <div id="chartFootnote" class="small text-muted mt-2"></div>
         </div>
       </div>
+
     </div>
   </main>
 

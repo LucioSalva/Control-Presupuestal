@@ -36,28 +36,50 @@
 <body class="suf-historial-page">
   <div id="cp-navbar"></div>
 
-  <main class="container-fluid py-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-      <div>
-        <h4 class="mb-1 historial-title">Historial de Suficiencias</h4>
-        <div class="text-muted">Listado general con estatus y tiempos</div>
+  <main class="sh-main container-fluid py-4">
+
+    <!-- ================================================
+         TOPBAR DE LA PÁGINA
+         ================================================ -->
+    <div class="sh-topbar mb-4">
+      <div class="sh-topbar__info">
+        <div class="sh-topbar__icon">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div>
+          <h4 class="sh-topbar__title mb-0">Historial de Suficiencias</h4>
+          <div class="sh-topbar__subtitle">Listado general con estatus y tiempos de validez</div>
+        </div>
       </div>
-      <div class="d-flex gap-2">
+      <div class="sh-topbar__actions">
         <button id="btnRefresh" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
         </button>
       </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-body">
+    <!-- ================================================
+         PANEL DE FILTROS
+         ================================================ -->
+    <div class="sh-filtros-card mb-3">
+      <div class="sh-filtros-card__header">
+        <i class="bi bi-funnel me-1"></i>Filtros de búsqueda
+      </div>
+      <div class="sh-filtros-card__body">
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-5">
-            <label class="form-label">Buscar</label>
-            <input id="fBuscar" class="form-control form-control-sm" placeholder="Número de suficiencia, estatus o motivo">
+            <label class="form-label sh-label">Buscar</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-white">
+                <i class="bi bi-search text-muted"></i>
+              </span>
+              <input id="fBuscar" class="form-control"
+                placeholder="Número de suficiencia, estatus o motivo"
+                autocomplete="off">
+            </div>
           </div>
           <div class="col-6 col-md-3">
-            <label class="form-label">Estatus</label>
+            <label class="form-label sh-label">Estatus</label>
             <select id="fEstatus" class="form-select form-select-sm">
               <option value="">Todos</option>
               <option value="VIGENTE">Vigente</option>
@@ -66,7 +88,7 @@
             </select>
           </div>
           <div class="col-6 col-md-2">
-            <label class="form-label">Filas</label>
+            <label class="form-label sh-label">Filas por página</label>
             <select id="fPageSize" class="form-select form-select-sm">
               <option value="10">10</option>
               <option value="25" selected>25</option>
@@ -75,35 +97,54 @@
             </select>
           </div>
           <div class="col-12 col-md-2 text-md-end">
-            <div id="lblResumen" class="small text-muted"></div>
+            <div id="lblResumen" class="sh-resumen-text small text-muted"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="table-responsive bg-white shadow-sm rounded">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th class="text-nowrap">No. Suficiencia</th>
-            <th class="text-nowrap">Estatus</th>
-            <th class="text-nowrap">Tiempo transcurrido</th>
-            <th class="text-nowrap">Tiempo restante</th>
-            <th>Motivo cancelación</th>
-            <th class="text-center text-nowrap">Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="tbodyHistorial"></tbody>
-      </table>
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center mt-3">
-      <div id="lblPaginacion" class="small text-muted"></div>
-      <div class="btn-group">
-        <button id="btnPrev" class="btn btn-outline-secondary btn-sm">Anterior</button>
-        <button id="btnNext" class="btn btn-outline-secondary btn-sm">Siguiente</button>
+    <!-- ================================================
+         TABLA DE HISTORIAL
+         ================================================ -->
+    <div class="sh-table-card">
+      <div class="table-responsive sh-table-scroll">
+        <table class="table table-hover align-middle mb-0 sh-table">
+          <thead>
+            <tr>
+              <th class="sh-th text-nowrap">
+                <i class="bi bi-hash me-1 opacity-50"></i>No. Suficiencia
+              </th>
+              <th class="sh-th text-nowrap">Estatus</th>
+              <th class="sh-th text-nowrap">
+                <i class="bi bi-stopwatch me-1 opacity-50"></i>Tiempo transcurrido
+              </th>
+              <th class="sh-th text-nowrap">
+                <i class="bi bi-hourglass-split me-1 opacity-50"></i>Tiempo restante
+              </th>
+              <th class="sh-th">Motivo cancelación</th>
+              <th class="sh-th text-center text-nowrap">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyHistorial"></tbody>
+        </table>
       </div>
     </div>
+
+    <!-- ================================================
+         PAGINACIÓN
+         ================================================ -->
+    <div class="sh-paginacion mt-3">
+      <div id="lblPaginacion" class="sh-paginacion__info small text-muted"></div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Paginación">
+        <button id="btnPrev" class="btn btn-outline-secondary">
+          <i class="bi bi-chevron-left me-1"></i>Anterior
+        </button>
+        <button id="btnNext" class="btn btn-outline-secondary">
+          Siguiente<i class="bi bi-chevron-right ms-1"></i>
+        </button>
+      </div>
+    </div>
+
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

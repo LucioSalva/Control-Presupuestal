@@ -39,51 +39,70 @@
 <body>
   <div id="cp-navbar"></div>
 
+  <!-- ================================================
+       TOOLBAR DE ACCIONES
+       ================================================ -->
   <div class="container mt-5 mb-2 no-print">
-    <!-- ACCIONES -->
-    <div class="cp-actions mt-3">
-      <div class="cp-actions__left d-flex flex-wrap align-items-center gap-2">
-        <button id="btn-guardar" class="btn btn-success btn-sm">
-          <i class="bi bi-save me-1"></i>Guardar
-        </button>
+    <div class="cp-toolbar mt-3">
 
-        <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
-        </button>
-
-        <a href="/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank" class="btn btn-secondary btn-sm">
-          <i class="bi bi-file-earmark-pdf-fill me-1"></i>Abrir instructivo en PDF
-        </a>
-
-        <button id="btn-cancelar-suf" class="btn btn-outline-dark btn-sm">
-          <i class="bi bi-x-circle me-1"></i>Cancelar suficiencia
-        </button>
-      </div>
-      <div class="cp-actions__right d-flex flex-wrap align-items-center gap-2">
-        <button id="btn-nuevo-suf" type="button" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
-        </button>
-        <div id="sufStatusBox" class="suf-status-box">
-          <span id="sufEstadoBadge" class="badge bg-secondary">Sin cargar</span>
-          <span class="suf-status-meta small text-muted text-truncate">
-            Restante: <span id="sufRestanteText">—</span> · Caduca: <span id="sufCaducaText">—</span>
-          </span>
+      <!-- GRUPO IZQUIERDO: Guardar + PDF + Instructivo + Cancelar -->
+      <div class="cp-toolbar__group">
+        <div class="btn-group" role="group" aria-label="Acciones principales">
+          <button id="btn-guardar" class="btn btn-primary btn-sm" title="Guardar suficiencia">
+            <i class="bi bi-save me-1"></i>Guardar
+          </button>
+          <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm" title="Descargar PDF">
+            <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+          </button>
+          <a href="/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank"
+             class="btn btn-outline-secondary btn-sm" title="Abrir instructivo en PDF">
+            <i class="bi bi-file-earmark-text me-1"></i>Instructivo
+          </a>
+          <button id="btn-cancelar-suf" class="btn btn-outline-dark btn-sm" title="Cancelar suficiencia">
+            <i class="bi bi-x-circle me-1"></i>Cancelar
+          </button>
         </div>
-        <button id="btnAbrirBuscarSuf" type="button" class="btn btn-outline-primary btn-sm">
-          <i class="bi bi-search me-1"></i>Buscar suficiencia
-        </button>
       </div>
+
+      <!-- SEPARADOR -->
+      <div class="cp-toolbar__sep d-none d-md-block"></div>
+
+      <!-- STATUS BOX -->
+      <div id="sufStatusBox" class="cp-toolbar__status">
+        <span id="sufEstadoBadge" class="badge bg-secondary">Sin cargar</span>
+        <span class="suf-status-meta small text-muted">
+          Restante: <span id="sufRestanteText">—</span> · Caduca: <span id="sufCaducaText">—</span>
+        </span>
+      </div>
+
+      <!-- SEPARADOR -->
+      <div class="cp-toolbar__sep d-none d-md-block"></div>
+
+      <!-- GRUPO DERECHO: Nuevo + Buscar -->
+      <div class="cp-toolbar__group ms-md-auto">
+        <div class="btn-group" role="group" aria-label="Navegación">
+          <button id="btn-nuevo-suf" type="button" class="btn btn-outline-secondary btn-sm" title="Nueva suficiencia">
+            <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
+          </button>
+          <button id="btnAbrirBuscarSuf" type="button" class="btn btn-outline-primary btn-sm" title="Buscar suficiencia">
+            <i class="bi bi-search me-1"></i>Buscar
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <!-- MODAL BUSCAR SUFICIENCIA -->
+  <!-- ================================================
+       MODAL: BUSCAR SUFICIENCIA
+       ================================================ -->
   <div class="modal fade" id="modalBuscarSuf" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content shadow">
+      <div class="modal-content">
 
         <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="bi bi-search me-2"></i>Buscar suficiencia
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-search me-2 text-secondary"></i>Buscar suficiencia
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
@@ -91,7 +110,7 @@
         <div class="modal-body">
           <div class="row g-2 align-items-end">
             <div class="col-12 col-md-8">
-              <label class="form-label mb-1">Buscar Folio</label>
+              <label class="form-label mb-1 fw-semibold">Folio de suficiencia</label>
               <input id="txtNumeroSuf" type="text" class="form-control" placeholder="ECA-2026-01-SP-0001"
                 autocomplete="off">
             </div>
@@ -102,12 +121,11 @@
               </button>
             </div>
           </div>
-
         </div>
 
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-            Cerrar
+            <i class="bi bi-x me-1"></i>Cerrar
           </button>
         </div>
 
@@ -116,31 +134,40 @@
   </div>
 
 
+  <!-- ================================================
+       FORMULARIO PRINCIPAL
+       ================================================ -->
   <div class="form-container">
-    <div class="row mb-3">
-      <div class="col-3 text-center">
-        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="" style="max-height: 70px" />
+
+    <!-- HEADER: logo | títulos | folio + QR -->
+    <div class="doc-header mb-3">
+
+      <div class="doc-header__logo">
+        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="Escudo Ecatepec" />
       </div>
-      <div class="col-6">
+
+      <div class="doc-header__titles">
         <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
-        <div class="sub-title">
-          SUFICIENCIA PRESUPUESTAL - EJERCICIO FISCAL 2026
+        <div class="sub-title mt-1">
+          SUFICIENCIA PRESUPUESTAL — EJERCICIO FISCAL 2026
         </div>
       </div>
-      <div class="col-3">
+
+      <div class="doc-header__folio">
         <table class="table table-bordered mb-0">
           <tr>
-            <th class="table-header" style="background-color: rgb(180, 180, 180)">
+            <th class="table-header" style="background-color: #d6d6d6; font-size:11px;">
               No. de Suficiencia
             </th>
           </tr>
           <tr>
             <td>
-              <input type="text" class="form-control form-control-sm cp-readonly text-end" style="text-align: end"
+              <input type="text" class="form-control form-control-sm cp-readonly text-end"
                 name="no_suficiencia" readonly />
             </td>
           </tr>
         </table>
+
         <div class="cp-qr-card mt-2">
           <div class="cp-qr-label">QR Documento</div>
           <div id="qr-suf" class="cp-qr-img">
@@ -148,91 +175,89 @@
           </div>
         </div>
       </div>
+
     </div>
+    <!-- /doc-header -->
 
-    <table class="table table-bordered mb-2 formato">
-      <colgroup>
-        <col class="c-lbl" />
-        <col class="c-val" />
-        <col class="c-lbl" />
-        <col class="c-val" />
-      </colgroup>
+    <!-- TABLA DE DATOS DEL DOCUMENTO -->
+    <div class="formato-wrap">
+      <table class="table table-bordered mb-2 formato">
+        <colgroup>
+          <col class="c-lbl" />
+          <col class="c-val" />
+          <col class="c-lbl" />
+          <col class="c-val" />
+        </colgroup>
 
-      <tr>
-        <th class="table-header">FECHA DE ELABORACIÓN:</th>
-        <td colspan="3">
-          <input type="date" class="form-control form-control-sm cp-readonly" name="fecha" readonly />
-        </td>
-      </tr>
+        <tr>
+          <th class="table-header">FECHA DE ELABORACIÓN:</th>
+          <td colspan="3">
+            <input type="date" class="form-control form-control-sm cp-readonly" name="fecha" readonly />
+          </td>
+        </tr>
 
-      <!-- ROW 2: DEPENDENCIA GENERAL + AUX -->
-      <tr>
-        <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm cp-readonly" name="dependencia" readonly />
-          <input type="hidden" name="id_dgeneral" />
-        </td>
+        <!-- ROW 2: DEPENDENCIA GENERAL + AUX -->
+        <tr>
+          <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
+          <td>
+            <input type="text" class="form-control form-control-sm cp-readonly" name="dependencia" readonly />
+            <input type="hidden" name="id_dgeneral" />
+          </td>
 
-        <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm cp-readonly" name="dependencia_aux" readonly />
-          <input type="hidden" name="id_dauxiliar" />
-        </td>
-      </tr>
+          <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
+          <td>
+            <input type="text" class="form-control form-control-sm cp-readonly" name="dependencia_aux" readonly />
+            <input type="hidden" name="id_dauxiliar" />
+          </td>
+        </tr>
 
-      <!-- ROW 3: PROYECTO + FUENTE -->
-      <tr>
-        <th class="table-header">PROYECTO:</th>
-        <td colspan="3">
-          <select class="form-select form-select-sm" name="id_proyecto">
-            <option value="">-- Selecciona un proyecto --</option>
-          </select>
-        </td>
-<!-- 
-        <th class="table-header" id="th-fuente">FUENTE DE FINANCIAMIENTO:</th>
-        <td id="td-fuente">
-          <select class="form-select form-select-sm" name="fuente">
-            <option value="">-- Selecciona una fuente --</option>
-          </select>
-          <input type="hidden" name="id_fuente" />
-        </td> -->
-      </tr>
+        <!-- ROW 3: PROYECTO -->
+        <tr>
+          <th class="table-header">PROYECTO:</th>
+          <td colspan="3">
+            <select class="form-select form-select-sm" name="id_proyecto">
+              <option value="">-- Selecciona un proyecto --</option>
+            </select>
+          </td>
+        </tr>
 
-      <!-- ROW 4: CLAVE + PROGRAMACION -->
-      <tr>
-        <th class="table-header">CLAVE PROGRAMÁTICA:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm cp-readonly" name="clave_programatica" readonly />
-          <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
-        </td>
+        <!-- ROW 4: CLAVE + PROGRAMACION -->
+        <tr>
+          <th class="table-header">CLAVE PROGRAMÁTICA:</th>
+          <td>
+            <input type="text" class="form-control form-control-sm cp-readonly" name="clave_programatica" readonly />
+            <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
+          </td>
 
-        <th class="table-header table-header-strong">
-          PROGRAMACIÓN DE PAGO:
-        </th>
-        <td>
-          <select class="form-select form-select-sm" name="mes_pago">
-            <option value="ENERO">ENERO</option>
-            <option value="FEBRERO">FEBRERO</option>
-            <option value="MARZO">MARZO</option>
-            <option value="ABRIL">ABRIL</option>
-            <option value="MAYO">MAYO</option>
-            <option value="JUNIO">JUNIO</option>
-            <option value="JULIO">JULIO</option>
-            <option value="AGOSTO">AGOSTO</option>
-            <option value="SEPTIEMBRE">SEPTIEMBRE</option>
-            <option value="OCTUBRE">OCTUBRE</option>
-            <option value="NOVIEMBRE">NOVIEMBRE</option>
-            <option value="DICIEMBRE">DICIEMBRE</option>
-          </select>
+          <th class="table-header">
+            PROGRAMACIÓN DE PAGO:
+          </th>
+          <td>
+            <select class="form-select form-select-sm" name="mes_pago">
+              <option value="ENERO">ENERO</option>
+              <option value="FEBRERO">FEBRERO</option>
+              <option value="MARZO">MARZO</option>
+              <option value="ABRIL">ABRIL</option>
+              <option value="MAYO">MAYO</option>
+              <option value="JUNIO">JUNIO</option>
+              <option value="JULIO">JULIO</option>
+              <option value="AGOSTO">AGOSTO</option>
+              <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+              <option value="OCTUBRE">OCTUBRE</option>
+              <option value="NOVIEMBRE">NOVIEMBRE</option>
+              <option value="DICIEMBRE">DICIEMBRE</option>
+            </select>
 
-          <input type="text"
-            class="form-control form-control-sm as-text td-text text-strong text-end input-no-click mt-2"
-            name="cantidad_pago" placeholder="Cantidad" readonly />
-        </td>
-      </tr>
-    </table>
+            <input type="text"
+              class="form-control form-control-sm as-text td-text text-strong text-end input-no-click mt-2"
+              name="cantidad_pago" placeholder="Cantidad" readonly />
+          </td>
+        </tr>
+      </table>
+    </div>
+    <!-- /formato-wrap -->
 
-    <!-- PANEL SELECCIÓN DE PARTIDAS (nuevo flujo multi-fuente, oculto para L00/117) -->
+    <!-- PANEL SELECCIÓN DE PARTIDAS (multi-fuente, oculto para L00/117) -->
     <div id="panel-seleccion-partidas" style="display:none;" class="mb-3">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div class="fw-bold" style="font-size:11px;">
@@ -243,61 +268,51 @@
           <i class="bi bi-grid-3x3-gap me-1"></i>Seleccionar Partidas
         </button>
       </div>
-      <!-- Tabla resumen de partidas agrupadas por fuente -->
       <div id="resumen-partidas-por-fuente"></div>
     </div>
 
-    <!-- Detalle (dinámico) -->
-    <div class="d-flex align-items-center justify-content-between mb-2">
-      <div class="fw-bold" style="font-size: 11px">Detalle:</div>
-      <div class="d-flex gap-2">
-        <button id="btn-remove-row" type="button" class="btn btn-sm btn-outline-danger" title="Quitar fila">
+    <!-- CONTROLES DE FILAS + TABLA DETALLE -->
+    <div class="cp-row-controls">
+      <div class="cp-row-controls__label">
+        <i class="bi bi-list-ul me-1"></i>Detalle
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Gestión de filas">
+        <button id="btn-remove-row" type="button" class="btn btn-outline-danger" title="Quitar última fila">
           <i class="bi bi-dash-lg"></i>
         </button>
-        <button id="btn-add-row" type="button" class="btn btn-sm btn-outline-primary" title="Agregar fila">
+        <button id="btn-add-row" type="button" class="btn btn-outline-primary" title="Agregar fila">
           <i class="bi bi-plus-lg"></i>
         </button>
       </div>
     </div>
 
-    <table class="table table-bordered mb-3">
-      <thead>
-        <tr>
-          <th class="table-header" style="width: 5%; background-color: rgb(180, 180, 180)">
-            No.
-          </th>
-          <th class="table-header" style="width: 12%; background-color: rgb(180, 180, 180)">
-            Clave
-          </th>
-          <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180)">
-            Concepto de partida
-          </th>
-          <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180)">
-            Justificación
-          </th>
-          <th class="table-header" style="width: 33%; background-color: rgb(180, 180, 180)">
-            Descripción
-          </th>
-          <th class="table-header" style="width: 10%; background-color: rgb(180, 180, 180)">
-            Importe solicitado
-          </th>
-        </tr>
-      </thead>
-      <tbody id="detalleBody"></tbody>
-    </table>
+    <div class="table-detalle-wrap">
+      <table class="table table-bordered mb-3">
+        <thead>
+          <tr>
+            <th class="detalle-header" style="width: 5%">No.</th>
+            <th class="detalle-header" style="width: 12%">Clave</th>
+            <th class="detalle-header" style="width: 20%">Concepto de partida</th>
+            <th class="detalle-header" style="width: 20%">Justificación</th>
+            <th class="detalle-header" style="width: 33%">Descripción</th>
+            <th class="detalle-header" style="width: 10%">Importe solicitado</th>
+          </tr>
+        </thead>
+        <tbody id="detalleBody"></tbody>
+      </table>
+    </div>
 
     <!-- META + TOTALES -->
     <table class="table table-bordered mb-2">
-
       <tr>
-        <th class="table-header align-middle text-center" style="width: 15%; background-color: rgb(180, 180, 180)"
+        <th class="table-header align-middle text-center" style="width: 15%; background-color: #d6d6d6"
           rowspan="6">
           META:
         </th>
         <td class="align-middle" style="width: 65%" rowspan="6">
           <div class="d-flex align-items-center h-100">
             <div class="w-100">
-              <label for="metaSelect" class="form-label small mb-1">Meta</label>
+              <label for="metaSelect" class="form-label small mb-1 fw-semibold">Meta</label>
               <select id="metaSelect" name="id_meta" class="form-select form-select-sm" aria-describedby="metaHelp">
                 <option value="">-- Selecciona un proyecto --</option>
               </select>
@@ -307,62 +322,50 @@
           </div>
         </td>
 
-        <th class="table-header text-end" style="width: 10%; background-color: rgb(180, 180, 180)">
-          SUBTOTAL:
-        </th>
+        <th class="table-header text-end" style="width: 10%; background-color: #d6d6d6">SUBTOTAL:</th>
         <td style="width: 10%">
           <input type="text" class="form-control form-control-sm text-end ro" name="subtotal" value="0.00" readonly />
         </td>
       </tr>
 
       <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180)">
-          IVA:
-        </th>
+        <th class="table-header text-end" style="background-color: #d6d6d6">IVA:</th>
         <td>
           <input type="text" class="form-control form-control-sm text-end ro" name="iva" value="0.00" readonly />
         </td>
       </tr>
 
       <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180)">
-          ISR:
-        </th>
+        <th class="table-header text-end" style="background-color: #d6d6d6">ISR:</th>
         <td>
           <input type="text" class="form-control form-control-sm text-end ro" name="isr" value="0.00" readonly />
         </td>
       </tr>
 
       <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180)">
-          IEPS:
-        </th>
+        <th class="table-header text-end" style="background-color: #d6d6d6">IEPS:</th>
         <td>
           <input type="text" class="form-control form-control-sm text-end ro" name="ieps" value="0.00" readonly />
         </td>
       </tr>
       <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180)">
-          PENSIÓN:
-        </th>
+        <th class="table-header text-end" style="background-color: #d6d6d6">PENSIÓN:</th>
         <td>
           <input type="text" class="form-control form-control-sm text-end ro" name="pension_total" value="0.00"
             readonly />
         </td>
       </tr>
       <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180)">
-          TOTAL:
-        </th>
+        <th class="table-header text-end fw-bold" style="background-color: #d6d6d6">TOTAL:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro" name="total" value="0.00" readonly />
+          <input type="text" class="form-control form-control-sm text-end ro fw-bold" name="total" value="0.00" readonly />
         </td>
       </tr>
     </table>
 
     <table class="table table-bordered mb-4">
       <tr>
-        <th class="table-header" style="width: 15%; background-color: rgb(180, 180, 180)">
+        <th class="table-header" style="width: 15%; background-color: #d6d6d6">
           CANTIDAD CON LETRA:
         </th>
         <td style="width: 85%">
@@ -371,59 +374,72 @@
       </tr>
     </table>
 
-    <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
-      <div class="form-check m-0">
-        <input class="form-check-input" type="checkbox" name="imp_iva" id="imp_iva" />
-        <label class="form-check-label" for="imp_iva">IVA 16%</label>
-      </div>
-
-      <div class="d-flex align-items-center gap-2">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="checkbox" name="imp_isr" id="imp_isr" />
-          <label class="form-check-label" for="imp_isr">ISR</label>
-        </div>
-        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width: 120px"
-          placeholder="Ej. 10 %" min="0" max="100" step="0.01" id="isr_tasa" />
-      </div>
-
-      <div class="d-flex align-items-center gap-2" id="iepsControls">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="checkbox" name="imp_ieps" id="imp_ieps" />
-          <label class="form-check-label" for="imp_ieps">IEPS</label>
-        </div>
-        <input type="number" class="form-control form-control-sm text-end" id="ieps_tasa" name="ieps_tasa"
-          style="width: 120px" placeholder="Ej. 8 %" min="0" max="100" step="0.01" />
-      </div>
-      <!-- PENSIÓN ALIMENTICIA (hasta 5) -->
-      <div class="d-flex align-items-center gap-2" id="pensionControls">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="checkbox" name="imp_pension" id="imp_pension" />
-          <label class="form-check-label" for="imp_pension">Pensión alimenticia</label>
-        </div>
-
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddPension" title="Agregar pensión">
-          <i class="bi bi-plus-lg"></i>
-        </button>
-
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnInfoPension" title="Info">
+    <!-- PANEL IMPUESTOS -->
+    <div class="cp-impuestos-card mb-3">
+      <div class="cp-impuestos-card__title">
+        <i class="bi bi-percent"></i>
+        Impuestos aplicables
+        <button type="button" class="btn btn-link p-0 ms-auto text-muted" id="infoImpuestos"
+          title="Información de impuestos" style="font-size:13px; text-decoration:none; line-height:1;">
           <i class="bi bi-info-circle"></i>
         </button>
       </div>
 
-      <!-- contenedor dinámico de pensiones -->
-      <div id="pensionList" class="w-100 d-none"></div>
+      <div class="cp-impuestos-grid">
 
-      <button type="button" class="btn btn-link p-0 text-muted" id="infoImpuestos" title="Información de impuestos"
-        style="font-size:12px; text-decoration:none;">
-        <i class="bi bi-info-circle"></i>
-      </button>
+        <!-- IVA -->
+        <div class="cp-impuesto-item">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_iva" id="imp_iva" />
+            <label class="form-check-label fw-semibold" for="imp_iva">IVA 16%</label>
+          </div>
+        </div>
+
+        <!-- ISR -->
+        <div class="cp-impuesto-item">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_isr" id="imp_isr" />
+            <label class="form-check-label fw-semibold" for="imp_isr">ISR</label>
+          </div>
+          <input type="number" class="form-control form-control-sm text-end" name="isr_tasa"
+            placeholder="Ej. 10 %" min="0" max="100" step="0.01" id="isr_tasa" />
+        </div>
+
+        <!-- IEPS -->
+        <div class="cp-impuesto-item" id="iepsControls">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_ieps" id="imp_ieps" />
+            <label class="form-check-label fw-semibold" for="imp_ieps">IEPS</label>
+          </div>
+          <input type="number" class="form-control form-control-sm text-end" id="ieps_tasa" name="ieps_tasa"
+            placeholder="Ej. 8 %" min="0" max="100" step="0.01" />
+        </div>
+
+        <!-- PENSIÓN ALIMENTICIA -->
+        <div class="cp-impuesto-item" id="pensionControls">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_pension" id="imp_pension" />
+            <label class="form-check-label fw-semibold" for="imp_pension">Pensión alimenticia</label>
+          </div>
+          <div class="btn-group btn-group-sm ms-1" role="group">
+            <button type="button" class="btn btn-outline-secondary" id="btnAddPension" title="Agregar pensión">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btnInfoPension" title="Información">
+              <i class="bi bi-info-circle"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- contenedor dinámico de pensiones -->
+      <div id="pensionList" class="w-100 d-none mt-2"></div>
     </div>
-    <br />
-    <div class="border p-2" style="
-          font-size: 11px;
-          text-align: justify;
-          background-color: rgb(180, 180, 180);
-        ">
+    <!-- /cp-impuestos-card -->
+
+    <!-- AVISO LEGAL -->
+    <div class="cp-aviso-legal">
       <p class="mb-2">
         La presente suficiencia presupuestal únicamente acredita la
         disponibilidad de recursos en la(s) clave(s) indicada(s), sin que ello
@@ -452,20 +468,25 @@
       </p>
     </div>
 
-    <!-- Se eliminó sección de encabezados y firmantes (se captura al descargar PDF) -->
   </div>
+  <!-- /form-container -->
 
-  <!-- Modal selección de partidas (nuevo flujo multi-fuente) -->
+  <!-- ================================================
+       MODAL: SELECCIÓN DE PARTIDAS (multi-fuente)
+       ================================================ -->
   <div class="modal fade" id="modalSeleccionPartidas" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-      <div class="modal-content shadow">
+      <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-grid-3x3-gap me-2"></i>Seleccionar Partidas</h5>
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-grid-3x3-gap me-2 text-secondary"></i>Seleccionar Partidas
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
-        <div class="modal-body p-2">
+        <div class="modal-body">
           <p class="small text-muted mb-2">
-            Selecciona las partidas y asigna el importe. Las suficiencias se crearán agrupadas por fuente de financiamiento automáticamente.
+            Selecciona las partidas y asigna el importe. Las suficiencias se crearán agrupadas por fuente de
+            financiamiento automáticamente.
           </p>
           <div id="lista-partidas-modal">
             <div class="text-center py-4 text-muted">Cargando partidas...</div>
@@ -475,7 +496,9 @@
           <div class="me-auto small text-muted">
             <span id="modal-resumen-seleccion">Ninguna partida seleccionada</span>
           </div>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x me-1"></i>Cancelar
+          </button>
           <button type="button" id="btn-confirmar-partidas" class="btn btn-primary">
             <i class="bi bi-check2 me-1"></i>Confirmar selección
           </button>
@@ -484,23 +507,27 @@
     </div>
   </div>
 
-  <!-- Modal confirmación -->
+  <!-- ================================================
+       MODAL: CONFIRMACIÓN DE GUARDADO
+       ================================================ -->
   <div class="modal fade" id="modalConfirm" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Confirmación</h5>
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-question-circle me-2 text-warning"></i>Confirmación
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           ¿Estás seguro de guardar la Suficiencia Presupuestal?
         </div>
         <div class="modal-footer">
-          <button id="btn-no-seguro" type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-            No estoy seguro
+          <button id="btn-no-seguro" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-1"></i>No estoy seguro
           </button>
-          <button id="btn-si-seguro" type="button" class="btn btn-success">
-            Sí, estoy seguro
+          <button id="btn-si-seguro" type="button" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i>Sí, guardar
           </button>
         </div>
       </div>

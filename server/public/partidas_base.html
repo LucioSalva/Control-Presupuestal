@@ -18,87 +18,123 @@
 
   <main class="container-fluid py-4">
     <div class="container-xxl">
-      <div class="pbp-header mb-3">
-        <h2 class="mb-1">Presupuesto Base de Partidas (Carga Masiva)</h2>
-        <p class="text-muted mb-0">Sube un archivo Excel para registrar o actualizar presupuesto base por DG, DA, FF, partida y proyecto.</p>
+
+      <!-- ===== TOPBAR DE PÁGINA ===== -->
+      <div class="pbp-page-topbar d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="pbp-topbar-icon">
+            <i class="bi bi-cloud-upload-fill"></i>
+          </div>
+          <div>
+            <h2 class="pbp-topbar-title">Presupuesto Base de Partidas</h2>
+            <p class="pbp-topbar-subtitle mb-0">
+              Sube un archivo Excel para registrar o actualizar presupuesto base
+              por DG, DA, FF, partida y proyecto.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div class="card shadow-sm mb-3 pbp-card">
+      <!-- ===== CARD DE ACCIONES ===== -->
+      <div class="card pbp-actions-card">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="bi bi-file-earmark-excel-fill" style="color:#bc955c;"></i>
+          <span>Carga masiva desde Excel</span>
+        </div>
         <div class="card-body">
-          <div class="row g-1 align-items-end">
-            <div class="col-12 col-lg-4 px-1">
+          <div class="row g-3 align-items-end">
+
+            <!-- Selector de archivo -->
+            <div class="col-12 col-lg-5">
               <label for="fileExcel" class="form-label">Archivo Excel (.xlsx)</label>
               <input id="fileExcel" class="form-control" type="file" accept=".xlsx" />
             </div>
 
-            <div class="col-12 col-md-6 col-lg-3 d-grid px-1">
+            <!-- Botón plantilla -->
+            <div class="col-12 col-md-4 col-lg-3 d-grid">
               <button id="btnDescargarPlantilla" class="btn btn-outline-secondary">
-                <i class="bi bi-download me-1"></i>Descargar plantilla
+                <i class="bi bi-download me-1"></i>
+                <span>Descargar plantilla</span>
               </button>
             </div>
 
-            <div class="col-12 col-md-6 col-lg-2 d-grid px-1">
-              <button id="btnSubirExcel" class="btn btn-success">
-                <i class="bi bi-cloud-upload me-1"></i>Subir Excel
+            <!-- Botón subir -->
+            <div class="col-12 col-md-4 col-lg-2 d-grid">
+              <button id="btnSubirExcel" class="btn pbp-btn-upload">
+                <i class="bi bi-cloud-upload me-1"></i>
+                <span>Subir Excel</span>
               </button>
             </div>
-            <div class="col-12 col-lg-2 d-grid px-1">
-              <button id="btnLimpiarBase" class="btn btn-danger">
-                <i class="bi bi-trash3 me-1"></i>Limpiar base
+
+            <!-- Botón limpiar -->
+            <div class="col-12 col-md-4 col-lg-2 d-grid">
+              <button id="btnLimpiarBase" class="btn btn-danger pbp-btn-danger">
+                <i class="bi bi-trash3 me-1"></i>
+                <span>Limpiar base</span>
               </button>
             </div>
+
           </div>
         </div>
       </div>
 
-      <div class="card shadow-sm mb-3 pbp-card">
-        <div class="card-body p-0">
-          <div class="table-responsive pbp-table-wrap">
-            <table class="table table-sm table-hover table-striped mb-0 pbp-table">
-              <thead>
-                <tr>
-                  <th>DEP_GRAL</th>
-                  <th>DEP_AUX</th>
-                  <th>PROY</th>
-                  <th>FF</th>
-                  <th>PARTIDA</th>
-                  <th>DESCRIPCION</th>
-                  <th class="text-end">ENE</th>
-                  <th class="text-end">FEB</th>
-                  <th class="text-end">MAR</th>
-                  <th class="text-end">ABR</th>
-                  <th class="text-end">MAY</th>
-                  <th class="text-end">JUN</th>
-                  <th class="text-end">JUL</th>
-                  <th class="text-end">AGO</th>
-                  <th class="text-end">SEP</th>
-                  <th class="text-end">OCT</th>
-                  <th class="text-end">NOV</th>
-                  <th class="text-end">DIC</th>
-                  <th class="text-end">TOTAL</th>
-                  <th>EJERCICIO</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyResultados">
-                <tr>
-                  <td colspan="20" class="text-center text-muted py-4">Cargando...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      <!-- ===== TABLA DE RESULTADOS ===== -->
+      <div class="pbp-results-card">
+        <div class="pbp-table-wrap">
+          <table class="table table-sm table-hover table-striped pbp-table">
+            <thead>
+              <tr>
+                <th>DEP_GRAL</th>
+                <th>DEP_AUX</th>
+                <th>PROY</th>
+                <th>FF</th>
+                <th>PARTIDA</th>
+                <th>DESCRIPCION</th>
+                <th class="text-end">ENE</th>
+                <th class="text-end">FEB</th>
+                <th class="text-end">MAR</th>
+                <th class="text-end">ABR</th>
+                <th class="text-end">MAY</th>
+                <th class="text-end">JUN</th>
+                <th class="text-end">JUL</th>
+                <th class="text-end">AGO</th>
+                <th class="text-end">SEP</th>
+                <th class="text-end">OCT</th>
+                <th class="text-end">NOV</th>
+                <th class="text-end">DIC</th>
+                <th class="text-end">TOTAL</th>
+                <th>EJERCICIO</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyResultados">
+              <tr>
+                <td colspan="20" class="text-center text-muted py-5">
+                  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Cargando...
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
+
+      <!-- Totales -->
       <div class="small text-muted mb-3" id="txtTotal"></div>
 
-      <div class="card shadow-sm pbp-card">
-        <div class="card-header pbp-errors-head">
+      <!-- ===== CARD DE ERRORES ===== -->
+      <div class="pbp-errors-card">
+        <div class="pbp-errors-head d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
           <strong>Errores de Carga</strong>
         </div>
         <div class="card-body">
-          <div id="errorEmpty" class="alert alert-success mb-0">Sin errores en la ultima carga.</div>
+          <div id="errorEmpty" class="alert alert-success mb-0">
+            <i class="bi bi-check-circle-fill me-2"></i>Sin errores en la última carga.
+          </div>
           <ul id="errorList" class="list-group d-none"></ul>
         </div>
       </div>
+
     </div>
   </main>
 

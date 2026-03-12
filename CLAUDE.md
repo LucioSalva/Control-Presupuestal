@@ -29,7 +29,11 @@ No test framework is configured. The `server/utils/*.test.js` files contain manu
 - `server/` — Node.js/Express backend (API + static frontend serving)
 - `server/public/` — Vanilla JS/HTML/CSS frontend (no build step)
 - `server/routes/` — One file per feature domain
-- `server/utils/` — Shared helpers, seeds, filters
+- `server/utils/` — Shared helpers, seeds, filters:
+  - `helpers.js` — `logAuditEvent()`, `logUnauthorizedPartidasAccess()`, `computeSaldo()`, `isPartidaMilKey()`
+  - `financial-fields-perm.js` — `canViewIepsPensionesByClaves()` and `sanitizeFinancialFieldsForLimitedView()` (IEPS/pension fields hidden for non-L00/117 and non-E00)
+  - `metas-filter.js` — `filterMetasByHierarchy()` for filtering metas rows by DG/DA/project/CONAC
+  - `seed_partidas_permitidas.js` — populates `partidas_permitidas` table on startup
 - `server/sql/` — SQL migration scripts
 - `sql/` — Additional SQL scripts
 
@@ -50,25 +54,34 @@ The system uses a **custom "fake" token** (not JWT despite the dependency):
 - `AREA` — regular user, read-only on catalogs
 
 **Key middleware in `server.js`:**
-- `authRequired` — validates token, attaches `req.user` with `{ id, id_dgeneral, id_dauxiliar, roles }`
+- `authRequired` — validates token, attaches `req.user` with `{ id, id_dgeneral, id_dauxiliar, roles }`; auto-logs audit events for all write methods via `res.on("finish")`
 - `requireGodOrAdmin` — blocks non-GOD/ADMIN
 - `blockPartidasWrite` — blocks AREA users from modifying catalog entries (except `/monto`)
+- `helmet` — security headers (CSP disabled in dev, enabled in production)
+- `rateLimit` — 600 req/15 min global on `/api`; 20 req/10 min on `/api/login`
+- Trace ID — each request gets `req.cpTraceId` (UUID) and `x-trace-id` response header
+
+**Token passing:** Primary via `Authorization: Bearer token-{userId}-{ts}` header. For file downloads (`window.open`), also accepted as `?token=` query param.
 
 ## API Routes
 
-| Path | Router file |
-|------|-------------|
-| `/api/login` | `auth.routes.js` |
-| `/api/admin/usuarios` | `admin-usuarios.routes.js` (GOD/ADMIN only) |
-| `/api/admin/auditoria` | `admin-auditoria.routes.js` (GOD/ADMIN only) |
-| `/api/suficiencias` | `suficiencias.routes.js` |
-| `/api/comprometido` | `comprometido.routes.js` |
-| `/api/devengado` | `devengado.routes.js` |
-| `/api/catalogos/partidas` | `partidas.routes.js` |
-| `/api/catalogos` | `catalogos.routes.js` |
-| `/api/dashboard` | `dashboard_partidas.routes.js` |
-| `/api/reconducciones` | `reconducciones.routes.js` |
-| `/api/presupuesto-base-partidas` | `presupuesto_base_partidas.routes.js` (GOD/ADMIN) |
+| Path | Router file | Notes |
+|------|-------------|-------|
+| `/api/login` | `auth.routes.js` | No auth required |
+| `/api/admin/usuarios` | `admin-usuarios.routes.js` | GOD/ADMIN only |
+| `/api/admin/auditoria` | `admin-auditoria.routes.js` | GOD/ADMIN only |
+| `/api/suficiencias` | `suficiencias.routes.js` | |
+| `/api/comprometido` | `comprometido.routes.js` | |
+| `/api/devengado` | `devengado.routes.js` | |
+| `/api/expedientes-entrega` | `expedientes_entrega.routes.js` | |
+| `/api/catalogos/partidas` | `partidas.routes.js` | AREA write blocked via `blockPartidasWrite` |
+| `/api/catalogos/metas` | `metas.routes.js` | |
+| `/api/catalogos` | `catalogos.routes.js` | |
+| `/api/dashboard` | `dashboard_partidas.routes.js` | |
+| `/api/reconducciones` | `reconducciones.routes.js` + `reconducciones_oficios.routes.js` | Both mounted on same path |
+| `/api/presupuesto-base-partidas` | `presupuesto_base_partidas.routes.js` | GOD/ADMIN only |
+| `/api/presupuesto` | `presupuesto.routes.js` | No auth required |
+| `/api/health` | inline in `server.js` | No auth required |
 
 ## Environment Variables
 
@@ -101,7 +114,13 @@ SEED=true   # runs seedPartidasPermitidas() on startup
 
 ## Startup Behavior
 
-On start, `server.js`:
-1. Runs pending SQL migration (`reconducciones`) if the table doesn't exist
-2. If `SEED=true`, calls `seedPartidasPermitidas()` to populate allowed partidas per dependency/project/source
-3. Starts Express on `PORT` (default 3000)
+On start, `server.js` runs the following migrations idempotently (each checks if already applied), then seeds:
+
+1. `reconducciones` table (`2026_02_23_reconducciones.sql`)
+2. `reconduccion_oficios` table (`2026_03_11_reconduccion_oficios.sql`)
+3. `firma_enlace_label` column on `reconducciones` (`2026_03_11_reconducciones_firmas.sql`)
+4. `firma_enlace_label` column on `suficiencias`/`comprometidos`/`devengados` (`2026_03_11_firmas_suf_comp_dev.sql`)
+5. `fn_saldo_disponible_partida` DB function (`2026_03_11_fn_saldo_partida.sql`)
+6. General normalization indexes (`2026_03_11_normalizacion_db.sql`)
+7. If `SEED=true`, calls `seedPartidasPermitidas()` to populate allowed partidas per dependency/project/source
+8. Starts Express on `PORT` (default 3000)

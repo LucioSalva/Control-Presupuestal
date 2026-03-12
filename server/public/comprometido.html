@@ -39,62 +39,86 @@
 <body>
   <div id="cp-navbar"></div>
 
+  <!-- BARRA DE ACCIONES -->
   <div class="container mt-5 mb-2 no-print">
     <div class="cp-actions mt-3">
 
-      <!-- IZQUIERDA: botones -->
+      <!-- GRUPO IZQUIERDO: acciones principales + exportación -->
       <div class="cp-actions__left">
-        <button id="btn-guardar" class="btn btn-success btn-sm">
-          <i class="bi bi-save me-1"></i>Guardar Comprometido
-        </button>
 
-        <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
-        </button>
+        <!-- Grupo 1: Guardar -->
+        <div class="btn-group" role="group" aria-label="Guardar documento">
+          <button id="btn-guardar" class="btn btn-cp-primary btn-sm">
+            <i class="bi bi-save me-1"></i>Guardar Comprometido
+          </button>
+        </div>
 
-        <button id="btn-recargar" class="btn btn-secondary btn-sm">
-          <i class="bi bi-arrow-clockwise me-1"></i>Recargar datos
-        </button>
+        <!-- Separador visual -->
+        <div class="cp-actions-divider"></div>
+
+        <!-- Grupo 2: Exportación -->
+        <div class="btn-group" role="group" aria-label="Exportar">
+          <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+          </button>
+          <button id="btn-recargar" class="btn btn-cp-outline btn-sm">
+            <i class="bi bi-arrow-clockwise me-1"></i>Recargar
+          </button>
+        </div>
+
       </div>
 
-      <!-- DERECHA: buscador -->
+      <!-- GRUPO DERECHO: navegación + buscador -->
       <div class="cp-actions__right">
-        <div class="d-flex justify-content-end mb-2">
-          <button id="btn-nuevo-comp" class="btn btn-outline-secondary btn-sm">
+
+        <!-- Fila superior: Nuevo + badge de status -->
+        <div class="cp-actions__nav">
+          <button id="btn-nuevo-comp" class="btn btn-cp-outline btn-sm">
             <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
           </button>
-        </div>
-        <div class="input-group input-group-sm cp-search">
-          <span class="input-group-text bg-white">
-            <i class="bi bi-search"></i>
+          <span id="compStatusBadge" class="badge cp-badge-status bg-secondary">
+            <i class="bi bi-circle-fill me-1" style="font-size:8px;"></i>Sin cargar
           </span>
-          <input id="txtFolioSuf" type="text" class="form-control" placeholder="Ej. ECA-2026-02-SP-0001"
-            autocomplete="off" />
-          <button id="btnBuscarSuf" class="btn btn-outline-primary" type="button">
-            Buscar suficiencia
-          </button>
         </div>
-        <div class="small text-muted mt-1">
-          Escribe el folio completo (ECA-AAAA-MM-SP-0001) y carga sus datos.
+
+        <!-- Buscador de suficiencia -->
+        <div class="cp-search-wrap">
+          <div class="input-group input-group-sm cp-search">
+            <span class="input-group-text cp-search-icon">
+              <i class="bi bi-search"></i>
+            </span>
+            <input id="txtFolioSuf" type="text" class="form-control" placeholder="ECA-2026-02-SP-0001"
+              autocomplete="off" />
+            <button id="btnBuscarSuf" class="btn btn-cp-primary" type="button">
+              Buscar suficiencia
+            </button>
+          </div>
+          <div class="cp-search-hint">
+            <i class="bi bi-info-circle me-1"></i>Escribe el folio completo (ECA-AAAA-MM-SP-####) y carga sus datos.
+          </div>
         </div>
+
       </div>
 
     </div>
   </div>
 
+  <!-- DOCUMENTO OFICIAL -->
   <div class="form-container doc-header">
-    <div class="row mb-3">
+
+    <!-- Encabezado institucional -->
+    <div class="row mb-3 align-items-center">
       <div class="col-3 text-center">
-        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="" style="max-height: 70px;">
+        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="Ayuntamiento de Ecatepec" style="max-height: 70px;">
       </div>
-      <div class="col-6">
+      <div class="col-6 text-center">
         <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
-        <div class="sub-title">COMPROMETIDO - EJERCICIO FISCAL 2026</div>
+        <div class="sub-title">COMPROMETIDO — EJERCICIO FISCAL 2026</div>
       </div>
       <div class="col-3">
-        <table class="table table-bordered mb-0">
+        <table class="table table-bordered mb-0 cp-folio-table">
           <tr>
-            <th class="table-header" style="background-color: rgb(180, 180, 180);">No. de Comprometido</th>
+            <th class="table-header cp-th-folio">No. de Comprometido</th>
           </tr>
           <tr>
             <td>
@@ -112,7 +136,7 @@
       </div>
     </div>
 
-    <!-- MISMA TABLA DE SUFICIENCIA -->
+    <!-- Datos generales del documento -->
     <table class="table table-bordered mb-2 formato">
       <colgroup>
         <col class="c-lbl">
@@ -122,21 +146,27 @@
       </colgroup>
 
       <tr>
-        <th class="table-header">FECHA DE ELABORACIÓN:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-calendar3 me-1 text-muted"></i>FECHA DE ELABORACIÓN:
+        </th>
         <td colspan="3">
           <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha" readonly>
         </td>
       </tr>
 
       <tr>
-        <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-building me-1 text-muted"></i>NOMBRE DE LA DEPENDENCIA GENERAL:
+        </th>
         <td>
           <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia"
             readonly>
           <input type="hidden" name="id_dgeneral">
         </td>
 
-        <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-diagram-3 me-1 text-muted"></i>NOMBRE DE LA DEPENDENCIA AUXILIAR:
+        </th>
         <td>
           <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia_aux"
             readonly>
@@ -145,12 +175,16 @@
       </tr>
 
       <tr>
-        <th class="table-header">PROYECTO:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-folder2 me-1 text-muted"></i>PROYECTO:
+        </th>
         <td>
           <input type="text" class="form-control" name="proyecto_text" readonly>
           <input type="hidden" name="id_proyecto">
         </td>
-        <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-coin me-1 text-muted"></i>FUENTE DE FINANCIAMIENTO:
+        </th>
         <td>
           <input type="text" class="form-control" name="fuente_text" readonly>
           <input type="hidden" name="id_fuente">
@@ -158,14 +192,17 @@
       </tr>
 
       <tr>
-        <th class="table-header">CLAVE PROGRAMÁTICA:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-code-square me-1 text-muted"></i>CLAVE PROGRAMÁTICA:
+        </th>
         <td>
           <div id="claveProgramaticaClave" class="fw-bold"></div>
           <div id="claveProgramaticaTexto" class="text-muted small"></div>
         </td>
 
-
-        <th class="table-header table-header-strong">PROGRAMACIÓN DE PAGO:</th>
+        <th class="table-header cp-th-label table-header-strong">
+          <i class="bi bi-calendar-check me-1 text-muted"></i>PROGRAMACIÓN DE PAGO:
+        </th>
         <td>
           <select class="form-select form-select-sm" name="mes_pago" readonly>
             <option value="ENERO">ENERO</option>
@@ -189,112 +226,124 @@
       </tr>
     </table>
 
-    <!-- Detalle (MISMO) -->
-    <div class="d-flex align-items-center justify-content-between mb-2">
-      <div class="fw-bold" style="font-size: 11px;">Detalle:</div>
-      <div class="small text-muted">Vista solo lectura</div>
+    <!-- Encabezado de sección detalle -->
+    <div class="cp-section-bar mb-2">
+      <span class="cp-section-title">
+        <i class="bi bi-list-ul me-1"></i>Detalle
+      </span>
+      <span class="small text-muted">Vista solo lectura</span>
     </div>
 
-    <table class="table table-bordered mb-3">
-      <thead>
-        <tr>
-          <th class="table-header" style="width: 5%; background-color: rgb(180, 180, 180);">No.</th>
-          <th class="table-header" style="width: 12%; background-color: rgb(180, 180, 180);">Clave</th>
-          <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180);">Concepto de partida</th>
-          <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180);">Justificación</th>
-          <th class="table-header" style="width: 33%; background-color: rgb(180, 180, 180);">Descripción</th>
-          <th class="table-header" style="width: 10%; background-color: rgb(180, 180, 180);">Importe solicitado</th>
-        </tr>
-      </thead>
-      <tbody id="detalleBody"></tbody>
-    </table>
+    <!-- Tabla de detalle con scroll horizontal en mobile -->
+    <div class="table-responsive cp-table-detail-wrap">
+      <table class="table table-bordered table-hover mb-3 cp-table-detail">
+        <thead>
+          <tr>
+            <th class="cp-thead-cell" style="width: 5%;">No.</th>
+            <th class="cp-thead-cell" style="width: 12%;">Clave</th>
+            <th class="cp-thead-cell" style="width: 20%;">Concepto de partida</th>
+            <th class="cp-thead-cell" style="width: 20%;">Justificación</th>
+            <th class="cp-thead-cell" style="width: 33%;">Descripción</th>
+            <th class="cp-thead-cell text-end" style="width: 10%;">Importe solicitado</th>
+          </tr>
+        </thead>
+        <tbody id="detalleBody"></tbody>
+      </table>
+    </div>
 
-    <!-- META + TOTALES (MISMO) -->
-    <table class="table table-bordered mb-2">
-      <tr>
-        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);"
-          rowspan="5">
-          META:
-        </th>
+    <!-- META + TOTALES en grid de 2 secciones -->
+    <div class="cp-meta-totales-grid mb-2">
 
-        <td class="align-middle" style="width:65%;" rowspan="5">
-          <div class="d-flex align-items-center h-100">
-            <input type="text" class="form-control form-control-sm as-text td-text input-no-click" name="meta" readonly>
+      <!-- Columna META -->
+      <div class="cp-meta-col">
+        <div class="cp-meta-inner">
+          <div class="cp-meta-label">META:</div>
+          <input type="text" class="form-control form-control-sm as-text td-text input-no-click" name="meta" readonly>
+        </div>
+      </div>
+
+      <!-- Columna TOTALES -->
+      <div class="cp-totales-col">
+        <table class="table table-bordered mb-0 cp-totales-table">
+          <tr>
+            <th class="table-header cp-th-total text-end">SUBTOTAL:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="subtotal" readonly>
+            </td>
+          </tr>
+          <tr>
+            <th class="table-header cp-th-total text-end">IVA:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="iva" readonly>
+            </td>
+          </tr>
+          <tr>
+            <th class="table-header cp-th-total text-end">ISR:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="isr" readonly>
+            </td>
+          </tr>
+          <tr>
+            <th class="table-header cp-th-total text-end">IEPS:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="ieps" readonly>
+            </td>
+          </tr>
+          <tr class="cp-total-row">
+            <th class="table-header cp-th-total cp-th-total--highlight text-end">TOTAL:</th>
+            <td class="cp-td-total">
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="total" readonly>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- Controles de impuestos (solo lectura en comprometido) -->
+    <div class="cp-impuestos-bar mb-3">
+      <span class="cp-impuestos-label">
+        <i class="bi bi-percent me-1"></i>Tipo de impuesto:
+      </span>
+      <div class="cp-impuestos-opts">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE" disabled>
+          <label class="form-check-label">Sin impuesto</label>
+        </div>
+        <div class="form-check m-0">
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA" disabled>
+          <label class="form-check-label">IVA 16%</label>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-nowrap">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR" disabled>
+            <label class="form-check-label">ISR</label>
           </div>
-        </td>
-
-        <th class="table-header text-end" style="width:10%; background-color: rgb(180, 180, 180);">SUBTOTAL:</th>
-        <td style="width:10%;">
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
-            name="subtotal" readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IVA:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="iva"
-            readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">ISR:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="isr"
-            readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IEPS:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="ieps"
-            readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">TOTAL:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
-            name="total" readonly>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Impuestos (mismos radios, solo lectura) -->
-    <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
-      <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE" disabled>
-        <label class="form-check-label">Sin impuesto</label>
-      </div>
-      <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA" disabled>
-        <label class="form-check-label">IVA 16%</label>
-      </div>
-      <div class="d-flex align-items-center gap-2 flex-nowrap">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR" disabled>
-          <label class="form-check-label">ISR</label>
+          <input type="number" class="form-control form-control-sm text-end cp-tasa-input" name="isr_tasa"
+            placeholder="Ej. 10 %" min="0" step="0.01" disabled />
         </div>
-        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa"
-          style="width:120px; flex: 0 0 120px;" placeholder="Ej. 10 %" min="0" step="0.01" disabled />
-      </div>
-
-      <div class="d-flex align-items-center gap-2 flex-nowrap">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS" disabled>
-          <label class="form-check-label">IEPS</label>
+        <div class="d-flex align-items-center gap-2 flex-nowrap">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS" disabled>
+            <label class="form-check-label">IEPS</label>
+          </div>
+          <input type="number" class="form-control form-control-sm text-end cp-tasa-input" name="ieps_tasa"
+            placeholder="Ej. 8 %" min="0" step="0.01" disabled />
         </div>
-        <input type="number" class="form-control form-control-sm text-end" name="ieps_tasa"
-          style="width:120px; flex: 0 0 120px;" placeholder="Ej. 8 %" min="0" step="0.01" disabled />
       </div>
     </div>
 
+    <!-- Cantidad con letra -->
     <table class="table table-bordered mb-4">
       <tr>
-        <th class="table-header" style="width: 15%; background-color: rgb(180, 180, 180);">CANTIDAD CON LETRA:</th>
+        <th class="table-header cp-th-label" style="width: 15%;">
+          <i class="bi bi-fonts me-1 text-muted"></i>CANTIDAD CON LETRA:
+        </th>
         <td style="width: 85%;">
           <input type="text" class="form-control form-control-sm ro as-text td-text input-no-click"
             name="cantidad_con_letra" readonly>
@@ -302,28 +351,23 @@
       </tr>
     </table>
 
-    <!-- Leyenda + firmas (igual) -->
-    <div class="border p-2" style="font-size:11px; text-align:justify; background-color: rgb(180, 180, 180);">
+    <!-- Leyenda legal -->
+    <div class="cp-leyenda mb-3">
       <p class="mb-2">
         La presente suficiencia presupuestal únicamente acredita la disponibilidad de recursos en la(s) clave(s)
-        indicada(s),
-        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación,
-        adquisición, pago
-        o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
+        indicada(s), sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación,
+        adquisición, pago o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
       </p>
       <p class="mb-2">
         Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa
-        correspondiente,
-        siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación
-        del uso de los recursos.
+        correspondiente, siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación
+        y comprobación del uso de los recursos.
       </p>
       <p class="mb-2">
         El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y
-        Municipal,
-        incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los
-        Lineamientos Generales
-        para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y
-        complementaria aplicable.
+        Municipal, incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en
+        los Lineamientos Generales para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad
+        municipal, estatal y complementaria aplicable.
       </p>
       <p class="mb-0">
         El recurso deberá ejercerse en el mismo mes de emisión de esta suficiencia; en caso contrario, perderá validez y
@@ -331,6 +375,7 @@
       </p>
     </div>
 
+    <!-- Firmas (oculto en pantalla, visible en PDF) -->
     <table class="table table-bordered mt-3 mb-0" style="display:none;">
       <tr>
         <th class="text-center table-header" style="background:#d9d9d9; width:33.33%; font-size:11px;">

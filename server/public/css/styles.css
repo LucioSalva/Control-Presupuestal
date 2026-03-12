@@ -203,38 +203,43 @@ h6 {
   }
 }
 
+/* -----------------------------------------------
+   PROJECTS — clases legacy (soporte backward compat)
+   ----------------------------------------------- */
 .theme-projects {
-  background: #f7f5f2;
+  background: #f5f5f5;
 }
 
 .projects-main {
   padding-bottom: 40px;
 }
 
+/* card-kpi base — los valores reales están en projects.html
+   y expedientes_entrega.css para mayor especificidad */
 .card-kpi {
   background: #ffffff;
-  border: 1px solid #e6e6e6;
+  border: none;
   border-radius: 12px;
-  padding: 12px 16px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
-  min-height: 92px;
+  padding: 14px 18px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+  min-height: 88px;
 }
 
 .card-kpi .title {
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   color: #6c757d;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .card-kpi .value {
   font-weight: 700;
   font-size: 1.1rem;
+  color: #2b2b2b;
 }
 
-.table-light-custom thead th {
-  background: #f1f3f5;
-}
-
+/* Tabla de proyectos — base */
 .table-light-custom tbody td {
   vertical-align: middle;
 }
@@ -257,38 +262,47 @@ h6 {
   letter-spacing: 0.3px;
 }
 
+/* Mini KPIs del detalle de proyecto */
 .mini-kpi {
   background: #f8f9fa;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border: 1px solid #e9ecef;
 }
 
 .mini-kpi .label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #6c757d;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .mini-kpi .value {
   font-weight: 700;
+  font-size: 0.95rem;
+  color: #2b2b2b;
 }
 
+/* Metas */
 .meta-card {
   border: 1px solid #e9ecef;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   background: #ffffff;
 }
 
 .meta-card .meta-title {
   font-weight: 700;
-}
-
-.meta-card .meta-sub {
   font-size: 0.8rem;
 }
 
+.meta-card .meta-sub {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+/* QR */
 .cp-qr-card {
   border: 1px solid #e9ecef;
   border-radius: 8px;

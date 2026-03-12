@@ -34,43 +34,13 @@
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/navbar.css" />
   <link rel="stylesheet" href="/css/devengado.css">
-
-  <style>
-    .alerta-cancelado {
-      background-color: #dc3545;
-      color: white;
-      padding: 10px 20px;
-      text-align: center;
-      font-weight: bold;
-      font-size: 14px;
-      display: none;
-    }
-
-    .alerta-cancelado.show {
-      display: block;
-    }
-
-    .input-editable {
-      background-color: #fff9c4 !important;
-      border: 1px solid #ffc107 !important;
-    }
-
-    .monto-error {
-      border-color: #dc3545 !important;
-      background-color: #f8d7da !important;
-    }
-
-    .input-no-click {
-      pointer-events: none;
-    }
-  </style>
 </head>
 
 <body>
 
   <!-- ALERTA DOCUMENTO VENCIDO/CANCELADO -->
   <div id="alertaCancelado" class="alerta-cancelado">
-    <i class="bi bi-exclamation-triangle me-2"></i>
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
     DOCUMENTO CANCELADO / VENCIDO (VIGENCIA MENSUAL)
   </div>
 
@@ -78,78 +48,105 @@
 
   <!-- BARRA DE ACCIONES -->
   <div class="container mt-5 mb-2 no-print">
-    <div class="d-flex flex-wrap gap-2 justify-content-between mt-3">
-      <div class="d-flex flex-wrap gap-2">
-        <button id="btn-guardar" class="btn btn-success btn-sm">
-          <i class="bi bi-save me-1"></i>Guardar Devengado
-        </button>
+    <div class="cp-actions mt-3">
 
-        <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
-        </button>
+      <!-- GRUPO IZQUIERDO: acciones principales + exportación -->
+      <div class="cp-actions__left">
 
-        <button id="btn-recargar" class="btn btn-secondary btn-sm">
-          <i class="bi bi-arrow-repeat me-1"></i>Recargar datos
-        </button>
+        <!-- Grupo 1: Guardar -->
+        <div class="btn-group" role="group" aria-label="Guardar documento">
+          <button id="btn-guardar" class="btn btn-cp-primary btn-sm">
+            <i class="bi bi-save me-1"></i>Guardar Devengado
+          </button>
+        </div>
+
+        <!-- Separador visual -->
+        <div class="cp-actions-divider"></div>
+
+        <!-- Grupo 2: Exportación + utilidades -->
+        <div class="btn-group" role="group" aria-label="Exportar">
+          <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+          </button>
+          <button id="btn-recargar" class="btn btn-cp-outline btn-sm">
+            <i class="bi bi-arrow-repeat me-1"></i>Recargar
+          </button>
+        </div>
+
       </div>
-      <div class="d-flex flex-wrap gap-2">
-        <button id="btn-nuevo-dev" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
-        </button>
+
+      <!-- GRUPO DERECHO: navegación + status -->
+      <div class="cp-actions__right">
+        <div class="cp-actions__nav">
+          <button id="btn-nuevo-dev" class="btn btn-cp-outline btn-sm">
+            <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
+          </button>
+          <span id="devStatusBadge" class="badge cp-badge-status bg-secondary">
+            <i class="bi bi-circle-fill me-1" style="font-size:8px;"></i>Sin cargar
+          </span>
+        </div>
       </div>
 
-      <!-- <div class="d-flex">
-        <button id="btn-cancelar" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-x-circle me-1"></i>Cancelar Documento
-        </button>
-      </div> -->
     </div>
   </div>
 
   <!-- BUSCAR COMPROMETIDO + RESUMEN + PARCIALIDADES -->
   <div class="container mt-2 mb-3 no-print">
-    <div class="card shadow-sm">
-      <div class="card-body py-2">
-        <div class="d-flex flex-wrap gap-2 align-items-end justify-content-between">
-          <div style="min-width: 320px;">
-            <label class="form-label small mb-1">No. Comprometido</label>
+    <div class="card cp-search-card shadow-sm">
+      <div class="card-header cp-search-card-header">
+        <i class="bi bi-search me-2"></i>Buscar Comprometido y gestionar parcialidades
+      </div>
+      <div class="card-body py-3">
+
+        <!-- Fila superior: buscador + totales resumidos -->
+        <div class="d-flex flex-wrap gap-3 align-items-end justify-content-between mb-3">
+
+          <!-- Buscador de comprometido -->
+          <div class="cp-buscar-comp-wrap">
+            <label class="form-label small fw-bold mb-1">
+              <i class="bi bi-file-text me-1 text-muted"></i>No. Comprometido
+            </label>
             <div class="input-group input-group-sm">
-              <input id="txtNoComprometido" type="text" class="form-control" placeholder="Ej. ECA-2026-03-CP-0001">
-              <button id="btnBuscarComprometido" class="btn btn-primary">
+              <input id="txtNoComprometido" type="text" class="form-control" placeholder="ECA-2026-03-CP-0001">
+              <button id="btnBuscarComprometido" class="btn btn-cp-primary">
                 <i class="bi bi-search me-1"></i>Buscar
               </button>
             </div>
-            <div class="small text-muted mt-1">
-              Escribe el folio completo del Comprometido (ECA-YYYY-MM-CP-####).
+            <div class="cp-search-hint mt-1">
+              <i class="bi bi-info-circle me-1"></i>Folio completo del Comprometido (ECA-YYYY-MM-CP-####)
             </div>
           </div>
 
-          <div class="d-flex flex-wrap gap-3">
-            <div class="text-end">
-              <div class="small text-muted">Comprometido</div>
-              <div class="fw-bold" id="lblTotalComprometido">$0.00</div>
+          <!-- KPIs resumidos -->
+          <div class="cp-kpis-row">
+            <div class="cp-kpi-item">
+              <div class="cp-kpi-label">Comprometido</div>
+              <div class="cp-kpi-value" id="lblTotalComprometido">$0.00</div>
             </div>
-            <div class="text-end">
-              <div class="small text-muted">Devengado acumulado</div>
-              <div class="fw-bold" id="lblDevAcum">$0.00</div>
+            <div class="cp-kpi-divider"></div>
+            <div class="cp-kpi-item">
+              <div class="cp-kpi-label">Devengado acumulado</div>
+              <div class="cp-kpi-value" id="lblDevAcum">$0.00</div>
             </div>
-            <div class="text-end">
-              <div class="small text-muted">Saldo</div>
-              <div class="fw-bold" id="lblSaldo">$0.00</div>
+            <div class="cp-kpi-divider"></div>
+            <div class="cp-kpi-item">
+              <div class="cp-kpi-label">Saldo</div>
+              <div class="cp-kpi-value cp-kpi-saldo" id="lblSaldo">$0.00</div>
             </div>
           </div>
 
-          <div class="d-flex gap-2">
-            <button id="btnNuevoDevengado" class="btn btn-outline-success btn-sm" disabled>
+          <!-- Botón nueva parcialidad -->
+          <div>
+            <button id="btnNuevoDevengado" class="btn btn-cp-outline btn-sm" disabled>
               <i class="bi bi-plus-circle me-1"></i>Nuevo devengado (parcialidad)
             </button>
           </div>
+
         </div>
 
-        <hr class="my-2">
-
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered mb-0">
+        <!-- Tabla de parcialidades -->
+        <div class="table-responsive cp-parcialidades-wrap">
+          <table class="table table-sm table-bordered table-hover mb-0 cp-parcialidades-table">
             <thead>
               <tr>
                 <th style="width: 22%;">No. Devengado</th>
@@ -161,7 +158,9 @@
             </thead>
             <tbody id="tbodyParcialidades">
               <tr>
-                <td colspan="5" class="text-center small text-muted">Sin parcialidades cargadas</td>
+                <td colspan="5" class="text-center small text-muted py-3">
+                  <i class="bi bi-inbox me-1"></i>Sin parcialidades cargadas
+                </td>
               </tr>
             </tbody>
           </table>
@@ -171,22 +170,22 @@
     </div>
   </div>
 
-
-  <!-- CONTENEDOR FORMATO -->
+  <!-- CONTENEDOR FORMATO OFICIAL -->
   <div class="form-container doc-header">
-    <div class="row mb-3">
-      <div class="col-3 text-center">
-        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="" style="max-height: 70px;">
-      </div>
-      <div class="col-6">
-        <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
-        <div class="sub-title">DEVENGADO - EJERCICIO FISCAL 2026</div>
-      </div>
 
+    <!-- Encabezado institucional -->
+    <div class="row mb-3 align-items-center">
+      <div class="col-3 text-center">
+        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="Ayuntamiento de Ecatepec" style="max-height: 70px;">
+      </div>
+      <div class="col-6 text-center">
+        <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
+        <div class="sub-title">DEVENGADO — EJERCICIO FISCAL 2026</div>
+      </div>
       <div class="col-3">
-        <table class="table table-bordered mb-0">
+        <table class="table table-bordered mb-0 cp-folio-table">
           <tr>
-            <th class="table-header" style="background-color: rgb(180, 180, 180);">No. de Devengado</th>
+            <th class="table-header cp-th-folio">No. de Devengado</th>
           </tr>
           <tr>
             <td>
@@ -195,10 +194,8 @@
                 name="no_devengado" readonly>
             </td>
           </tr>
-
           <tr>
-            <th class="table-header" style="background-color: rgb(220, 220, 220); font-size: 10px;">Ref. Comprometido
-            </th>
+            <th class="table-header cp-th-folio" style="font-size: 10px;">Ref. Comprometido</th>
           </tr>
           <tr>
             <td>
@@ -216,7 +213,7 @@
       </div>
     </div>
 
-    <!-- DATOS GENERALES -->
+    <!-- Datos generales -->
     <table class="table table-bordered mb-2 formato">
       <colgroup>
         <col style="width:20%;">
@@ -226,20 +223,26 @@
       </colgroup>
 
       <tr>
-        <th class="table-header">FECHA DE ELABORACIÓN:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-calendar3 me-1 text-muted"></i>FECHA DE ELABORACIÓN:
+        </th>
         <td colspan="3">
           <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha">
         </td>
       </tr>
 
       <tr>
-        <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-building me-1 text-muted"></i>NOMBRE DE LA DEPENDENCIA GENERAL:
+        </th>
         <td>
           <input type="text" class="form-control form-control-sm as-text text-strong td-text input-no-click"
             name="dependencia" readonly>
         </td>
 
-        <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-diagram-3 me-1 text-muted"></i>NOMBRE DE LA DEPENDENCIA AUXILIAR:
+        </th>
         <td>
           <input type="text" class="form-control form-control-sm as-text text-strong td-text input-no-click"
             name="dependencia_aux" readonly>
@@ -247,13 +250,17 @@
       </tr>
 
       <tr>
-        <th class="table-header">CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-code-square me-1 text-muted"></i>CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:
+        </th>
         <td>
           <input type="text" class="form-control form-control-sm as-text text-strong td-text input-no-click"
             name="clave_programatica" readonly>
         </td>
 
-        <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
+        <th class="table-header cp-th-label">
+          <i class="bi bi-coin me-1 text-muted"></i>FUENTE DE FINANCIAMIENTO:
+        </th>
         <td>
           <input type="text" class="form-control" name="fuente_text" readonly>
           <input type="hidden" name="id_fuente">
@@ -261,12 +268,13 @@
       </tr>
 
       <tr>
-        <th class="table-header table-header-strong">PROGRAMACIÓN DE PAGO:</th>
+        <th class="table-header cp-th-label table-header-strong">
+          <i class="bi bi-calendar-check me-1 text-muted"></i>PROGRAMACIÓN DE PAGO:
+        </th>
         <td colspan="3">
           <div class="d-flex gap-2 align-items-center">
             <input type="text" class="form-control form-control-sm as-text td-text input-no-click" name="mes_pago"
               readonly>
-
             <input type="text" class="form-control form-control-sm as-text td-text text-strong text-end input-no-click"
               name="cantidad_pago" readonly>
           </div>
@@ -274,14 +282,18 @@
       </tr>
 
       <tr>
-        <th class="table-header" style="background-color:#fff3cd;">MONTO COMPROMETIDO:</th>
-        <td>
+        <th class="table-header cp-th-label cp-th-comprometido">
+          <i class="bi bi-currency-dollar me-1"></i>MONTO COMPROMETIDO:
+        </th>
+        <td class="cp-td-comprometido">
           <input type="text" class="form-control form-control-sm as-text td-text text-strong text-end input-no-click"
-            name="monto_comprometido" readonly style="background-color:#fff3cd;">
+            name="monto_comprometido" readonly>
         </td>
 
-        <th class="table-header" style="background-color:#d4edda;">MONTO A DEVENGAR:</th>
-        <td>
+        <th class="table-header cp-th-label cp-th-devengar">
+          <i class="bi bi-pencil-square me-1"></i>MONTO A DEVENGAR:
+        </th>
+        <td class="cp-td-devengar">
           <input type="number" step="0.01" min="0"
             class="form-control form-control-sm as-text td-text text-strong text-end input-editable"
             name="monto_devengado" placeholder="0.00">
@@ -289,142 +301,149 @@
       </tr>
     </table>
 
-    <!-- Detalle -->
-    <div class="d-flex align-items-center justify-content-between mb-2">
-      <div class="fw-bold" style="font-size: 11px;">Detalle:</div>
-      <div class="small text-muted">Los importes pueden editarse (no exceder el monto comprometido)</div>
+    <!-- Encabezado de sección detalle -->
+    <div class="cp-section-bar mb-2">
+      <span class="cp-section-title">
+        <i class="bi bi-list-ul me-1"></i>Detalle
+      </span>
+      <span class="small text-muted">Los importes pueden editarse (no exceder el monto comprometido)</span>
     </div>
 
-    <table class="table table-bordered mb-3">
-      <thead>
-        <tr>
-          <th class="table-header" style="width: 5%; background-color: rgb(180, 180, 180);">No.</th>
-          <th class="table-header" style="width: 12%; background-color: rgb(180, 180, 180);">Clave</th>
-          <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180);">Concepto de partida</th>
-          <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180);">Justificación</th>
-          <th class="table-header" style="width: 33%; background-color: rgb(180, 180, 180);">Descripción</th>
-          <th class="table-header" style="width: 10%; background-color: rgb(180, 180, 180);">Importe</th>
-        </tr>
-      </thead>
-      <tbody id="detalleBody"></tbody>
-    </table>
+    <!-- Tabla de detalle -->
+    <div class="table-responsive cp-table-detail-wrap">
+      <table class="table table-bordered table-hover mb-3 cp-table-detail">
+        <thead>
+          <tr>
+            <th class="cp-thead-cell" style="width: 5%;">No.</th>
+            <th class="cp-thead-cell" style="width: 12%;">Clave</th>
+            <th class="cp-thead-cell" style="width: 20%;">Concepto de partida</th>
+            <th class="cp-thead-cell" style="width: 20%;">Justificación</th>
+            <th class="cp-thead-cell" style="width: 33%;">Descripción</th>
+            <th class="cp-thead-cell text-end" style="width: 10%;">Importe</th>
+          </tr>
+        </thead>
+        <tbody id="detalleBody"></tbody>
+      </table>
+    </div>
 
-    <table class="table table-bordered mb-2">
-      <tr>
-        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);"
-          rowspan="6">META:</th>
+    <!-- META + TOTALES en grid de 2 secciones -->
+    <div class="cp-meta-totales-grid mb-2">
 
-        <td class="align-middle" style="width:65%;" rowspan="6">
-          <div class="d-flex align-items-center justify-content-center h-100">
-            <input type="text" class="form-control form-control-sm as-text td-text input-no-click text-center"
-              name="meta" readonly>
+      <!-- Columna META -->
+      <div class="cp-meta-col">
+        <div class="cp-meta-inner">
+          <div class="cp-meta-label">META:</div>
+          <input type="text" class="form-control form-control-sm as-text td-text input-no-click text-center"
+            name="meta" readonly>
+        </div>
+      </div>
+
+      <!-- Columna TOTALES -->
+      <div class="cp-totales-col">
+        <table class="table table-bordered mb-0 cp-totales-table">
+          <tr>
+            <th class="table-header cp-th-total text-end">SUBTOTAL:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="subtotal" readonly>
+            </td>
+          </tr>
+          <tr>
+            <th class="table-header cp-th-total text-end">IVA:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="iva" readonly>
+            </td>
+          </tr>
+          <tr>
+            <th class="table-header cp-th-total text-end">ISR:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="isr" readonly>
+            </td>
+          </tr>
+          <tr>
+            <th class="table-header cp-th-total text-end">IEPS:</th>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="ieps" readonly>
+            </td>
+          </tr>
+          <tr class="cp-total-row">
+            <th class="table-header cp-th-total cp-th-total--highlight text-end">TOTAL:</th>
+            <td class="cp-td-total">
+              <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+                name="total" readonly>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- Controles de impuestos -->
+    <div class="cp-impuestos-bar mb-3">
+      <span class="cp-impuestos-label">
+        <i class="bi bi-percent me-1"></i>Tipo de impuesto:
+      </span>
+      <div class="cp-impuestos-opts">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE">
+          <label class="form-check-label">Sin impuesto</label>
+        </div>
+        <div class="form-check m-0">
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA">
+          <label class="form-check-label">IVA 16%</label>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-nowrap">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR">
+            <label class="form-check-label">ISR</label>
           </div>
-        </td>
-
-
-        <th class="table-header text-end" style="width:10%; background-color: rgb(180, 180, 180);">SUBTOTAL:</th>
-        <td style="width:10%;">
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
-            name="subtotal" readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IVA:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="iva"
-            readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">ISR:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="isr"
-            readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IEPS:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="ieps"
-            readonly>
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">TOTAL:</th>
-        <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
-            name="total" readonly>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Impuestos -->
-    <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
-      <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE">
-        <label class="form-check-label">Sin impuesto</label>
-      </div>
-
-      <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA">
-        <label class="form-check-label">IVA 16%</label>
-      </div>
-
-      <div class="d-flex align-items-center gap-2">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR">
-          <label class="form-check-label">ISR</label>
+          <input type="number" class="form-control form-control-sm text-end cp-tasa-input" name="isr_tasa"
+            placeholder="Ej. 10 %" min="0" step="0.01" />
         </div>
-        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width:120px;"
-          placeholder="Ej. 10 %" min="0" step="0.01" />
-      </div>
-
-      <div class="d-flex align-items-center gap-2">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS">
-          <label class="form-check-label">IEPS</label>
+        <div class="d-flex align-items-center gap-2 flex-nowrap">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS">
+            <label class="form-check-label">IEPS</label>
+          </div>
+          <input type="number" class="form-control form-control-sm text-end cp-tasa-input" name="ieps_tasa"
+            placeholder="Ej. 8 %" min="0" step="0.01" />
         </div>
-        <input type="number" class="form-control form-control-sm text-end" name="ieps_tasa" style="width:120px;"
-          placeholder="Ej. 8 %" min="0" step="0.01" />
       </div>
     </div>
 
+    <!-- Cantidad con letra -->
     <table class="table table-bordered mb-4">
       <tr>
-        <th class="table-header" style="width: 15%; background-color: rgb(180, 180, 180);">CANTIDAD CON LETRA:</th>
+        <th class="table-header cp-th-label" style="width: 15%;">
+          <i class="bi bi-fonts me-1 text-muted"></i>CANTIDAD CON LETRA:
+        </th>
         <td style="width: 85%;">
           <input type="text" class="form-control form-control-sm ro as-text td-text input-no-click text-center"
             name="cantidad_con_letra" readonly>
         </td>
-
       </tr>
     </table>
 
-    <!-- Leyenda -->
-    <div class="border p-2" style="font-size:11px; text-align:justify; background-color: rgb(180, 180, 180);">
+    <!-- Leyenda legal -->
+    <div class="cp-leyenda mb-3">
       <p class="mb-2">
         El presente Devengado únicamente acredita la disponibilidad de recursos en la(s) clave(s) indicada(s),
-        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación,
-        adquisición,
+        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación, adquisición,
         pago o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
       </p>
       <p class="mb-2">
         Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa
-        correspondiente,
-        siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación
-        del uso de los recursos.
+        correspondiente, siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación
+        y comprobación del uso de los recursos.
       </p>
       <p class="mb-2">
         El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y
-        Municipal,
-        incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los
-        Lineamientos Generales
-        para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y
-        complementaria aplicable.
+        Municipal, incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en
+        los Lineamientos Generales para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad
+        municipal, estatal y complementaria aplicable.
       </p>
       <p class="mb-0">
         El recurso deberá ejercerse en el mismo mes de emisión de este devengado; en caso contrario, perderá validez y
@@ -432,19 +451,14 @@
       </p>
     </div>
 
-    <!-- Firmas (4 columnas) — oculto visualmente -->
+    <!-- Firmas (oculto en pantalla, visible en PDF) -->
     <table class="table table-bordered mt-3 mb-0" style="display:none;">
       <tr>
-        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">ÁREA SOLICITANTE
-        </th>
-        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">DIRECCIÓN
-          SOLICITANTE</th>
-        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">SUFICIENCIA
-          PRESUPUESTAL</th>
-        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">AUTORIZA TESORERO
-          MUNICIPAL</th>
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">ÁREA SOLICITANTE</th>
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">DIRECCIÓN SOLICITANTE</th>
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">SUFICIENCIA PRESUPUESTAL</th>
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">AUTORIZA TESORERO MUNICIPAL</th>
       </tr>
-
       <tr>
         <td class="text-center" style="font-size:9px; font-weight:bold; padding:4px;">
           <span id="firmaAreaSolicitante">-</span>
@@ -459,32 +473,23 @@
           TESORERÍA MUNICIPAL
         </td>
       </tr>
-
       <tr>
-        <!-- editable -->
         <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
           <input type="text" class="text-center firma-nombre-input" name="firma_area_nombre"
             placeholder="Nombre del firmante"
             style="font-size:9px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
         </td>
-
-        <!-- editable -->
         <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
           <input type="text" class="text-center firma-nombre-input" name="firma_direccion_nombre"
             placeholder="Nombre del firmante"
             style="font-size:9px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
         </td>
-
-        <!-- editable -->
         <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
           <input type="text" class="text-center firma-nombre-input" name="firma_suficiencia_nombre"
             placeholder="Nombre (Suficiencia)"
             style="font-size:9px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
         </td>
-
-        <!-- fijo -->
-        <td class="text-center"
-          style="height:25px; vertical-align:bottom; padding:4px; font-size:9px; font-weight:bold;">
+        <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px; font-size:9px; font-weight:bold;">
           LIC. ALEJANDRO HERNANDEZ AGUILAR
         </td>
       </tr>
@@ -495,15 +500,17 @@
   <!-- MODAL CONFIRMAR CANCELACIÓN -->
   <div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
+      <div class="modal-content cp-modal-content shadow-lg">
         <div class="modal-header bg-danger text-white">
-          <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Cancelación</h5>
+          <h5 class="modal-title">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmar Cancelación
+          </h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           <p class="mb-3">¿Estás seguro de que deseas cancelar este recurso?</p>
           <div class="alert alert-warning mb-0">
-            <i class="bi bi-info-circle me-2"></i>
+            <i class="bi bi-info-circle-fill me-2"></i>
             <strong>Esta acción es irreversible.</strong> El monto será devuelto al presupuesto disponible del área.
           </div>
         </div>
@@ -520,21 +527,23 @@
   <!-- MODAL CONFIRMAR GUARDADO -->
   <div class="modal fade" id="modalGuardar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Confirmar Guardado</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      <div class="modal-content cp-modal-content shadow-lg">
+        <div class="modal-header cp-modal-header-vino text-white">
+          <h5 class="modal-title">
+            <i class="bi bi-save me-2"></i>Confirmar Guardado
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           <p>¿Deseas guardar este devengado presupuestal?</p>
           <div id="infoLiberacion" class="alert alert-info" style="display: none;">
-            <i class="bi bi-info-circle me-2"></i>
+            <i class="bi bi-info-circle-fill me-2"></i>
             Quedará un saldo de <strong id="montoLiberar">$0.00</strong> en el Comprometido.
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-success" id="btnConfirmarGuardar">
+          <button type="button" class="btn btn-cp-primary" id="btnConfirmarGuardar">
             <i class="bi bi-save me-1"></i>Guardar
           </button>
         </div>
@@ -549,10 +558,9 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.2.2/build/qrcode.min.js"></script>
   <script src="/js/session-guard.js"></script>
   <script src="/js/navbar.js"></script>
-  <script type="module" src="/js/devengado.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="/js/user-info.js"></script>
+  <script type="module" src="/js/devengado.js"></script>
 
 </body>
 

@@ -1,56 +1,247 @@
+/* =============================================================
+   reconducciones.css — Estilos del formulario de reconducción
+   Tema: vino (#691c32) | Bootstrap 5.3.3 | Montserrat
+   ============================================================= */
+
+/* ------------------------------------------------------------------
+   TOPBAR DEL DOCUMENTO
+   ------------------------------------------------------------------ */
+.rc-doc-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, var(--cp-vino) 0%, #8b2442 100%);
+  border-radius: 10px 10px 0 0;
+  margin: -18px -18px 20px -18px;
+  color: #ffffff;
+  flex-wrap: wrap;
+}
+
+.rc-doc-topbar .rc-topbar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  flex-shrink: 0;
+  font-size: 22px;
+}
+
+.rc-doc-topbar .rc-topbar-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.rc-doc-topbar .rc-topbar-titles .rc-main-title {
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.rc-doc-topbar .rc-topbar-titles .rc-sub-title {
+  font-size: 11px;
+  opacity: 0.8;
+  margin: 2px 0 0 0;
+}
+
+.rc-doc-topbar .rc-topbar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rc-doc-topbar .rc-topbar-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.rc-doc-topbar .btn-topbar {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.18s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rc-doc-topbar .btn-topbar:hover {
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.rc-doc-topbar .rc-topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.rc-doc-topbar .rc-id-label {
+  opacity: 0.7;
+  font-size: 10px;
+  margin-right: 2px;
+}
+
+.rc-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* QR compacto en el topbar */
+.rc-qr-topbar {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.rc-qr-topbar .cp-qr-label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 3px;
+}
+
+.rc-qr-topbar .cp-qr-img img {
+  width: 40px;
+  height: 40px;
+}
+
+.rc-qr-topbar .cp-qr-empty {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Badge de estado en el topbar */
+#rc-status {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ------------------------------------------------------------------
+   CONTENEDOR PRINCIPAL
+   ------------------------------------------------------------------ */
 .rc-form {
   margin-bottom: 30px;
 }
 
+/* Línea divisora del antiguo header (ya no se usa) */
 .rc-doc-header {
   padding-bottom: 10px;
-  border-bottom: 2px solid var(--cp-gold);
+  border-bottom: 2px solid var(--cp-gold, #c9a84c);
 }
 
+/* ------------------------------------------------------------------
+   CARDS DE ORIGEN / DESTINO
+   ------------------------------------------------------------------ */
 .rc-side-card {
-  border: 1px solid #e6e6e6;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.rc-side-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.13);
 }
 
 .rc-side-header {
   font-weight: 700;
   text-align: center;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  padding: 10px 14px;
 }
 
+/* Origen: azul institucional */
 .rc-origen {
-  background: #f8d7da;
-  color: #842029;
+  background: linear-gradient(90deg, #1a56a0 0%, #1e6bbf 100%);
+  color: #ffffff;
+  border: none;
 }
 
+/* Destino: verde */
 .rc-destino {
-  background: #d1e7dd;
-  color: #0f5132;
+  background: linear-gradient(90deg, #0f6b3e 0%, #198754 100%);
+  color: #ffffff;
+  border: none;
 }
 
 .rc-subtitle {
-  font-weight: 600;
-  font-size: 12px;
+  font-weight: 700;
+  font-size: 11px;
   text-transform: uppercase;
   color: #6c757d;
+  letter-spacing: 0.5px;
+  padding: 6px 0 4px 0;
+  border-top: 1px solid #e9ecef;
+  margin-top: 4px;
 }
 
+/* ------------------------------------------------------------------
+   TABLAS DE RECURSOS Y METAS
+   ------------------------------------------------------------------ */
 .rc-table-header {
-  font-weight: 600;
-  background: #f4f6f9;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: linear-gradient(90deg, #f0e6ea 0%, #f8f0f2 100%);
+  color: var(--cp-vino);
+  border-bottom: 2px solid var(--cp-vino);
+  padding: 9px 14px;
 }
 
 .rc-table thead th {
-  background: #e9ecef;
-  font-size: 12px;
+  background: #f4f6f9;
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
 }
 
 .rc-table tbody td {
   vertical-align: middle;
+  font-size: 12px;
+}
+
+/* Botones agregar/eliminar renglón */
+.rc-row-btns {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .rc-row-invalid {
-  background: #f8d7da;
+  background: rgba(220, 53, 69, 0.06);
 }
 
 .rc-row-invalid .form-control,
@@ -58,42 +249,346 @@
   border-color: #dc3545;
 }
 
+/* ------------------------------------------------------------------
+   TOTALES
+   ------------------------------------------------------------------ */
 .rc-total-box {
   display: flex;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  font-weight: 600;
+  align-items: center;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #f8f9fa 0%, #eef0f2 100%);
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  font-weight: 700;
+  font-size: 13px;
+  margin-top: 6px;
 }
 
 .rc-total-diff {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  background: #fff3cd;
-  border-radius: 6px;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, #fff8e1 0%, #fffde7 100%);
+  border-radius: 8px;
+  border: 1px solid #ffc107;
   font-weight: 700;
+  font-size: 14px;
+  margin-top: 8px;
+  box-shadow: 0 2px 6px rgba(255, 193, 7, 0.15);
 }
 
+/* ------------------------------------------------------------------
+   BARRA DE ACCIONES (rc-actions)
+   ------------------------------------------------------------------ */
 .rc-actions {
-  padding: 12px;
-  background: #fff;
+  padding: 14px 16px;
+  background: #ffffff;
   border-radius: 10px;
-  border: 1px solid #e9ecef;
+  border: 1px solid #e2d6da;
+  box-shadow: 0 2px 10px rgba(105, 28, 50, 0.07);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
+.rc-actions .rc-actions-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-right: 4px;
+}
+
+.rc-actions-divider {
+  width: 1px;
+  height: 32px;
+  background: #dee2e6;
+  margin: 0 4px;
+}
+
+/* Botón principal del grupo de acciones: Guardar */
+#btn-guardar {
+  background-color: var(--cp-vino) !important;
+  border-color: var(--cp-vino) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+#btn-guardar:hover {
+  background-color: var(--cp-vino-dark) !important;
+  border-color: var(--cp-vino-dark) !important;
+}
+
+/* Botón Enviar: verde */
+#btn-enviar {
+  background-color: #198754 !important;
+  border-color: #198754 !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+#btn-enviar:hover {
+  background-color: #157347 !important;
+  border-color: #157347 !important;
+}
+
+/* Botón Aplicar: ámbar */
+#btn-aplicar {
+  background-color: #e09b00 !important;
+  border-color: #e09b00 !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+#btn-aplicar:hover {
+  background-color: #b87d00 !important;
+  border-color: #b87d00 !important;
+}
+
+/* Botón Cancelar: danger outline */
+#btn-cancelar {
+  background-color: transparent !important;
+  border-color: #dc3545 !important;
+  color: #dc3545 !important;
+  font-weight: 600;
+}
+
+#btn-cancelar:hover {
+  background-color: #dc3545 !important;
+  color: #fff !important;
+}
+
+/* ------------------------------------------------------------------
+   SECCIÓN FIRMANTES
+   ------------------------------------------------------------------ */
+.rc-firmantes-card .card-header {
+  background: linear-gradient(90deg, #f0e6ea 0%, #f8f0f2 100%);
+  color: var(--cp-vino);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 2px solid var(--cp-vino);
+}
+
+.rc-firmantes-card .firma-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6c757d;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  background: #f8f9fa;
+  border-left: 3px solid var(--cp-vino);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ------------------------------------------------------------------
+   SECCIÓN OFICIO PDF
+   ------------------------------------------------------------------ */
+.rc-oficio-upload-zone {
+  border: 2px dashed #adb5bd;
+  border-radius: 10px;
+  padding: 24px 20px;
+  text-align: center;
+  background: #fafbfc;
+  transition: border-color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+
+.rc-oficio-upload-zone:hover,
+.rc-oficio-upload-zone.dragover {
+  border-color: var(--cp-vino);
+  background: #fdf5f7;
+}
+
+.rc-oficio-upload-zone .rc-upload-icon {
+  font-size: 36px;
+  color: #adb5bd;
+  margin-bottom: 8px;
+  transition: color 0.2s;
+}
+
+.rc-oficio-upload-zone:hover .rc-upload-icon {
+  color: var(--cp-vino);
+}
+
+.rc-oficio-upload-zone .rc-upload-hint {
+  font-size: 12px;
+  color: #6c757d;
+  margin-bottom: 10px;
+}
+
+.rc-oficio-existente {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f8f9fa 0%, #ffffff 100%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* ------------------------------------------------------------------
+   MODAL DE BÚSQUEDA
+   ------------------------------------------------------------------ */
+#modalBuscarRecon .modal-content {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+#modalBuscarRecon .modal-header {
+  background: linear-gradient(135deg, var(--cp-vino) 0%, #8b2442 100%);
+  color: #ffffff;
+  border-bottom: none;
+  padding: 14px 20px;
+}
+
+#modalBuscarRecon .modal-header .modal-title {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+#modalBuscarRecon .modal-header .btn-close {
+  filter: invert(1);
+  opacity: 0.9;
+}
+
+#modalBuscarRecon .modal-body {
+  padding: 20px;
+}
+
+#modalBuscarRecon .modal-footer {
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+#modalBuscarRecon thead th {
+  background: #f0e6ea;
+  color: var(--cp-vino);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ------------------------------------------------------------------
+   FIRMA (legacy, no eliminar)
+   ------------------------------------------------------------------ */
 .rc-firma {
   background: #f8f9fa;
   padding: 12px;
   border-radius: 6px;
 }
 
+/* ------------------------------------------------------------------
+   TABLA GLOBAL (búsqueda)
+   ------------------------------------------------------------------ */
 #tabla-recon thead th {
-  background: #f1f3f5;
+  background: #f0e6ea;
+  color: var(--cp-vino);
 }
 
 #tabla-recon tbody td {
   vertical-align: middle;
+}
+
+/* ------------------------------------------------------------------
+   RESPONSIVE — Mobile first
+   ------------------------------------------------------------------ */
+
+/* Mobile (<480px): stack vertical */
+@media (max-width: 479.98px) {
+  .rc-doc-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin: -16px -16px 16px -16px;
+    border-radius: 0;
+  }
+
+  .rc-topbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rc-doc-topbar .rc-topbar-actions {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .rc-doc-topbar .rc-topbar-btns {
+    width: 100%;
+  }
+
+  .rc-doc-topbar .btn-topbar {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Cards origen/destino: stack vertical */
+  .col-lg-6 .rc-side-card {
+    margin-bottom: 12px;
+  }
+
+  /* Barra de acciones: stack vertical, full width */
+  .rc-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rc-actions .btn,
+  .rc-actions .btn-group {
+    width: 100%;
+  }
+
+  .rc-actions-divider {
+    display: none;
+  }
+
+  .rc-actions .btn-group .btn {
+    flex: 1;
+  }
+}
+
+/* Tablet (480px – 959px) */
+@media (min-width: 480px) and (max-width: 959.98px) {
+  .rc-doc-topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .rc-doc-topbar .rc-topbar-titles .rc-main-title {
+    font-size: 12px;
+  }
+
+  .rc-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* Desktop normal (960px – 1327px) */
+@media (min-width: 960px) and (max-width: 1327.98px) {
+  .rc-doc-topbar .rc-topbar-titles .rc-main-title {
+    font-size: 13px;
+  }
+}
+
+/* Widescreen (>=1328px): contenedor máximo 1600px */
+@media (min-width: 1328px) {
+  .form-container.rc-form {
+    max-width: 1600px;
+  }
+
+  .rc-doc-topbar .rc-topbar-titles .rc-main-title {
+    font-size: 14px;
+  }
 }

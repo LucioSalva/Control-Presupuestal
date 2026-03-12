@@ -1498,10 +1498,8 @@
           <table class="table table-sm table-bordered mb-0">
             <thead><tr>
               <th style="width:40px;"></th>
-              <th style="width:90px;">Clave</th>
-              <th>Concepto</th>
-              <th style="width:150px;">Importe</th>
-              <th>Descripción</th>
+              <th style="width:90px;">Partida</th>
+              <th>Nombre de Partida</th>
             </tr></thead>
             <tbody>
       `;
@@ -1518,20 +1516,6 @@
             </td>
             <td class="align-middle small fw-semibold">${p.partida_clave}</td>
             <td class="align-middle small">${p.partida_descripcion}</td>
-            <td>
-              <input type="text" class="form-control form-control-sm text-end mp-importe"
-                data-clave="${p.partida_clave}"
-                placeholder="$ 0.00"
-                value="${importe}"
-                ${checked ? "" : "disabled"} />
-            </td>
-            <td>
-              <input type="text" class="form-control form-control-sm mp-desc"
-                data-clave="${p.partida_clave}"
-                placeholder="Descripción"
-                value="${desc}"
-                ${checked ? "" : "disabled"} />
-            </td>
           </tr>
         `;
       }
@@ -1550,44 +1534,13 @@
     container.querySelectorAll(".mp-check").forEach((chk) => {
       chk.addEventListener("change", () => {
         const clave = chk.dataset.clave;
-        const tr = chk.closest("tr");
-        const impEl = tr?.querySelector(".mp-importe");
-        const descEl = tr?.querySelector(".mp-desc");
-
         if (chk.checked) {
-          if (impEl) impEl.disabled = false;
-          if (descEl) descEl.disabled = false;
           if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
           seleccionPartidasModal[clave].checked = true;
         } else {
-          if (impEl) impEl.disabled = true;
-          if (descEl) descEl.disabled = true;
           if (seleccionPartidasModal[clave]) seleccionPartidasModal[clave].checked = false;
         }
         actualizarResumenModal();
-      });
-    });
-
-    container.querySelectorAll(".mp-importe").forEach((el) => {
-      el.addEventListener("blur", () => {
-        const clave = el.dataset.clave;
-        const n = moneyParse(el.value);
-        el.value = n ? moneyFormat(n) : "";
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        seleccionPartidasModal[clave].importe = n;
-      });
-      el.addEventListener("focus", () => {
-        const n = moneyParse(el.value);
-        el.value = n ? String(n.toFixed(2)) : "";
-        setTimeout(() => el.select(), 0);
-      });
-    });
-
-    container.querySelectorAll(".mp-desc").forEach((el) => {
-      el.addEventListener("input", () => {
-        const clave = el.dataset.clave;
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        seleccionPartidasModal[clave].descripcion = el.value;
       });
     });
   }
@@ -1606,16 +1559,6 @@
         const clave = chk.dataset.clave;
         if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
         seleccionPartidasModal[clave].checked = chk.checked;
-      });
-      container.querySelectorAll(".mp-importe").forEach((el) => {
-        const clave = el.dataset.clave;
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        seleccionPartidasModal[clave].importe = moneyParse(el.value);
-      });
-      container.querySelectorAll(".mp-desc").forEach((el) => {
-        const clave = el.dataset.clave;
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        seleccionPartidasModal[clave].descripcion = el.value;
       });
     }
 
@@ -1666,29 +1609,20 @@
       return;
     }
 
-    const fmt = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
     let html = "";
     for (const [fk, g] of Object.entries(gruposPorFuente)) {
-      const totalFuente = g.partidas.reduce((acc, p) => acc + (p.importe || 0), 0);
       html += `
         <div class="border rounded p-2 mb-2 bg-light">
           <div class="fw-semibold small mb-1">F.F. ${fk} — ${g.fuente_nombre}</div>
           <table class="table table-sm table-bordered mb-0 bg-white">
-            <thead><tr><th>Clave</th><th>Concepto</th><th class="text-end">Importe</th><th>Descripción</th></tr></thead>
+            <thead><tr><th>Partida</th><th>Nombre de Partida</th></tr></thead>
             <tbody>
               ${g.partidas.map((p) => `
                 <tr>
                   <td class="small">${p.partida_clave}</td>
                   <td class="small">${p.concepto_partida}</td>
-                  <td class="text-end small">${fmt.format(p.importe)}</td>
-                  <td class="small">${p.descripcion}</td>
                 </tr>
               `).join("")}
-              <tr class="table-light fw-semibold">
-                <td colspan="2" class="text-end small">Subtotal</td>
-                <td class="text-end small">${fmt.format(totalFuente)}</td>
-                <td></td>
-              </tr>
             </tbody>
           </table>
         </div>

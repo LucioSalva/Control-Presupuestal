@@ -37,37 +37,59 @@
   <div id="cp-navbar"></div>
 
   <div class="container mt-4">
+
+    <!-- ===================================================
+         CARD 1: Registro de Entrega
+         =================================================== -->
     <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+        <!-- Encabezado de sección -->
+        <div class="card-header-custom">
           <div>
-            <h5 class="mb-1">Registro de Entregas</h5>
-            <div class="text-muted small">Selecciona un expediente y registra su entrega mensual</div>
+            <p class="page-title">
+              <i class="bi bi-folder2-open me-2" style="color:#691c32;"></i>Registro de Entregas
+            </p>
+            <p class="page-subtitle">Selecciona un expediente y registra su entrega mensual</p>
           </div>
-          <div class="d-flex flex-wrap align-items-end gap-2">
-            <div style="min-width: 160px;">
-              <label class="form-label small mb-1">Folio (MM-XX)</label>
-              <input id="inputFolio" type="text" class="form-control form-control-sm" readonly />
+
+          <!-- Grupo de acciones: folio + botones -->
+          <div class="exp-action-bar">
+            <div class="exp-folio-group">
+              <!-- Folio generado -->
+              <div style="min-width:160px;">
+                <label class="form-label small mb-1">Folio (MM-XX)</label>
+                <input id="inputFolio" type="text" class="form-control form-control-sm readonly" readonly />
+              </div>
+              <!-- Diferido toggle -->
+              <div class="d-flex align-items-end gap-2">
+                <div class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" id="chkFolioDiferido" />
+                  <label class="form-check-label small" for="chkFolioDiferido">Diferido</label>
+                </div>
+                <div id="wrapFolioDiferido" style="min-width:90px;">
+                  <label class="form-label small mb-1">D-XX</label>
+                  <select id="selectFolioDiferido" class="form-select form-select-sm"></select>
+                </div>
+              </div>
             </div>
-            <div class="form-check mb-1">
-              <input class="form-check-input" type="checkbox" id="chkFolioDiferido" />
-              <label class="form-check-label small" for="chkFolioDiferido">Diferido</label>
+
+            <!-- Botones de acción agrupados -->
+            <div class="exp-btn-group">
+              <button id="btnGenerarFolio" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-repeat me-1"></i>Generar
+              </button>
+              <button id="btnLimpiarEntrega" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-eraser me-1"></i>Nuevo
+              </button>
+              <button id="btnGuardarEntrega" class="btn btn-success btn-sm btn-guardar-full">
+                <i class="bi bi-save me-1"></i>Guardar
+              </button>
             </div>
-            <div id="wrapFolioDiferido" style="min-width: 90px;">
-              <label class="form-label small mb-1">D-XX</label>
-              <select id="selectFolioDiferido" class="form-select form-select-sm"></select>
-            </div>
-            <button id="btnGenerarFolio" class="btn btn-outline-primary btn-sm">
-              <i class="bi bi-arrow-repeat me-1"></i>Generar
-            </button>
-            <button id="btnLimpiarEntrega" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-eraser me-1"></i>Nuevo
-            </button>
-            <button id="btnGuardarEntrega" class="btn btn-success btn-sm">
-              <i class="bi bi-save me-1"></i>Guardar
-            </button>
           </div>
         </div>
+
+        <!-- Campos ocultos de control -->
         <input type="hidden" id="currentEntregaId" value="" />
         <input type="hidden" id="idSuficiencia" value="" />
         <input type="hidden" id="idComprometido" value="" />
@@ -75,11 +97,18 @@
         <input type="hidden" id="idDgeneral" value="" />
         <input type="hidden" id="idDauxiliar" value="" />
         <input type="hidden" id="partidaClave" value="" />
-        <div class="row g-3 mt-2">
-          <div class="col-lg-3">
-            <label class="form-label small form-section-title">Periodo</label>
+
+        <hr class="exp-divider">
+
+        <!-- Fila de datos del expediente -->
+        <div class="row g-3">
+
+          <!-- Periodo -->
+          <div class="col-12 col-sm-6 col-lg-3">
+            <span class="form-section-title">Periodo</span>
             <div class="d-flex gap-2">
-              <input id="inputAnio" type="number" class="form-control form-control-sm" min="2000" max="2100" />
+              <input id="inputAnio" type="number" class="form-control form-control-sm"
+                min="2000" max="2100" placeholder="Año" />
               <select id="selectMes" class="form-select form-select-sm">
                 <option value="1">Enero</option>
                 <option value="2">Febrero</option>
@@ -96,70 +125,101 @@
               </select>
             </div>
           </div>
-          <div class="col-lg-5">
-            <label class="form-label small form-section-title">Origen</label>
-            <div class="d-flex gap-2">
-              <select id="selectTipoOrigen" class="form-select form-select-sm" style="max-width: 180px;">
+
+          <!-- Origen (búsqueda) -->
+          <div class="col-12 col-sm-12 col-lg-5">
+            <span class="form-section-title">Origen del Expediente</span>
+            <div class="d-flex gap-2 flex-wrap">
+              <select id="selectTipoOrigen" class="form-select form-select-sm" style="max-width:180px; min-width:140px;">
                 <option value="SUF">SUFICIENCIAS</option>
                 <option value="COMP">COMPROMETIDOS</option>
                 <option value="DEV">DEVENGADOS</option>
               </select>
-              <input id="inputBuscarOrigen" type="text" class="form-control form-control-sm"
-                placeholder="Folio, dependencia o concepto" />
-              <button id="btnBuscarOrigen" class="btn btn-primary btn-sm">
-                <i class="bi bi-search me-1"></i>Buscar
-              </button>
+              <div class="input-group input-group-sm flex-grow-1" style="min-width:200px;">
+                <input id="inputBuscarOrigen" type="text" class="form-control"
+                  placeholder="Folio, dependencia o concepto" />
+                <button id="btnBuscarOrigen" class="btn btn-primary btn-sm">
+                  <i class="bi bi-search"></i>
+                </button>
+              </div>
             </div>
-            <div id="labelOrigen" class="small text-muted mt-1">Sin expediente seleccionado</div>
+            <div id="labelOrigen" class="small text-muted mt-1">
+              <i class="bi bi-info-circle me-1"></i>Sin expediente seleccionado
+            </div>
           </div>
-          <div class="col-lg-4">
-            <label class="form-label small form-section-title">Checks de Entrega</label>
-            <div class="d-flex gap-3">
+
+          <!-- Checks de entrega -->
+          <div class="col-12 col-sm-6 col-lg-4">
+            <span class="form-section-title">Checks de Entrega</span>
+            <div class="d-flex gap-4 pt-1">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="chkEntregoComprometido" />
-                <label class="form-check-label" for="chkEntregoComprometido">Comprometido</label>
+                <label class="form-check-label small" for="chkEntregoComprometido">
+                  <i class="bi bi-check2-square me-1"></i>Comprometido
+                </label>
               </div>
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="chkEntregoDevengado" />
-                <label class="form-check-label" for="chkEntregoDevengado">Devengado</label>
+                <label class="form-check-label small" for="chkEntregoDevengado">
+                  <i class="bi bi-check2-square me-1"></i>Devengado
+                </label>
               </div>
             </div>
           </div>
-          <div class="col-lg-4">
-            <label class="form-label small">Fecha Entrega Tesorería</label>
+
+          <!-- Fechas y estatus -->
+          <div class="col-12 col-sm-6 col-lg-4">
+            <label class="form-label small mb-1">
+              <i class="bi bi-calendar3 me-1 text-muted"></i>Fecha Entrega a Tesorería
+            </label>
             <input id="inputFechaEntrega" type="date" class="form-control form-control-sm" />
           </div>
-          <div class="col-lg-4">
-            <label class="form-label small">Fecha Recibido Presupuesto</label>
+          <div class="col-12 col-sm-6 col-lg-4">
+            <label class="form-label small mb-1">
+              <i class="bi bi-calendar-check me-1 text-muted"></i>Fecha Recibido Presupuesto
+            </label>
             <input id="inputFechaRecibido" type="date" class="form-control form-control-sm" />
           </div>
-          <div class="col-lg-4">
-            <label class="form-label small">Estatus</label>
+          <div class="col-12 col-sm-6 col-lg-4">
+            <label class="form-label small mb-1">
+              <i class="bi bi-flag me-1 text-muted"></i>Estatus
+            </label>
             <select id="selectEstatus" class="form-select form-select-sm">
               <option value="ENTREGADO">ENTREGADO</option>
               <option value="CANCELADO">CANCELADO</option>
             </select>
           </div>
+
+          <!-- Observaciones -->
           <div class="col-12">
-            <label class="form-label small">Observaciones</label>
-            <textarea id="inputObservaciones" class="form-control form-control-sm" rows="2"></textarea>
+            <label class="form-label small mb-1">
+              <i class="bi bi-chat-left-text me-1 text-muted"></i>Observaciones
+            </label>
+            <textarea id="inputObservaciones" class="form-control form-control-sm" rows="2"
+              placeholder="Notas adicionales sobre esta entrega..."></textarea>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- ===================================================
+         CARD 2: Expedientes del Origen (resultados de búsqueda)
+         =================================================== -->
     <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="exp-card-header">
           <div>
-            <div class="form-section-title">Expedientes del Origen</div>
-            <div class="text-muted small">Selecciona un expediente para registrar</div>
+            <div class="exp-card-title">
+              <i class="bi bi-search me-1" style="color:#691c32;"></i>Expedientes del Origen
+            </div>
+            <div class="exp-card-subtitle">Haz clic en "Seleccionar" para cargar el expediente en el formulario</div>
           </div>
-          <div class="small text-muted">Máximo 50 resultados</div>
+          <span class="badge text-bg-light border">Máx. 50 resultados</span>
         </div>
-        <div class="table-responsive mt-3">
-          <table class="table table-sm table-striped align-middle">
-            <thead class="table-light">
+
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
               <tr>
                 <th id="thOrigenFolio">Folio</th>
                 <th>Dependencia</th>
@@ -168,68 +228,82 @@
                 <th class="text-center">Acción</th>
               </tr>
             </thead>
-            <tbody id="tbodyOrigen"></tbody>
+            <tbody id="tbodyOrigen">
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3 small">
+                  <i class="bi bi-inbox me-1"></i>Realiza una búsqueda para ver expedientes
+                </td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
     </div>
 
+    <!-- ===================================================
+         CARD 3: Entregas Registradas (listado + filtros)
+         =================================================== -->
     <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="exp-card-header">
           <div>
-            <div class="form-section-title">Entregas Registradas</div>
-            <div class="text-muted small">Consulta por periodo o folio</div>
+            <div class="exp-card-title">
+              <i class="bi bi-card-list me-1" style="color:#691c32;"></i>Entregas Registradas
+            </div>
+            <div class="exp-card-subtitle">Consulta, filtra y gestiona las entregas registradas</div>
           </div>
-          <div class="entregas-filters">
-            <div class="entregas-filter">
-              <label class="form-label small mb-1">Año</label>
-              <input id="filtroAnio" type="number" class="form-control form-control-sm" placeholder="Año" />
-            </div>
-            <div class="entregas-filter">
-              <label class="form-label small mb-1">Mes</label>
-              <select id="filtroMes" class="form-select form-select-sm">
-                <option value="">Mes (todos)</option>
-                <option value="1">Enero</option>
-                <option value="2">Febrero</option>
-                <option value="3">Marzo</option>
-                <option value="4">Abril</option>
-                <option value="5">Mayo</option>
-                <option value="6">Junio</option>
-                <option value="7">Julio</option>
-                <option value="8">Agosto</option>
-                <option value="9">Septiembre</option>
-                <option value="10">Octubre</option>
-                <option value="11">Noviembre</option>
-                <option value="12">Diciembre</option>
-              </select>
-            </div>
-            <div class="entregas-filter entregas-filter-wide">
-              <label class="form-label small mb-1">Buscar por No. de folio</label>
-              <div class="input-group input-group-sm">
-                <input id="filtroFolio" type="text" class="form-control form-control-sm"
-                  placeholder="Ej. 02-01 o ECA-2026-02-CP-0001" />
-                <button id="btnBuscarFolio" class="btn btn-primary btn-sm" type="button">
-                  <i class="bi bi-search me-1"></i>Buscar
-                </button>
-              </div>
-            </div>
-            <div class="entregas-filter entregas-filter-wide">
-              <label class="form-label small mb-1">Buscar por texto</label>
-              <input id="filtroSearch" type="text" class="form-control form-control-sm"
-                placeholder="Dependencia o concepto" />
-            </div>
-            <div class="entregas-filter">
-              <label class="form-label small mb-1">&nbsp;</label>
-              <button id="btnRecargarListado" class="btn btn-outline-secondary btn-sm w-100">
-                <i class="bi bi-arrow-repeat me-1"></i>Recargar
+        </div>
+
+        <!-- Barra de filtros -->
+        <div class="entregas-filters">
+          <div class="entregas-filter">
+            <label class="form-label small mb-1">Año</label>
+            <input id="filtroAnio" type="number" class="form-control form-control-sm" placeholder="Ej. 2026" />
+          </div>
+          <div class="entregas-filter">
+            <label class="form-label small mb-1">Mes</label>
+            <select id="filtroMes" class="form-select form-select-sm">
+              <option value="">Todos los meses</option>
+              <option value="1">Enero</option>
+              <option value="2">Febrero</option>
+              <option value="3">Marzo</option>
+              <option value="4">Abril</option>
+              <option value="5">Mayo</option>
+              <option value="6">Junio</option>
+              <option value="7">Julio</option>
+              <option value="8">Agosto</option>
+              <option value="9">Septiembre</option>
+              <option value="10">Octubre</option>
+              <option value="11">Noviembre</option>
+              <option value="12">Diciembre</option>
+            </select>
+          </div>
+          <div class="entregas-filter entregas-filter-wide">
+            <label class="form-label small mb-1">Buscar por No. de folio</label>
+            <div class="input-group input-group-sm">
+              <input id="filtroFolio" type="text" class="form-control"
+                placeholder="Ej. 02-01 o ECA-2026-02-CP-0001" />
+              <button id="btnBuscarFolio" class="btn btn-primary btn-sm" type="button">
+                <i class="bi bi-search"></i>
               </button>
             </div>
           </div>
+          <div class="entregas-filter entregas-filter-wide">
+            <label class="form-label small mb-1">Buscar por texto</label>
+            <input id="filtroSearch" type="text" class="form-control form-control-sm"
+              placeholder="Dependencia o concepto..." />
+          </div>
+          <div class="entregas-filter d-flex align-items-end">
+            <button id="btnRecargarListado" class="btn btn-outline-secondary btn-sm w-100">
+              <i class="bi bi-arrow-repeat me-1"></i>Recargar
+            </button>
+          </div>
         </div>
+
+        <!-- Tabla de entregas registradas -->
         <div class="table-responsive mt-3">
-          <table class="table table-sm table-hover align-middle">
-            <thead class="table-light">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
               <tr>
                 <th>No.</th>
                 <th>Folio</th>
@@ -238,18 +312,25 @@
                 <th class="text-center">Comprometido</th>
                 <th class="text-center">Devengado</th>
                 <th class="text-end">Importe</th>
-                <th>Fecha de Entregado en Tesorería</th>
-                <th>Fecha de Recibido en Presupuesto</th>
-                <th class="text-center">Checks de Entrega</th>
+                <th>Entregado a Tesorería</th>
+                <th>Recibido en Presupuesto</th>
+                <th class="text-center">Checks</th>
                 <th>Observaciones</th>
               </tr>
             </thead>
-            <tbody id="tbodyEntregas"></tbody>
+            <tbody id="tbodyEntregas">
+              <tr>
+                <td colspan="11" class="text-center text-muted py-3 small">
+                  <i class="bi bi-inbox me-1"></i>No hay entregas registradas para mostrar
+                </td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
     </div>
-  </div>
+
+  </div><!-- /container -->
 
   <script src="/js/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

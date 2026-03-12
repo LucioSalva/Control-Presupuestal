@@ -3,8 +3,28 @@
 
 <head>
   <meta charset="utf-8" />
+  <style>
+    :root {
+      visibility: hidden;
+    }
+  </style>
+  <script>
+    (function () {
+      try {
+        var u = localStorage.getItem("cp_usuario");
+        var t = localStorage.getItem("cp_token");
+        if (!u || !t) {
+          window.location.replace("login.html");
+          return;
+        }
+        document.documentElement.style.visibility = "visible";
+      } catch (e) {
+        document.documentElement.style.visibility = "visible";
+      }
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Reconducciones</title>
+  <title>Reconducciones — Control Presupuestal</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -19,24 +39,43 @@
 
   <main class="container py-4">
     <div class="form-container rc-form">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 rc-doc-header">
-        <div>
-          <div class="form-title">Dictamen de Reconducción y Actualización Programático-Presupuestal</div>
-          <div class="sub-title">Formato de control interno</div>
+
+      <!-- ============================================================
+           TOPBAR DEL DOCUMENTO
+           ============================================================ -->
+      <div class="rc-doc-topbar">
+        <!-- Icono izquierda -->
+        <div class="rc-topbar-icon">
+          <i class="bi bi-arrow-left-right"></i>
         </div>
-        <div class="text-end">
-          <div class="mb-2 d-flex gap-2">
-            <button id="btn-nuevo-recon" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
-            </button>
-            <button id="btn-buscar-recon" class="btn btn-outline-primary btn-sm">
-              <i class="bi bi-search me-1"></i>Buscar
-            </button>
+
+        <!-- Título central -->
+        <div class="rc-topbar-titles">
+          <p class="rc-main-title">Dictamen de Reconducción y Actualización Programático-Presupuestal</p>
+          <p class="rc-sub-title">Formato de control interno</p>
+        </div>
+
+        <!-- Acciones derecha -->
+        <div class="rc-topbar-right">
+          <!-- Metadatos: ID + status + botones -->
+          <div class="rc-topbar-actions">
+            <div class="rc-topbar-btns">
+              <button id="btn-nuevo-recon" class="btn-topbar">
+                <i class="bi bi-file-earmark-plus"></i>Nuevo
+              </button>
+              <button id="btn-buscar-recon" class="btn-topbar">
+                <i class="bi bi-search"></i>Buscar
+              </button>
+            </div>
+            <div class="rc-topbar-meta">
+              <span class="rc-id-label">ID:</span>
+              <span id="rc-id" class="fw-bold">—</span>
+              <span id="rc-status" class="badge bg-secondary">BORRADOR</span>
+            </div>
           </div>
-          <div class="small text-muted">ID</div>
-          <div id="rc-id" class="fw-bold">—</div>
-          <span id="rc-status" class="badge bg-secondary mt-2">BORRADOR</span>
-          <div class="cp-qr-card mt-2">
+
+          <!-- QR esquina derecha -->
+          <div class="rc-qr-topbar">
             <div class="cp-qr-label">QR Documento</div>
             <div id="qr-recon" class="cp-qr-img">
               <div class="cp-qr-empty">Sin QR</div>
@@ -45,6 +84,9 @@
         </div>
       </div>
 
+      <!-- ============================================================
+           CAMPOS GENERALES
+           ============================================================ -->
       <div class="row g-3 mb-3">
         <div class="col-md-3">
           <label class="form-label">No. de Reconducción</label>
@@ -88,10 +130,17 @@
         </div>
       </div>
 
+      <!-- ============================================================
+           CARDS ORIGEN / DESTINO
+           ============================================================ -->
       <div class="row g-3">
+        <!-- ORIGEN -->
         <div class="col-lg-6">
           <div class="card rc-side-card">
-            <div class="card-header rc-side-header rc-origen">Identificación del Proyecto en el que se cancela o reduce</div>
+            <div class="card-header rc-side-header rc-origen">
+              <i class="bi bi-dash-circle me-1"></i>
+              Identificación del Proyecto en el que se cancela o reduce
+            </div>
             <div class="card-body">
               <div class="row g-2">
                 <div class="col-md-6">
@@ -129,7 +178,7 @@
               </div>
 
               <div class="rc-subtitle mt-3">Recursos a nivel proyecto</div>
-              <div class="row g-2">
+              <div class="row g-2 mt-1">
                 <div class="col-6">
                   <label class="form-label">Autorizado</label>
                   <input id="origen-autorizado" type="number" step="0.01" class="form-control form-control-sm text-end">
@@ -151,9 +200,13 @@
           </div>
         </div>
 
+        <!-- DESTINO -->
         <div class="col-lg-6">
           <div class="card rc-side-card">
-            <div class="card-header rc-side-header rc-destino">Identificación del Proyecto en el que se asigna o se amplia</div>
+            <div class="card-header rc-side-header rc-destino">
+              <i class="bi bi-plus-circle me-1"></i>
+              Identificación del Proyecto en el que se asigna o se amplía
+            </div>
             <div class="card-body">
               <div class="row g-2">
                 <div class="col-md-6">
@@ -191,7 +244,7 @@
               </div>
 
               <div class="rc-subtitle mt-3">Recursos a nivel proyecto</div>
-              <div class="row g-2">
+              <div class="row g-2 mt-1">
                 <div class="col-6">
                   <label class="form-label">Autorizado</label>
                   <input id="destino-autorizado" type="number" step="0.01" class="form-control form-control-sm text-end">
@@ -214,14 +267,26 @@
         </div>
       </div>
 
+      <!-- ============================================================
+           TABLAS RECURSOS POR PARTIDA
+           ============================================================ -->
       <div class="row g-3 mt-3">
+        <!-- Recursos ORIGEN -->
         <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header rc-table-header">Recursos por partida (ORIGEN)</div>
+          <div class="card shadow-sm">
+            <div class="card-header rc-table-header">
+              <i class="bi bi-table me-1"></i>Recursos por partida (ORIGEN)
+            </div>
             <div class="card-body">
-              <div class="d-flex gap-2 mb-2">
-                <button id="btn-add-origen" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
-                <button id="btn-del-origen" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              <div class="rc-row-btns">
+                <div class="btn-group" role="group">
+                  <button id="btn-add-origen" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Agregar renglón
+                  </button>
+                  <button id="btn-del-origen" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-dash-lg me-1"></i>Eliminar renglón
+                  </button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-sm align-middle rc-table">
@@ -238,23 +303,33 @@
                 </table>
               </div>
               <div id="origen-alerta-saldo" class="alert alert-warning d-none mb-2">
+                <i class="bi bi-exclamation-triangle me-1"></i>
                 Hay partidas ORIGEN con saldo insuficiente.
               </div>
               <div class="rc-total-box">
-                <span>Total ORIGEN</span>
+                <span><i class="bi bi-sigma me-1"></i>Total ORIGEN</span>
                 <strong id="total-origen">$0.00</strong>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- Recursos DESTINO -->
         <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header rc-table-header">Recursos por partida (DESTINO)</div>
+          <div class="card shadow-sm">
+            <div class="card-header rc-table-header">
+              <i class="bi bi-table me-1"></i>Recursos por partida (DESTINO)
+            </div>
             <div class="card-body">
-              <div class="d-flex gap-2 mb-2">
-                <button id="btn-add-destino" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
-                <button id="btn-del-destino" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              <div class="rc-row-btns">
+                <div class="btn-group" role="group">
+                  <button id="btn-add-destino" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Agregar renglón
+                  </button>
+                  <button id="btn-del-destino" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-dash-lg me-1"></i>Eliminar renglón
+                  </button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-sm align-middle rc-table">
@@ -271,7 +346,7 @@
                 </table>
               </div>
               <div class="rc-total-box">
-                <span>Total DESTINO</span>
+                <span><i class="bi bi-sigma me-1"></i>Total DESTINO</span>
                 <strong id="total-destino">$0.00</strong>
               </div>
             </div>
@@ -279,19 +354,32 @@
         </div>
       </div>
 
+      <!-- Diferencia general -->
       <div class="rc-total-diff mt-2">
-        <span>Diferencia general</span>
+        <span><i class="bi bi-calculator me-1"></i>Diferencia general</span>
         <strong id="total-diff">$0.00</strong>
       </div>
 
+      <!-- ============================================================
+           TABLAS DE METAS
+           ============================================================ -->
       <div class="row g-3 mt-3">
+        <!-- Metas ORIGEN -->
         <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header rc-table-header">Metas (ORIGEN)</div>
+          <div class="card shadow-sm">
+            <div class="card-header rc-table-header">
+              <i class="bi bi-bullseye me-1"></i>Metas (ORIGEN)
+            </div>
             <div class="card-body">
-              <div class="d-flex gap-2 mb-2">
-                <button id="btn-add-meta-origen" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
-                <button id="btn-del-meta-origen" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              <div class="rc-row-btns">
+                <div class="btn-group" role="group">
+                  <button id="btn-add-meta-origen" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Agregar renglón
+                  </button>
+                  <button id="btn-del-meta-origen" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-dash-lg me-1"></i>Eliminar renglón
+                  </button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-sm align-middle rc-table">
@@ -316,13 +404,22 @@
           </div>
         </div>
 
+        <!-- Metas DESTINO -->
         <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header rc-table-header">Metas (DESTINO)</div>
+          <div class="card shadow-sm">
+            <div class="card-header rc-table-header">
+              <i class="bi bi-bullseye me-1"></i>Metas (DESTINO)
+            </div>
             <div class="card-body">
-              <div class="d-flex gap-2 mb-2">
-                <button id="btn-add-meta-destino" class="btn btn-sm btn-outline-primary">Agregar renglón</button>
-                <button id="btn-del-meta-destino" class="btn btn-sm btn-outline-danger">Eliminar renglón</button>
+              <div class="rc-row-btns">
+                <div class="btn-group" role="group">
+                  <button id="btn-add-meta-destino" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Agregar renglón
+                  </button>
+                  <button id="btn-del-meta-destino" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-dash-lg me-1"></i>Eliminar renglón
+                  </button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-sm align-middle rc-table">
@@ -348,21 +445,27 @@
         </div>
       </div>
 
+      <!-- ============================================================
+           JUSTIFICACIÓN
+           ============================================================ -->
       <div class="mt-3">
-        <label class="form-label">Justificación</label>
-        <textarea id="rc-justificacion" rows="3" class="form-control"></textarea>
+        <label class="form-label fw-semibold">Justificación</label>
+        <textarea id="rc-justificacion" rows="3" class="form-control" placeholder="Describe la justificación del movimiento..."></textarea>
       </div>
 
-      <!-- Sección: Oficio PDF -->
+      <!-- ============================================================
+           OFICIO PDF
+           ============================================================ -->
       <div class="card mt-3 d-none" id="card-oficio-pdf">
         <div class="card-header rc-table-header d-flex justify-content-between align-items-center">
           <span><i class="bi bi-file-earmark-pdf me-1 text-danger"></i>Oficio de Reconducción (PDF)</span>
           <span class="badge bg-secondary" id="oficio-status-badge">Sin oficio</span>
         </div>
         <div class="card-body">
+          <!-- Oficio ya subido -->
           <div id="oficio-existente" class="d-none mb-3">
-            <div class="d-flex align-items-center gap-3 p-2 border rounded bg-light">
-              <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+            <div class="rc-oficio-existente">
+              <i class="bi bi-file-earmark-pdf-fill text-danger fs-2"></i>
               <div class="flex-grow-1">
                 <div class="fw-semibold" id="oficio-nombre-archivo">—</div>
                 <div class="text-muted small" id="oficio-fecha-subida">—</div>
@@ -377,16 +480,22 @@
               </div>
             </div>
           </div>
+
+          <!-- Zona de subida -->
           <div id="oficio-upload-area">
-            <div class="text-muted small mb-2">
-              <i class="bi bi-info-circle me-1"></i>
-              Sube el oficio físico escaneado en PDF como respaldo del trámite. Máximo 10 MB.
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <input type="file" id="oficio-file-input" accept=".pdf,application/pdf" class="form-control form-control-sm" style="max-width:350px">
-              <button id="btn-subir-oficio" class="btn btn-sm btn-success" disabled>
-                <i class="bi bi-cloud-upload me-1"></i>Subir PDF
-              </button>
+            <div class="rc-oficio-upload-zone mb-2">
+              <div class="rc-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+              <div class="rc-upload-hint">
+                Sube el oficio físico escaneado en PDF como respaldo del trámite.<br>
+                <strong>Máximo 10 MB</strong> — solo archivos .pdf
+              </div>
+              <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
+                <input type="file" id="oficio-file-input" accept=".pdf,application/pdf"
+                  class="form-control form-control-sm" style="max-width:320px">
+                <button id="btn-subir-oficio" class="btn btn-sm btn-success" disabled>
+                  <i class="bi bi-cloud-upload me-1"></i>Subir PDF
+                </button>
+              </div>
             </div>
             <div id="oficio-upload-progress" class="mt-2 d-none">
               <div class="progress" style="height:6px">
@@ -397,61 +506,98 @@
         </div>
       </div>
 
-      <div class="card mt-3">
+      <!-- ============================================================
+           FIRMANTES
+           ============================================================ -->
+      <div class="card mt-3 rc-firmantes-card">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="bi bi-pen"></i>
+          <span>Datos de Solicitante y Firmantes</span>
+        </div>
         <div class="card-body">
-          <h5 class="text-center mb-2">Datos de Solicitante y Firmantes</h5>
-          <div class="text-muted mb-3">Captura los datos para encabezados y firmantes:</div>
-          <div class="row g-2">
+          <p class="text-muted small mb-3">
+            Captura los datos para encabezados y firmantes del dictamen impreso.
+          </p>
+
+          <div class="firma-group-label">Enlace solicitante</div>
+          <div class="row g-2 mb-3">
             <div class="col-8">
               <label class="form-label">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
-              <input id="firma-enlace-label" type="text" class="form-control form-control-sm" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA">
+              <input id="firma-enlace-label" type="text" class="form-control form-control-sm"
+                placeholder="Ej. COORDINACIÓN ADMINISTRATIVA">
             </div>
             <div class="col-4">
               <label class="form-label">Firmante Enlace</label>
-              <input id="firma-enlace-nombre" type="text" class="form-control form-control-sm" placeholder="Nombre del firmante">
+              <input id="firma-enlace-nombre" type="text" class="form-control form-control-sm"
+                placeholder="Nombre del firmante">
             </div>
           </div>
-          <div class="row g-2 mt-2">
+
+          <div class="firma-group-label">Área solicitante</div>
+          <div class="row g-2 mb-3">
             <div class="col-8">
               <label class="form-label">ÁREA SOLICITANTE</label>
-              <input id="firma-area-label" type="text" class="form-control form-control-sm" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS...">
+              <input id="firma-area-label" type="text" class="form-control form-control-sm"
+                placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS...">
             </div>
             <div class="col-4">
               <label class="form-label">Firmante Área</label>
-              <input id="firma-area-nombre" type="text" class="form-control form-control-sm" placeholder="Nombre del firmante">
+              <input id="firma-area-nombre" type="text" class="form-control form-control-sm"
+                placeholder="Nombre del firmante">
             </div>
           </div>
-          <div class="row g-2 mt-2">
+
+          <div class="firma-group-label">Dirección</div>
+          <div class="row g-2">
             <div class="col-8">
               <label class="form-label">Dirección Solicitante</label>
-              <input id="firma-direccion-label" type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
+              <input id="firma-direccion-label" type="text" class="form-control form-control-sm" disabled
+                value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
             </div>
             <div class="col-4">
               <label class="form-label">Firmante Dirección</label>
-              <input id="firma-direccion-nombre" type="text" class="form-control form-control-sm" placeholder="Nombre del firmante">
+              <input id="firma-direccion-nombre" type="text" class="form-control form-control-sm"
+                placeholder="Nombre del firmante">
             </div>
           </div>
         </div>
       </div>
 
-      <div class="d-flex flex-wrap gap-2 mt-4 rc-actions">
-        <button id="btn-guardar" class="btn btn-success">
-          <i class="bi bi-save me-1"></i>Guardar borrador
-        </button>
-        <button id="btn-enviar" class="btn btn-primary">
-          <i class="bi bi-send me-1"></i>Enviar
-        </button>
-        <button id="btn-aplicar" class="btn btn-warning">
-          <i class="bi bi-check2-circle me-1"></i>Aplicar
-        </button>
-        <button id="btn-cancelar" class="btn btn-outline-danger">
-          <i class="bi bi-x-circle me-1"></i>Cancelar
-        </button>
+      <!-- ============================================================
+           BARRA DE ACCIONES
+           ============================================================ -->
+      <div class="rc-actions mt-4">
+        <span class="rc-actions-label"><i class="bi bi-lightning-charge me-1"></i>Acciones</span>
+
+        <!-- Grupo principal: Guardar + Enviar -->
+        <div class="btn-group" role="group">
+          <button id="btn-guardar" class="btn btn-success">
+            <i class="bi bi-save me-1"></i>Guardar borrador
+          </button>
+          <button id="btn-enviar" class="btn btn-primary">
+            <i class="bi bi-send me-1"></i>Enviar
+          </button>
+        </div>
+
+        <div class="rc-actions-divider"></div>
+
+        <!-- Grupo secundario: Aplicar + Cancelar -->
+        <div class="btn-group" role="group">
+          <button id="btn-aplicar" class="btn btn-warning">
+            <i class="bi bi-check2-circle me-1"></i>Aplicar
+          </button>
+          <button id="btn-cancelar" class="btn btn-outline-danger">
+            <i class="bi bi-x-circle me-1"></i>Cancelar
+          </button>
+        </div>
       </div>
+
     </div>
   </main>
 
-  <!-- Modal buscar reconducción -->
+  <!-- ================================================================
+       MODAL BUSCAR RECONDUCCIÓN
+       ================================================================ -->
   <div class="modal fade" id="modalBuscarRecon" tabindex="-1" aria-labelledby="modalBuscarReconLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
@@ -465,7 +611,8 @@
           <div class="row g-2 mb-3">
             <div class="col-md-4">
               <label class="form-label small">No. de Reconducción / Folio</label>
-              <input type="text" id="buscar-recon-folio" class="form-control form-control-sm" placeholder="Ej. ECA-2026-03-RCP-0001">
+              <input type="text" id="buscar-recon-folio" class="form-control form-control-sm"
+                placeholder="Ej. ECA-2026-03-RCP-0001">
             </div>
             <div class="col-md-3">
               <label class="form-label small">Estatus</label>
@@ -494,6 +641,7 @@
               </button>
             </div>
           </div>
+
           <div id="buscar-recon-loading" class="text-center d-none py-3">
             <div class="spinner-border spinner-border-sm text-primary"></div>
             <span class="ms-2 text-muted small">Buscando...</span>
@@ -502,9 +650,10 @@
             <i class="bi bi-inbox fs-4"></i>
             <div class="mt-1 small">No se encontraron reconducciones</div>
           </div>
+
           <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
-              <thead class="table-light">
+              <thead>
                 <tr>
                   <th>ID</th>
                   <th>No. Reconducción</th>

@@ -36,204 +36,382 @@
 
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/navbar.css">
+
+  <style>
+    /* ===================================================
+       INDEX — Estilos específicos de la página principal
+       =================================================== */
+
+    /* KPI cards */
+    .index-kpi-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 88px;
+      transition: box-shadow 0.2s ease;
+    }
+
+    .index-kpi-card:hover {
+      box-shadow: 0 4px 18px rgba(105, 28, 50, 0.12);
+    }
+
+    .index-kpi-card .kpi-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #6c757d;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
+    }
+
+    .index-kpi-card .kpi-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #2b2b2b;
+      line-height: 1.2;
+    }
+
+    .index-kpi-card .kpi-icon {
+      font-size: 2rem;
+      opacity: 0.18;
+      color: #691c32;
+    }
+
+    /* Cards del layout principal */
+    .index-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+    }
+
+    .index-card .index-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 14px 16px 10px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .index-card .index-card-header h6 {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #2b2b2b;
+    }
+
+    .index-card .index-card-body {
+      padding: 14px 16px;
+    }
+
+    /* Tabla principal de presupuesto */
+    .index-card .table thead th {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      background-color: #691c32;
+      color: #ffffff;
+      border-bottom: none;
+      padding: 9px 12px;
+      white-space: nowrap;
+    }
+
+    .index-card .table tbody td {
+      font-size: 0.78rem;
+      vertical-align: middle;
+      padding: 8px 12px;
+      border-color: #f0f0f0;
+    }
+
+    .index-card .table tbody tr:hover {
+      background-color: rgba(105, 28, 50, 0.04);
+    }
+
+    /* Card del gráfico — fondo oscuro */
+    .chart-card {
+      background: #1c1c2e;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .chart-card .chart-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .chart-card .chart-card-header h6 {
+      color: #ffffff;
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .chart-card .chart-card-header .text-muted-2 {
+      color: rgba(255, 255, 255, 0.55) !important;
+    }
+
+    .chart-card .chart-card-body {
+      padding: 14px 16px;
+    }
+
+    /* Formulario lateral */
+    .form-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+    }
+
+    .form-card .form-card-header {
+      background: #691c32;
+      color: #ffffff;
+      border-radius: 12px 12px 0 0;
+      padding: 12px 16px;
+    }
+
+    .form-card .form-card-header h6 {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .form-card .form-card-body {
+      padding: 14px 16px;
+    }
+
+    .form-card .form-control,
+    .form-card .form-select {
+      border-radius: 7px;
+      border-color: #d0d5dc;
+      font-size: 0.8rem;
+    }
+
+    .form-card .form-control:focus,
+    .form-card .form-select:focus {
+      border-color: #691c32;
+      box-shadow: 0 0 0 0.2rem rgba(105, 28, 50, 0.18);
+    }
+
+    .form-card label.form-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 4px;
+    }
+
+    /* Alerta soft dentro de la card oscura */
+    .alert-soft {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      font-size: 0.78rem;
+    }
+
+    /* Zona de alertas superior */
+    #alert-zone .alert {
+      border-radius: 10px;
+      border: none;
+      font-size: 0.8rem;
+    }
+
+    /* ===================================================
+       RESPONSIVE — BREAKPOINTS OBLIGATORIOS
+       =================================================== */
+
+    /* MOBILE: 320–480px */
+    @media (max-width: 480px) {
+      .index-kpi-card {
+        padding: 12px 14px;
+        min-height: 76px;
+      }
+
+      .index-kpi-card .kpi-value {
+        font-size: 1rem;
+      }
+
+      .index-kpi-card .kpi-icon {
+        font-size: 1.5rem;
+      }
+
+      .index-card .index-card-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .index-card .index-card-header .d-flex {
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .index-card .index-card-header .d-flex .form-control,
+      .index-card .index-card-header .d-flex .btn {
+        width: 100%;
+      }
+
+      .chart-card .chart-card-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+
+    /* TABLET: 480–960px */
+    @media (min-width: 480px) and (max-width: 960px) {
+      .index-kpi-card .kpi-value {
+        font-size: 1.1rem;
+      }
+    }
+
+    /* DESKTOP: 960–1328px */
+    @media (min-width: 960px) and (max-width: 1328px) {
+      .index-kpi-card .kpi-value {
+        font-size: 1.15rem;
+      }
+    }
+
+    /* WIDESCREEN: >1328px */
+    @media (min-width: 1328px) {
+      .index-kpi-card {
+        min-height: 96px;
+      }
+
+      .index-kpi-card .kpi-value {
+        font-size: 1.3rem;
+      }
+
+      .index-kpi-card .kpi-icon {
+        font-size: 2.4rem;
+      }
+    }
+  </style>
 </head>
 
 <body>
   <div id="cp-navbar"></div>
 
-  <!-- Panel modo proyecto: buscar / crear -->
-  <!-- <div class="container mt-5" id="project-mode-container">
-    <div class="card card-project-mode">
-      <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <div>
-          <div class="badge bg-light text-muted border mb-1">Proyecto de trabajo</div>
-          <p class="mb-0 text-muted small">
-            Puedes buscar un proyecto existente o armar uno nuevo usando los catálogos.
-          </p>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-          <button type="button" id="btn-mode-search" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-search me-1"></i> Buscar proyecto
-          </button>
-          <button type="button" id="btn-mode-new" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-circle me-1"></i> Crear proyecto
-          </button>
-        </div>
-      </div>
-    </div>
-  </div> -->
-
-  <!-- Panel CREAR PROYECTO (oculto por defecto) -->
-  <!-- <div class="container mt-3 d-none" id="project-create-container">
-    <div class="card card-project-create">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-          <div>
-            <h6 class="mb-1">Nuevo proyecto de trabajo</h6>
-            <p class="text-muted small mb-0">
-              Selecciona las claves de los catálogos. Después usarás el ID de proyecto para capturar partidas.
-            </p>
-          </div>
-          <button type="button" id="btn-cancel-create" class="btn btn-link btn-sm text-decoration-none">
-            <i class="bi bi-x-circle me-1"></i> Cancelar
-          </button>
-        </div>
-
-        <form id="form-create-project" class="row g-3 align-items-end">
-          <div class="col-md-3">
-            <label for="c-dgeneral" class="form-label">Dependencia general</label>
-            <select id="c-dgeneral" class="form-select form-select-sm" required>
-              <option value="">Seleccione...</option>
-            </select>
-          </div>
-
-          <div class="col-md-3">
-            <label for="c-dauxiliar" class="form-label">Dependencia auxiliar</label>
-            <select id="c-dauxiliar" class="form-select form-select-sm" required>
-              <option value="">Seleccione...</option>
-            </select>
-          </div>
-
-          <div class="col-md-2">
-            <label for="c-proyecto" class="form-label">Proyecto</label>
-            <select id="c-proyecto" class="form-select form-select-sm" required>
-              <option value="">Seleccione...</option>
-            </select>
-          </div>
-
-          <div class="col-md-4">
-            <label for="c-idproyecto" class="form-label">ID de proyecto (código)</label>
-            <input id="c-idproyecto" type="text" class="form-control form-control-sm" placeholder="Ej. L00, E00, K00…"
-              required>
-          </div>
-
-          <div class="col-md-5">
-            <label class="form-label">Resumen</label>
-            <div id="c-resumen" class="small border rounded px-2 py-2 bg-light project-summary-box">
-              Completa los campos para ver el resumen…
-            </div>
-          </div>
-
-          <div class="col-md-3 text-md-end">
-            <button type="submit" class="btn btn-success btn-sm w-100 mt-3 mt-md-0">
-              <i class="bi bi-check-circle me-1"></i> Usar este proyecto
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div> -->
-
-
   <main class="container py-4">
     <div id="alert-zone"></div>
 
-    <!-- KPIs -->
-    <div class="row g-3" id="kpi-row">
-      <div class="col-12 col-md-3">
-        <div class="card h-75">
-          <div class="card-body" style="margin-top: -17px;">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <div class="kpi-title">Presupuesto total</div>
-                <h4 id="kpi-presupuesto" class="mb-0">—</h4>
-              </div>
-              <i class="bi bi-cash-coin fs-1 text-muted-2"></i>
-            </div>
+    <!-- ===================================================
+         KPIs
+         =================================================== -->
+    <div class="row g-3 mb-4" id="kpi-row">
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">Presupuesto total</div>
+            <div id="kpi-presupuesto" class="kpi-value">—</div>
           </div>
+          <i class="bi bi-cash-coin kpi-icon"></i>
         </div>
       </div>
-      <div class="col-12 col-md-3">
-        <div class="card h-75">
-          <div class="card-body" style="margin-top: -17px;">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <div class="kpi-title">Gastado</div>
-                <h4 id="kpi-gastado" class="mb-0">—</h4>
-              </div>
-              <i class="bi bi-graph-down-arrow fs-1 text-muted-2"></i>
-            </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">Gastado</div>
+            <div id="kpi-gastado" class="kpi-value">—</div>
           </div>
+          <i class="bi bi-graph-down-arrow kpi-icon"></i>
         </div>
       </div>
-      <div class="col-12 col-md-3">
-        <div class="card h-75">
-          <div class="card-body" style="margin-top: -17px;">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <div class="kpi-title">Saldo disponible</div>
-                <h4 id="kpi-saldo" class="mb-0">—</h4>
-              </div>
-              <i class="bi bi-wallet2 fs-1 text-muted-2"></i>
-            </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">Saldo disponible</div>
+            <div id="kpi-saldo" class="kpi-value">—</div>
           </div>
+          <i class="bi bi-wallet2 kpi-icon"></i>
         </div>
       </div>
-      <div class="col-12 col-md-3">
-        <div class="card h-75">
-          <div class="card-body" style="margin-top: -17px;">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <div class="kpi-title">% ejercido</div>
-                <h4 id="kpi-porc" class="mb-0">—</h4>
-              </div>
-              <i class="bi bi-speedometer2 fs-1 text-muted-2"></i>
-            </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">% ejercido</div>
+            <div id="kpi-porc" class="kpi-value">—</div>
           </div>
+          <i class="bi bi-speedometer2 kpi-icon"></i>
         </div>
       </div>
     </div>
 
-    <!-- Panel izquierdo: Formularios -->
+    <!-- ===================================================
+         LAYOUT PRINCIPAL: Formulario | Tablas + Gráfico
+         =================================================== -->
     <div class="row g-3">
+
+      <!-- Columna izquierda: Formulario de partidas -->
       <div class="col-12 col-lg-4">
-        <div class="card mb-3">
-          <div class="card-body">
-            <h6 class="mb-3">Partidas / Presupuesto</h6>
+        <div class="form-card mb-3">
+          <div class="form-card-header">
+            <h6><i class="bi bi-plus-circle me-2"></i>Partidas / Presupuesto</h6>
+          </div>
+          <div class="form-card-body">
             <form id="form-partida" class="row g-2">
               <div class="col-4">
                 <label class="form-label">Partida</label>
-                <input type="text" class="form-control" id="p-partida" placeholder="Partida" required>
+                <input type="text" class="form-control form-control-sm" id="p-partida"
+                  placeholder="Clave" required>
               </div>
               <div class="col-8">
                 <label class="form-label">Presupuesto</label>
-                <input type="number" step="0.01" class="form-control" id="p-monto" placeholder="Monto" required>
+                <input type="number" step="0.01" class="form-control form-control-sm"
+                  id="p-monto" placeholder="Monto" required>
               </div>
               <div class="col-12">
                 <label class="form-label">Mes</label>
-                <input type="month" class="form-control" id="p-mes" required>
+                <input type="month" class="form-control form-control-sm" id="p-mes" required>
               </div>
-              <div class="col-12 d-grid">
-                <button class="btn btn-success" type="submit">
-                  <i class="bi bi-plus-circle me-1"></i>Agregar/Actualizar
+              <div class="col-12 d-grid mt-1">
+                <button class="btn btn-success btn-sm" type="submit">
+                  <i class="bi bi-plus-circle me-1"></i>Agregar / Actualizar
                 </button>
               </div>
             </form>
           </div>
         </div>
 
-        <div class="card mb-3 d-none">
-          <div class="card-body">
-            <h6 class="mb-3">Gastos</h6>
+        <!-- Formulario de gastos (oculto por JS, no se modifica) -->
+        <div class="form-card mb-3 d-none">
+          <div class="form-card-header">
+            <h6><i class="bi bi-receipt me-2"></i>Gastos</h6>
+          </div>
+          <div class="form-card-body">
             <form id="form-gasto" class="row g-2">
               <div class="col-5">
                 <label class="form-label">Fecha</label>
-                <input type="date" class="form-control" id="g-fecha" required>
+                <input type="date" class="form-control form-control-sm" id="g-fecha" required>
               </div>
               <div class="col-7">
                 <label class="form-label">Descripción</label>
-                <input type="text" class="form-control" id="g-desc" placeholder="Ej. Compra de equipo" required>
+                <input type="text" class="form-control form-control-sm" id="g-desc"
+                  placeholder="Ej. Compra de equipo" required>
               </div>
               <div class="col-5">
                 <label class="form-label">Partida</label>
-                <input type="text" class="form-control" id="g-partida" placeholder="Partida">
+                <input type="text" class="form-control form-control-sm" id="g-partida" placeholder="Partida">
               </div>
               <div class="col-7">
                 <label class="form-label">Monto</label>
-                <input type="number" step="0.01" class="form-control" id="g-monto" placeholder="Monto" required>
+                <input type="number" step="0.01" class="form-control form-control-sm"
+                  id="g-monto" placeholder="Monto" required>
               </div>
-              <div class="col-12 d-grid">
-                <button class="btn btn-success" type="submit">
+              <div class="col-12 d-grid mt-1">
+                <button class="btn btn-success btn-sm" type="submit">
                   <i class="bi bi-plus-circle me-1"></i>Agregar
                 </button>
               </div>
@@ -242,24 +420,35 @@
         </div>
       </div>
 
-      <!-- Panel derecho: Tablas y gráfico -->
+      <!-- Columna derecha: Tablas y gráfico -->
       <div class="col-12 col-lg-8">
-        <div class="card mb-3">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0">Presupuesto por Partida</h6>
-              <div class="d-flex align-items-center gap-2">
-                <input id="f-partida" type="text" class="form-control form-control-sm w-auto"
-                  placeholder="Filtrar partida">
-                <input id="f-buscar" type="text" class="form-control form-control-sm w-auto" placeholder="Buscar">
-                <button id="btn-aplicar" class="btn btn-primary btn-sm">
+
+        <!-- Tabla presupuesto por partida -->
+        <div class="index-card mb-3">
+          <div class="index-card-header">
+            <h6><i class="bi bi-table me-2" style="color:#691c32;"></i>Presupuesto por Partida</h6>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input id="f-partida" type="text"
+                class="form-control form-control-sm"
+                style="max-width:130px;"
+                placeholder="Filtrar partida">
+              <input id="f-buscar" type="text"
+                class="form-control form-control-sm"
+                style="max-width:130px;"
+                placeholder="Buscar">
+              <div class="btn-group btn-group-sm">
+                <button id="btn-aplicar" class="btn btn-primary">
                   <i class="bi bi-funnel me-1"></i>Filtrar
                 </button>
-                <button id="btn-limpiar" class="btn btn-outline-light btn-sm">Quitar</button>
+                <button id="btn-limpiar" class="btn btn-outline-secondary">
+                  <i class="bi bi-x-lg"></i>
+                </button>
               </div>
             </div>
-            <div class="table-responsive" style="max-height:420px;">
-              <table class="table table-sm align-middle" id="tabla-presupuesto">
+          </div>
+          <div class="index-card-body p-0">
+            <div class="table-responsive" style="max-height:380px;">
+              <table class="table table-sm align-middle mb-0" id="tabla-presupuesto">
                 <thead>
                   <tr>
                     <th>Partida</th>
@@ -274,67 +463,68 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-body" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0">Indicadores</h6>
-              <div class="d-flex gap-2 align-items-center">
-                <small class="text-muted-2">Agrupar por</small>
-                <select id="chart-group" class="form-select form-select-sm w-auto">
-                  <option value="mes" selected>Mes</option>
-                  <option value="partida">Partida</option>
-                  <option value="global">Global</option>
-                </select>
-                <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="checkbox" id="chart-stacked">
-                  <label class="form-check-label" for="chart-stacked">Apilar</label>
-                </div>
+        <!-- Gráfico -->
+        <div class="chart-card mb-3">
+          <div class="chart-card-header">
+            <h6><i class="bi bi-bar-chart-line me-2"></i>Indicadores</h6>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+              <small class="text-muted-2">Agrupar por</small>
+              <select id="chart-group" class="form-select form-select-sm w-auto"
+                style="background-color:#2c2c40; color:#fff; border-color:rgba(255,255,255,0.2);">
+                <option value="mes" selected>Mes</option>
+                <option value="partida">Partida</option>
+                <option value="global">Global</option>
+              </select>
+              <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="checkbox" id="chart-stacked">
+                <label class="form-check-label text-white-50 small" for="chart-stacked">Apilar</label>
               </div>
             </div>
+          </div>
+          <div class="chart-card-body">
             <canvas id="chart-mensual" height="120"></canvas>
 
             <div class="alert alert-soft mt-3" id="missing-alert" style="display:none;">
               <div class="d-flex justify-content-between align-items-center">
                 <div>
+                  <i class="bi bi-exclamation-triangle me-1"></i>
                   <strong id="missing-count">0</strong> gastos sin Partida
                 </div>
-                <div class="btn-group">
-                  <button id="btn-ver-missing" class="btn btn-sm btn-outline-info">Ver</button>
-                  <button id="btn-export-missing" class="btn btn-sm btn-outline-success">
+                <div class="btn-group btn-group-sm">
+                  <button id="btn-ver-missing" class="btn btn-outline-info btn-sm">Ver</button>
+                  <button id="btn-export-missing" class="btn btn-outline-success btn-sm">
                     <i class="bi bi-download me-1"></i>CSV
                   </button>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
 
         <!-- Movimientos -->
-        <div class="row g-3 mt-1">
-          <div class="col-12">
-            <div class="card">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h6 class="mb-0">Movimientos (Gastos y Reconducciones)</h6>
-                  <small class="text-muted-2">Origen → Destino</small>
-                </div>
-                <div class="table-responsive" style="max-height:280px;">
-                  <table class="table table-sm align-middle" id="tabla-movs">
-                    <thead>
-                      <tr>
-                        <th>Fecha</th>
-                        <th>Tipo</th>
-                        <th>Concepto / Descripción</th>
-                        <th>Origen</th>
-                        <th>Destino</th>
-                        <th class="text-end">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody></tbody>
-                  </table>
-                </div>
-              </div>
+        <div class="index-card">
+          <div class="index-card-header">
+            <h6>
+              <i class="bi bi-arrow-left-right me-2" style="color:#691c32;"></i>
+              Movimientos (Gastos y Reconducciones)
+            </h6>
+            <small class="text-muted">Origen &rarr; Destino</small>
+          </div>
+          <div class="p-0">
+            <div class="table-responsive" style="max-height:260px;">
+              <table class="table table-sm align-middle mb-0" id="tabla-movs">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Concepto / Descripción</th>
+                    <th>Origen</th>
+                    <th>Destino</th>
+                    <th class="text-end">Monto</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -342,13 +532,18 @@
       </div><!-- /col derecha -->
     </div><!-- /row -->
   </main>
-  <!-- Modal: Gastos sin Partida -->
+
+  <!-- ===================================================
+       Modal: Gastos sin Partida
+       =================================================== -->
   <div class="modal fade" id="modalMissing" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content modal-soft">
-        <div class="modal-header">
-          <h6 class="modal-title">Gastos sin Partida</h6>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-content" style="border-radius:12px; border:none; box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+        <div class="modal-header" style="background:#691c32; border-radius:12px 12px 0 0;">
+          <h6 class="modal-title text-white">
+            <i class="bi bi-exclamation-triangle me-2"></i>Gastos sin Partida
+          </h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           <div class="table-responsive" style="max-height:60vh;">
@@ -364,32 +559,21 @@
             </table>
           </div>
         </div>
-        <div class="modal-footer">
-          <button id="btn-export-missing-footer" class="btn btn-success">
+        <div class="modal-footer" style="border-top:1px solid #f0f0f0;">
+          <button id="btn-export-missing-footer" class="btn btn-success btn-sm">
             <i class="bi bi-download me-1"></i>Exportar CSV
           </button>
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- <div class="spinner position-fixed top-50 start-50 translate-middle" id="spinner">
-    <div class="spinner-border text-light" role="status"></div>
-  </div> -->
-
-
   <script src="/js/config.js"></script>
-
-  <!-- Bootstrap bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- Librerías -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-  <!-- Lógica -->
   <script src="/js/session-guard.js"></script>
   <script src="/js/navbar.js"></script>
   <script src="/js/user-info.js"></script>

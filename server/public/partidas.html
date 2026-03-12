@@ -2,113 +2,133 @@
 <html lang="es">
 
 <head>
-    <meta charset="utf-8" />
-    <title>Partidas permitidas — Control Presupuestal</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <title>Partidas permitidas — Control Presupuestal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-    <link rel="stylesheet" href="/css/styles.css">
-    <link rel="stylesheet" href="/css/navbar.css" />
-    <link rel="stylesheet" href="/css/partidas.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/navbar.css" />
+  <link rel="stylesheet" href="/css/partidas.css" />
 </head>
 
-<body class="bg-light">
-    <div id="cp-navbar"></div>
+<body class="partidas-page">
+  <div id="cp-navbar"></div>
 
-    <main class="container-fluid py-4">
-        <div class="container-xxl">
+  <main class="container-fluid py-4">
+    <div class="container-xxl">
 
-            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
-                <div>
-                    <h2 class="mb-1">Partidas Presupuestales</h2>
-                    <div class="text-muted">Acceso exclusivo para DG L00 / DA 117. Captura el monto de presupuesto.</div>
-                    <div class="small text-muted mt-1">DG/DA: <span id="dgda">—</span></div>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <button id="btnReload" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-clockwise me-1"></i>Recargar
-                    </button>
-                    <button id="btnGuardar" class="btn btn-success">
-                        <i class="bi bi-check2-square me-1"></i>Guardar cambios
-                    </button>
-                </div>
-            </div>
-
-            <div class="card shadow-sm">
-                <div class="card-body">
-
-                    <div class="row g-2 align-items-end mb-3">
-                        <div class="col-12 col-md-6 col-lg-5">
-                            <label class="form-label mb-1">Buscar</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                <input id="q" type="text" class="form-control" placeholder="Clave o descripción...">
-                                <button id="btnClear" class="btn btn-outline-secondary" type="button">Limpiar</button>
-                            </div>
-                        </div>
-
-                        <div class="col-6 col-md-3 col-lg-2">
-                            <label class="form-label mb-1">Por página</label>
-                            <select id="pageSize" class="form-select">
-                                <option value="10">10</option>
-                                <option value="20" selected>20</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
-                        </div>
-
-                        <div class="col-6 col-md-3 col-lg-2">
-                            <label class="form-label mb-1">Página</label>
-                            <div class="input-group">
-                                <button id="btnPrev" class="btn btn-outline-secondary" type="button"><i
-                                        class="bi bi-chevron-left"></i></button>
-                                <input id="page" class="form-control text-center" value="1" />
-                                <button id="btnNext" class="btn btn-outline-secondary" type="button"><i
-                                        class="bi bi-chevron-right"></i></button>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-lg-3 text-lg-end">
-                            <div class="small text-muted mt-2 mt-lg-4">
-                                <span id="countInfo">—</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table align-middle table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 160px;">Partidas</th>
-                                    <th>Descripción</th>
-                                    <th style="width: 280px;" class="text-end">Monto ($)</th>
-                                    <th style="width: 140px;" class="text-end">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbody">
-                                <tr>
-                                    <td colspan="4" class="text-muted">Cargando…</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                </div>
-            </div>
-
+      <!-- ===== TOPBAR DE PÁGINA ===== -->
+      <div class="pt-page-topbar d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="pt-topbar-icon">
+            <i class="bi bi-card-list"></i>
+          </div>
+          <div>
+            <h2 class="pt-topbar-title">Partidas Presupuestales</h2>
+            <p class="pt-topbar-subtitle mb-0">Acceso exclusivo para DG L00 / DA 117. Captura el monto de presupuesto.</p>
+            <p class="pt-topbar-meta mb-0">DG/DA: <strong><span id="dgda">—</span></strong></p>
+          </div>
         </div>
-    </main>
+        <div class="btn-group" role="group" aria-label="Acciones de partidas">
+          <button id="btnReload" class="btn btn-outline-secondary" title="Recargar datos">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            <span class="d-none d-sm-inline">Recargar</span>
+          </button>
+          <button id="btnGuardar" class="btn btn-success" title="Guardar cambios">
+            <i class="bi bi-check2-square me-1"></i>
+            <span class="d-none d-sm-inline">Guardar cambios</span>
+          </button>
+        </div>
+      </div>
 
-    <script src="/js/config.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+      <!-- ===== CARD DE HERRAMIENTAS + TABLA ===== -->
+      <div class="pt-tools-card card shadow-sm">
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
 
-    <script src="/js/session-guard.js"></script>
-    <script src="/js/navbar.js"></script>
-    <script src="/js/user-info.js"></script>
-    <script src="/js/partidas.js"></script>
+            <!-- Búsqueda -->
+            <div class="col-12 col-md-6 col-lg-5">
+              <label class="form-label">Buscar partida</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input id="q" type="text" class="form-control" placeholder="Clave o descripción...">
+                <button id="btnClear" class="btn btn-outline-secondary" type="button">
+                  <i class="bi bi-x-lg me-1 d-none d-sm-inline"></i>Limpiar
+                </button>
+              </div>
+            </div>
+
+            <!-- Por página -->
+            <div class="col-6 col-md-3 col-lg-2">
+              <label class="form-label">Por página</label>
+              <select id="pageSize" class="form-select">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+
+            <!-- Paginador -->
+            <div class="col-6 col-md-3 col-lg-2">
+              <label class="form-label">Página</label>
+              <div class="input-group">
+                <button id="btnPrev" class="btn btn-outline-secondary" type="button" title="Anterior">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+                <input id="page" class="form-control text-center" value="1" />
+                <button id="btnNext" class="btn btn-outline-secondary" type="button" title="Siguiente">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Info contador -->
+            <div class="col-12 col-lg-3 text-lg-end">
+              <div class="small mt-2 mt-lg-4">
+                <span id="countInfo">—</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Tabla sin redondeo inferior para que continúe con pt-table-card -->
+        <div class="table-responsive" style="border-radius: 0 0 16px 16px; overflow:hidden;">
+          <table class="table align-middle table-hover mb-0 pt-table">
+            <thead>
+              <tr>
+                <th style="width:160px;">Partida</th>
+                <th>Descripción</th>
+                <th style="width:280px;" class="text-end">Monto ($)</th>
+                <th style="width:140px;" class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbody">
+              <tr>
+                <td colspan="4" class="text-center text-muted py-5">
+                  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Cargando…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <script src="/js/session-guard.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/user-info.js"></script>
+  <script src="/js/partidas.js"></script>
 </body>
 
 </html>

@@ -40,138 +40,165 @@
 
   <main class="container-fluid py-4">
     <div class="container-xxl">
-      <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
-        <div>
-          <h2 class="mb-1">Dashboard Partidas</h2>
-          <div class="text-muted">Acceso exclusivo para DG L00 / DA 117 o DG E00</div>
+
+      <!-- ===== TOPBAR DE PÁGINA ===== -->
+      <div class="dp-page-topbar d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="dp-topbar-icon">
+            <i class="bi bi-bar-chart-line-fill"></i>
+          </div>
+          <div>
+            <h2 class="dp-topbar-title">Dashboard Partidas</h2>
+            <p class="dp-topbar-subtitle mb-0">Acceso exclusivo para DG L00 / DA 117 o DG E00</p>
+          </div>
         </div>
-        <div class="d-flex gap-2">
-          <button id="btnRefresh" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-clockwise me-1"></i>Recargar
+        <div class="btn-group" role="group" aria-label="Acciones del dashboard">
+          <button id="btnRefresh" class="btn btn-outline-secondary" title="Recargar datos">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            <span class="d-none d-sm-inline">Recargar</span>
           </button>
-          <button id="btnGrafica" class="btn btn-outline-primary">
-            <i class="bi bi-bar-chart me-1"></i>Ver gráfica
+          <button id="btnGrafica" class="btn btn-outline-primary" title="Ver gráfica">
+            <i class="bi bi-bar-chart me-1"></i>
+            <span class="d-none d-sm-inline">Ver gráfica</span>
           </button>
         </div>
       </div>
 
-      <div class="card shadow-sm dp-card mb-3">
+      <!-- ===== CARD DE FILTROS ===== -->
+      <div class="card dp-filters-card">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="bi bi-funnel-fill" style="color:#bc955c;"></i>
+          <span>Filtros de consulta</span>
+        </div>
         <div class="card-body">
           <div class="row g-3 align-items-end">
-            <div class="col-12 col-md-4 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fPeriodo" class="form-label">Periodo</label>
               <select id="fPeriodo" class="form-select"></select>
             </div>
-            <div class="col-12 col-md-4 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fAnio" class="form-label">Año</label>
               <input id="fAnio" type="number" class="form-control" min="2000" />
             </div>
-            <div class="col-12 col-md-4 col-lg-3">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label id="lblSegmento" for="fSegmento" class="form-label">Mes</label>
               <select id="fSegmento" class="form-select"></select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fVista" class="form-label">Vista</label>
               <select id="fVista" class="form-select">
                 <option value="CAPITULO">Capítulo</option>
                 <option value="PARTIDA">Partidas</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fArea" class="form-label">DG</label>
               <select id="fArea" class="form-select">
                 <option value="">Todas</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fDauxiliar" class="form-label">DA</label>
               <select id="fDauxiliar" class="form-select">
                 <option value="">Todas</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fCapitulo" class="form-label">Capítulo</label>
               <input id="fCapitulo" type="text" class="form-control" placeholder="Ej. 2000" />
             </div>
-            <div class="col-12 col-md-6 col-lg-2">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
               <label for="fPartida" class="form-label">Partida</label>
               <input id="fPartida" type="text" class="form-control" placeholder="Ej. 5151" />
             </div>
-            <div class="col-12 col-lg-1 d-grid">
-              <button id="btnAplicar" class="btn btn-primary">
-                <i class="bi bi-funnel me-1"></i>Aplicar
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2 d-grid">
+              <button id="btnAplicar" class="btn dp-btn-apply">
+                <i class="bi bi-search me-1"></i>Aplicar filtros
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="dp-kpi-grid mb-3">
-        <div class="dp-kpi-tile dp-kpi-primary">
+      <!-- ===== KPI TILES ===== -->
+      <div class="dp-kpi-grid">
+        <div class="dp-kpi-tile dp-kpi-presupuesto">
+          <i class="dp-kpi-icon bi bi-wallet2"></i>
           <div class="dp-kpi-label">Presupuesto total</div>
           <div id="kpiPresupuesto" class="dp-kpi-value">—</div>
         </div>
-        <div class="dp-kpi-tile">
-          <div class="dp-kpi-label">Total solicitado en suficiencia</div>
+        <div class="dp-kpi-tile dp-kpi-suficiencia">
+          <i class="dp-kpi-icon bi bi-clipboard-check"></i>
+          <div class="dp-kpi-label">Total suficiencia</div>
           <div id="kpiSuficiencia" class="dp-kpi-value">—</div>
         </div>
-        <div class="dp-kpi-tile">
+        <div class="dp-kpi-tile dp-kpi-comprometido">
+          <i class="dp-kpi-icon bi bi-file-earmark-text"></i>
           <div class="dp-kpi-label">Total comprometido</div>
           <div id="kpiComprometido" class="dp-kpi-value">—</div>
         </div>
-        <div class="dp-kpi-tile">
+        <div class="dp-kpi-tile dp-kpi-devengado">
+          <i class="dp-kpi-icon bi bi-receipt"></i>
           <div class="dp-kpi-label">Total devengado</div>
           <div id="kpiDevengado" class="dp-kpi-value">—</div>
         </div>
-        <div class="dp-kpi-tile">
+        <div class="dp-kpi-tile dp-kpi-reconduccion">
+          <i class="dp-kpi-icon bi bi-arrow-left-right"></i>
           <div class="dp-kpi-label">Total reconducciones</div>
           <div id="kpiReconducciones" class="dp-kpi-value">—</div>
         </div>
-        <div class="dp-kpi-tile dp-kpi-accent">
+        <div class="dp-kpi-tile dp-kpi-saldo">
+          <i class="dp-kpi-icon bi bi-piggy-bank"></i>
           <div class="dp-kpi-label">Saldo disponible</div>
           <div id="kpiSaldo" class="dp-kpi-value">—</div>
         </div>
       </div>
 
-      <div class="card shadow-sm dp-card">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 dp-table">
-              <thead id="theadCapitulos">
-                <tr>
-                  <th>Capítulo</th>
-                  <th class="text-end">Presupuesto</th>
-                  <th class="text-end">Suficiencia</th>
-                  <th class="text-end">Comprometido</th>
-                  <th class="text-end">Devengado</th>
-                  <th class="text-end">Reconducciones</th>
-                  <th class="text-end">Saldo</th>
-                  <th class="text-end">% Ejercido</th>
-                  <th class="text-center">Detalle</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyCapitulos">
-                <tr>
-                  <td colspan="9" class="text-center text-muted py-4">Cargando...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      <!-- ===== TABLA PRINCIPAL ===== -->
+      <div class="dp-table-card">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 dp-table">
+            <thead id="theadCapitulos">
+              <tr>
+                <th>Capítulo</th>
+                <th class="text-end">Presupuesto</th>
+                <th class="text-end">Suficiencia</th>
+                <th class="text-end">Comprometido</th>
+                <th class="text-end">Devengado</th>
+                <th class="text-end">Reconducciones</th>
+                <th class="text-end">Saldo</th>
+                <th class="text-end">% Ejercido</th>
+                <th class="text-center">Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyCapitulos">
+              <tr>
+                <td colspan="9" class="text-center text-muted py-5">
+                  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Cargando...
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
+
     </div>
   </main>
 
+  <!-- ===== MODAL DE DETALLE ===== -->
   <div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalDetalleTitle">Detalle de capítulo</h5>
+      <div class="modal-content" style="border-radius:16px; overflow:hidden; border:none;">
+        <div class="modal-header dp-modal-header">
+          <h5 class="modal-title" id="modalDetalleTitle">
+            <i class="bi bi-table me-2"></i>Detalle de capítulo
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-striped align-middle mb-0">
+            <table class="table table-sm align-middle mb-0 dp-modal-table">
               <thead>
                 <tr>
                   <th>Partida</th>
@@ -187,14 +214,16 @@
               </thead>
               <tbody id="tbodyDetalle">
                 <tr>
-                  <td colspan="9" class="text-center text-muted py-3">Sin detalle</td>
+                  <td colspan="9" class="text-center text-muted py-4">Sin detalle</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <div class="modal-footer" style="border-top:1px solid #e2d5c3;">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-lg me-1"></i>Cerrar
+          </button>
         </div>
       </div>
     </div>

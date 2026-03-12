@@ -7,20 +7,6 @@
     :root {
       visibility: hidden;
     }
-
-    .cp-sticky-head thead th {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      background: #fff;
-    }
-
-    .cp-log-details {
-      max-width: 520px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
   </style>
   <script>
     (function () {
@@ -47,6 +33,7 @@
 
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/navbar.css">
+  <link rel="stylesheet" href="/css/consola_god.css">
 </head>
 
 <body class="admin-body">
@@ -145,8 +132,8 @@
           </button>
         </div>
 
-        <div class="table-responsive border rounded-3" style="max-height: 70vh;">
-          <table class="table table-hover align-middle mb-0 cp-sticky-head" id="tablaLogs">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle table-pro" id="tablaLogs">
             <thead>
               <tr>
                 <th class="text-nowrap">ID</th>

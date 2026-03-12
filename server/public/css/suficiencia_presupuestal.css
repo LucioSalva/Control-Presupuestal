@@ -1,5 +1,5 @@
 /* ======================================================
-   🌐 BASE GLOBAL
+   BASE GLOBAL
    ====================================================== */
 *,
 *::before,
@@ -24,57 +24,15 @@ svg {
 }
 
 /* ======================================================
-   🔍 SEARCH NAV
-   ====================================================== */
-.nav-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 44px;
-  padding: 4px;
-  background: rgba(255,255,255,.1);
-  border-radius: 999px;
-  transition: all .35s ease;
-  overflow: hidden;
-}
-
-.nav-search:hover,
-.nav-search:focus-within {
-  width: 220px;
-}
-
-.nav-search__btn {
-  border: none;
-  background: none;
-  color: #fff;
-}
-
-.nav-search__input {
-  width: 0;
-  border: none;
-  background: transparent;
-  color: #fff;
-  opacity: 0;
-  transition: all .35s ease;
-}
-
-.nav-search:hover .nav-search__input,
-.nav-search:focus-within .nav-search__input {
-  width: 180px;
-  opacity: 1;
-  padding-left: 8px;
-}
-
-/* ======================================================
-   📄 FORM CONTAINER
+   FORM CONTAINER
    ====================================================== */
 .form-container {
   width: min(1000px, calc(100% - 24px));
   margin: 16px auto;
   padding: 16px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 0 6px rgba(0,0,0,.1);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.10);
 }
 
 .form-title {
@@ -89,9 +47,155 @@ svg {
 }
 
 /* ======================================================
-   📊 TABLAS
+   DOCUMENT HEADER (logo + titulo + folio)
    ====================================================== */
-.table-wrap {
+.doc-header {
+  display: grid;
+  grid-template-columns: 90px 1fr 160px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.doc-header__logo {
+  text-align: center;
+}
+
+.doc-header__logo img {
+  max-height: 70px;
+  width: auto;
+}
+
+.doc-header__titles {
+  text-align: center;
+}
+
+.doc-header__folio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ======================================================
+   ACTION TOOLBAR
+   ====================================================== */
+.cp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.09);
+  margin-bottom: 4px;
+}
+
+.cp-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.cp-toolbar__sep {
+  width: 1px;
+  height: 32px;
+  background: #dee2e6;
+  flex-shrink: 0;
+}
+
+.cp-toolbar__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8f9fa;
+  min-height: 38px;
+}
+
+.cp-toolbar__status .suf-status-meta {
+  font-size: 11px;
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+/* Botones del toolbar */
+.cp-toolbar .btn {
+  font-weight: 600;
+  border-radius: 8px 0 0 8px;
+}
+
+.cp-toolbar .btn-group .btn {
+  border-radius: 0;
+}
+
+.cp-toolbar .btn-group .btn:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.cp-toolbar .btn-group .btn:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.cp-toolbar .btn-group .btn:only-child {
+  border-radius: 8px;
+}
+
+/* Mantener compatibilidad con selectores JS que usen .cp-actions */
+.cp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.08);
+}
+
+.cp-actions .btn {
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+/* ======================================================
+   STATUS BOX (legacy + nuevo)
+   ====================================================== */
+.suf-status-box {
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 400px;
+  flex: 0 1 auto;
+}
+
+.suf-status-meta {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+/* ======================================================
+   TABLAS
+   ====================================================== */
+.table-wrap,
+.formato-wrap,
+.table-detalle-wrap {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -106,7 +210,7 @@ svg {
 .table.formato th,
 .table.formato td {
   vertical-align: middle !important;
-  padding: 12px !important;
+  padding: 10px 12px !important;
   line-height: 1.25;
 }
 
@@ -123,167 +227,113 @@ svg {
   min-width: 0;
 }
 
+/* Cabecera uniforme de la tabla detalle */
+.detalle-header {
+  background-color: #e9ecef !important;
+  font-weight: 700;
+  text-align: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 10px 8px !important;
+  border-bottom: 2px solid #dee2e6 !important;
+}
+
 /* ======================================================
-   🧷 ACTION BAR
+   PANEL CONTROLES DE FILAS
    ====================================================== */
-.cp-actions {
+.cp-row-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.cp-row-controls__label {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #495057;
+}
+
+/* ======================================================
+   PANEL DE IMPUESTOS
+   ====================================================== */
+.cp-impuestos-card {
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  background: #f8f9fa;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.cp-impuestos-card__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #691c32;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cp-impuestos-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px;
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 10px 26px rgba(0,0,0,.08);
+  align-items: flex-start;
+  gap: 12px 20px;
 }
 
-.cp-actions .btn {
-  min-height: 42px;
-  padding: 10px 14px;
-  font-weight: 700;
-  border-radius: 12px;
-}
-
-.suf-status-box {
-  min-height: 42px;
-  padding: 8px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #f8f9fa;
+.cp-impuesto-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
-  max-width: 420px;
-  flex: 0 1 auto;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
-.suf-status-meta {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.cp-impuesto-item input[type="number"] {
+  width: 110px;
+  flex-shrink: 0;
 }
 
 /* ======================================================
-   📱 MÓVILES 320–480
+   AVISO LEGAL
    ====================================================== */
-@media (max-width: 480px) {
-  html { font-size: 11px; }
+.cp-aviso-legal {
+  font-size: 11px;
+  text-align: justify;
+  background-color: #e9ecef;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 8px;
+}
 
-  .nav-search,
-  .nav-search:hover {
-    width: 100%;
-  }
-
-  .cp-actions {
-    flex-direction: column;
-  }
-
-  .cp-actions .btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .suf-status-box {
-    width: 100%;
-    max-width: none;
-  }
-
-  .table.formato th,
-  .table.formato td {
-    padding: 10px !important;
-  }
+.cp-aviso-legal p:last-child {
+  margin-bottom: 0;
 }
 
 /* ======================================================
-   📱📟 TABLETS 600–768
+   CAMPOS SOLO LECTURA
    ====================================================== */
-@media (min-width: 600px) and (max-width: 768px) {
-  .cp-actions {
-    justify-content: flex-start;
-  }
-}
-
-@media (min-width: 992px) {
-  .cp-actions {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-  }
-
-  .cp-actions__left,
-  .cp-actions__right {
-    flex-wrap: nowrap !important;
-  }
-}
-
-/* ======================================================
-   💻 LAPTOPS 1024–1280
-   ====================================================== */
-@media (min-width: 1024px) and (max-width: 1280px) {
-  .form-container {
-    width: min(1050px, calc(100% - 48px));
-  }
-}
-
-/* ======================================================
-   🖥️ DESKTOP 1366+
-   ====================================================== */
-@media (min-width: 1366px) {
-  html { font-size: 13px; }
-
-  .form-container {
-    width: min(1200px, calc(100% - 64px));
-  }
-
-  .form-title {
-    font-size: 15px;
-  }
-}
-
-/* ======================================================
-   🖨️ PRINT
-   ====================================================== */
-@media print {
-  body {
-    padding-top: 0;
-    background: #fff;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-
-  .form-container {
-    box-shadow: none;
-    border-radius: 0;
-    width: 100%;
-    padding: 0;
-  }
-}
-
-.cp-readonly[readonly]{
+.cp-readonly[readonly] {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
-
-  font-weight: 800;              /* MÁS GRUESO */
-  font-size: 14px;               /* un poco más grande */
-  letter-spacing: 0.5px;         /* más elegante */
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
   color: #000;
-
-  text-align: center;            /* CENTRADO */
-
+  text-align: center;
   padding-left: 0 !important;
   padding-right: 0 !important;
-
   pointer-events: none;
 }
 
-/* Quita icono del date */
 .cp-readonly[type="date"]::-webkit-calendar-picker-indicator {
   display: none;
 }
@@ -297,8 +347,8 @@ svg {
    ====================================================== */
 .cp-qr-card {
   border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 6px;
+  border-radius: 8px;
+  padding: 8px;
   text-align: center;
   background: #f8f9fa;
 }
@@ -306,6 +356,9 @@ svg {
 .cp-qr-label {
   font-size: 10px;
   color: #6c757d;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
   margin-bottom: 4px;
 }
 
@@ -324,154 +377,200 @@ svg {
 }
 
 /* ======================================================
-   TABLA DETALLE — wrapper responsivo
+   MODALES — mejora visual
    ====================================================== */
-.table-detalle-wrap {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+.modal-content {
+  border-radius: 14px !important;
+  border: none !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.18) !important;
 }
 
-.table-detalle-wrap > table {
-  min-width: 640px;
+.modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 20px;
 }
 
-/* ======================================================
-   HEADER DEL DOCUMENTO (logo + título + no-folio)
-   ====================================================== */
-.doc-header-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
+.modal-footer {
+  border-top: 1px solid #f0f0f0;
+  padding: 14px 20px;
 }
 
-/* ======================================================
-   TABLA FORMATO — siempre scrolleable en pantallas pequeñas
-   ====================================================== */
-.formato-wrap {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+.modal-body {
+  padding: 18px 20px;
 }
 
 /* ======================================================
-   IMPUESTOS ROW — wrap limpio en mobile
+   BREAKPOINT: TABLET MD (480px – 960px)
    ====================================================== */
-.impuestos-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+@media (min-width: 480px) and (max-width: 960px) {
+  .doc-header {
+    grid-template-columns: 70px 1fr 130px;
+    gap: 8px;
+  }
+
+  .doc-header__logo img {
+    max-height: 55px;
+  }
+
+  .cp-toolbar {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .cp-toolbar__status .suf-status-meta {
+    max-width: 180px;
+  }
 }
 
 /* ======================================================
-   RESPONSIVIDAD MOBILE (<576px)
+   BREAKPOINT: DESKTOP NORMAL (960px – 1328px)
    ====================================================== */
-@media (max-width: 575px) {
+@media (min-width: 960px) and (max-width: 1328px) {
+  html { font-size: 13px; }
 
-  /* Contenedor principal */
+  .form-container {
+    width: min(1050px, calc(100% - 48px));
+  }
+
+  .form-title {
+    font-size: 14px;
+  }
+}
+
+/* ======================================================
+   BREAKPOINT: WIDESCREEN (>= 1328px)
+   ====================================================== */
+@media (min-width: 1328px) {
+  html { font-size: 13px; }
+
+  .form-container {
+    width: min(1200px, calc(100% - 64px));
+  }
+
+  .form-title {
+    font-size: 15px;
+  }
+
+  .cp-toolbar {
+    flex-wrap: nowrap;
+  }
+}
+
+/* ======================================================
+   BREAKPOINT: MOBILE (< 480px)
+   ====================================================== */
+@media (max-width: 480px) {
+  html { font-size: 11px; }
+
   .form-container {
     width: calc(100% - 12px);
     padding: 10px;
     margin: 8px auto;
   }
 
-  /* Header del documento: logo, título y número de suficiencia
-     pasan a columna vertical */
-  .form-container .row.mb-3 .col-3,
-  .form-container .row.mb-3 .col-6 {
-    width: 100% !important;
-    flex: 0 0 100% !important;
-    max-width: 100% !important;
-    text-align: center !important;
+  /* Header apilado vertical */
+  .doc-header {
+    grid-template-columns: 1fr;
+    text-align: center;
   }
 
-  .form-container .row.mb-3 .col-3 img {
-    max-height: 50px !important;
+  .doc-header__logo {
+    order: 1;
   }
 
-  /* QR: ocultar en mobile para ahorrar espacio */
+  .doc-header__titles {
+    order: 2;
+  }
+
+  .doc-header__folio {
+    order: 3;
+    align-items: center;
+  }
+
+  .doc-header__logo img {
+    max-height: 50px;
+  }
+
   .cp-qr-card {
     display: none !important;
   }
 
-  /* Tabla formato: scroll horizontal */
+  /* Toolbar mobile: dos filas, full-width */
+  .cp-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .cp-toolbar__group {
+    width: 100%;
+  }
+
+  .cp-toolbar__group .btn-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .cp-toolbar__group .btn-group .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .cp-toolbar__status {
+    width: 100%;
+  }
+
+  .cp-toolbar__status .suf-status-meta {
+    max-width: none;
+    white-space: normal;
+  }
+
+  .cp-toolbar__sep {
+    display: none;
+  }
+
+  /* Tablas: scroll horizontal */
   .table.formato {
     min-width: 520px;
   }
 
-  /* Tabla detalle principal */
   .form-container .table.table-bordered:not(.formato) {
     min-width: 560px;
   }
 
-  /* Reducir font-size en tablas */
+  /* Fuente más pequeña en tablas */
   .form-container table td,
   .form-container table th {
     font-size: 11px !important;
   }
 
-  /* Action bar: izquierda y derecha en columna */
-  .cp-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .cp-actions__left,
-  .cp-actions__right {
-    width: 100% !important;
-    flex-wrap: wrap !important;
-  }
-
-  .cp-actions__left .btn,
-  .cp-actions__right .btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  /* Status box: ancho completo */
+  /* Status box full width */
   .suf-status-box {
     width: 100% !important;
     max-width: none !important;
   }
 
-  /* Impuestos: cada item en su propia línea */
-  .d-flex.flex-wrap.align-items-center.justify-content-end.gap-3.mb-3 {
-    justify-content: flex-start !important;
+  /* Panel impuestos: items en columna */
+  .cp-impuestos-grid {
+    flex-direction: column;
+    gap: 10px;
   }
 
-  .d-flex.flex-wrap.align-items-center.justify-content-end.gap-3.mb-3
-    > .d-flex.align-items-center.gap-2 {
-    flex-wrap: wrap;
+  .cp-impuesto-item input[type="number"] {
+    width: 100px;
   }
 
-  /* Inputs de tasa (ISR/IEPS) en mobile */
-  input[name="isr_tasa"],
-  input[id="isr_tasa"],
-  input[name="ieps_tasa"],
-  input[id="ieps_tasa"] {
-    width: 100px !important;
-  }
-
-  /* Panel selección de partidas */
-  #panel-seleccion-partidas .d-flex {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  /* Botones + y - de filas */
+  /* Botones + / - de filas */
   .form-container .d-flex.gap-2 .btn-sm {
     min-width: 36px;
   }
 }
 
 /* ======================================================
-   RESPONSIVIDAD TABLET (576px–767px)
+   BREAKPOINT LEGADO: TABLET 576–767px
    ====================================================== */
 @media (min-width: 576px) and (max-width: 767px) {
-
   .form-container {
     width: calc(100% - 20px);
     padding: 14px;
@@ -489,13 +588,16 @@ svg {
   .cp-qr-card {
     display: none !important;
   }
+
+  .doc-header {
+    grid-template-columns: 70px 1fr 130px;
+  }
 }
 
 /* ======================================================
-   RESPONSIVIDAD TABLET MD (768px–991px)
+   BREAKPOINT LEGADO: TABLET 768–991px
    ====================================================== */
 @media (min-width: 768px) and (max-width: 991px) {
-
   .form-container {
     width: calc(100% - 28px);
     padding: 14px;
@@ -508,5 +610,32 @@ svg {
   .form-container table td,
   .form-container table th {
     font-size: 11.5px !important;
+  }
+}
+
+/* ======================================================
+   PRINT
+   ====================================================== */
+@media print {
+  body {
+    padding-top: 0;
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .form-container {
+    box-shadow: none;
+    border-radius: 0;
+    width: 100%;
+    padding: 0;
+  }
+
+  .cp-aviso-legal {
+    background-color: #e9ecef !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
