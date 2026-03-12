@@ -214,6 +214,11 @@ router.post("/", async (req, res) => {
         c.ieps,
         c.total,
         c.cantidad_con_letra,
+        c.firma_enlace_label,
+        c.firma_enlace_nombre,
+        c.firma_area_label,
+        c.firma_area_nombre,
+        c.firma_direccion_nombre,
         COALESCE(c.estatus, 'ABIERTO') AS estatus
       FROM comprometidos c
       WHERE c.id = $1
@@ -315,6 +320,7 @@ router.post("/", async (req, res) => {
         ieps,
         total,
         cantidad_con_letra,
+        firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre,
 
         estatus
       )
@@ -323,6 +329,7 @@ router.post("/", async (req, res) => {
         $4,$5,$6,$7,
         $8,$9,$10,$11,$12,$13,$14,$15,
         $16,$17,$18,$19,$20,$21,$22,$23,$24,
+        $25,$26,$27,$28,$29,
         'ACTIVO'
       )
       RETURNING id, folio_num, no_devengado;
@@ -372,6 +379,11 @@ router.post("/", async (req, res) => {
 
       totalDev, // $23
       toNullIfEmpty(b.cantidad_con_letra ?? comp.cantidad_con_letra), // $24
+      comp.firma_enlace_label ?? null,    // $25
+      comp.firma_enlace_nombre ?? null,   // $26
+      comp.firma_area_label ?? null,      // $27
+      comp.firma_area_nombre ?? null,     // $28
+      comp.firma_direccion_nombre ?? null, // $29
     ];
 
     const rHead = await client.query(sqlHead, headParams);

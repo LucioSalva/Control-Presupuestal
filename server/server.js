@@ -26,6 +26,7 @@ import partidasRouter from "./routes/partidas.routes.js";
 import presupuestoBasePartidasRouter from "./routes/presupuesto_base_partidas.routes.js";
 import dashboardPartidasRouter from "./routes/dashboard_partidas.routes.js";
 import reconduccionesRouter from "./routes/reconducciones.routes.js";
+import reconduccionesOficiosRouter from "./routes/reconducciones_oficios.routes.js";
 import adminAuditoriaRouter from "./routes/admin-auditoria.routes.js";
 import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
 import { logAuditEvent } from "./utils/helpers.js";
@@ -139,11 +140,18 @@ app.get("/", (_req, res) => {
 //  AUTH (token de mentiritas) + roles reales en BD
 // =====================================================
 function parseFakeToken(req) {
+  // Soporte de token vía query param (solo para descarga de archivos vía window.open)
+  let rawToken = null;
   const h = String(req.headers.authorization || "");
   const m = h.match(/^Bearer\s+(.+)$/i);
-  if (!m) return null;
+  if (m) {
+    rawToken = m[1].trim();
+  } else if (req.query?.token) {
+    rawToken = String(req.query.token).trim();
+  }
+  if (!rawToken) return null;
 
-  const token = m[1].trim(); // token-<id>-<timestamp>
+  const token = rawToken; // token-<id>-<timestamp>
   const parts = token.split("-");
   if (parts.length < 3) return null;
   if (parts[0] !== "token") return null;
@@ -288,6 +296,7 @@ app.use("/api/catalogos/metas", authRequired, metasRouter);
 app.use("/api/catalogos", authRequired, catalogosRoutes);
 app.use("/api/dashboard", authRequired, dashboardPartidasRouter);
 app.use("/api/reconducciones", authRequired, reconduccionesRouter);
+app.use("/api/reconducciones", authRequired, reconduccionesOficiosRouter);
 
 
 // =====================================================
@@ -321,6 +330,81 @@ app.use((req, res) => {
       }
     } catch (e) {
       console.error("[MIGRATION] reconducciones error:", e);
+    }
+
+    // Migración: reconduccion_oficios
+    try {
+      const rOficios = await query("SELECT to_regclass('public.reconduccion_oficios') AS tbl");
+      const existsOficios = Boolean(rOficios.rows?.[0]?.tbl);
+      if (!existsOficios) {
+        const sqlPathOficios = path.join(__dirname, "sql", "migrations", "2026_03_11_reconduccion_oficios.sql");
+        const sqlOficios = await fs.readFile(sqlPathOficios, "utf8");
+        await query(sqlOficios);
+        console.log("[MIGRATION] reconduccion_oficios aplicada");
+      }
+    } catch (e) {
+      console.error("[MIGRATION] reconduccion_oficios error:", e);
+    }
+
+    // Migración: firma fields en reconducciones
+    try {
+      const rFirmas = await query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='reconducciones' AND column_name='firma_enlace_label'"
+      );
+      if (rFirmas.rowCount === 0) {
+        const sqlPathFirmas = path.join(__dirname, "sql", "migrations", "2026_03_11_reconducciones_firmas.sql");
+        const sqlFirmas = await fs.readFile(sqlPathFirmas, "utf8");
+        await query(sqlFirmas);
+        console.log("[MIGRATION] reconducciones_firmas aplicada");
+      }
+    } catch (e) {
+      console.error("[MIGRATION] reconducciones_firmas error:", e);
+    }
+
+    // Migración: firma fields en suficiencias, comprometidos y devengados
+    try {
+      const rFirmasSuf = await query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='suficiencias' AND column_name='firma_enlace_label'"
+      );
+      if (rFirmasSuf.rowCount === 0) {
+        const sqlPathFirmasSuf = path.join(__dirname, "sql", "migrations", "2026_03_11_firmas_suf_comp_dev.sql");
+        const sqlFirmasSuf = await fs.readFile(sqlPathFirmasSuf, "utf8");
+        await query(sqlFirmasSuf);
+        console.log("[MIGRATION] firmas_suf_comp_dev aplicada");
+      }
+    } catch (e) {
+      console.error("[MIGRATION] firmas_suf_comp_dev error:", e);
+    }
+
+    // Migración: función fn_saldo_disponible_partida
+    try {
+      const rFnSaldo = await query(
+        "SELECT routine_name FROM information_schema.routines WHERE routine_name = 'fn_saldo_disponible_partida' AND routine_schema = 'public'"
+      );
+      if (rFnSaldo.rowCount === 0) {
+        const sqlPathFnSaldo = path.join(__dirname, "sql", "migrations", "2026_03_11_fn_saldo_partida.sql");
+        const sqlFnSaldo = await fs.readFile(sqlPathFnSaldo, "utf8");
+        await query(sqlFnSaldo);
+        console.log("[MIGRATION] fn_saldo_disponible_partida aplicada");
+      }
+    } catch (e) {
+      console.error("[MIGRATION] fn_saldo_disponible_partida error:", e);
+    }
+
+    // Migración: normalización general de presupuesto_db
+    // (idempotente: usa IF NOT EXISTS / IF EXISTS en todo el script)
+    try {
+      const rNorm = await query(
+        "SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_suf_saldo_lookup' LIMIT 1"
+      );
+      if (rNorm.rowCount === 0) {
+        const sqlPathNorm = path.join(__dirname, "sql", "migrations", "2026_03_11_normalizacion_db.sql");
+        const sqlNorm = await fs.readFile(sqlPathNorm, "utf8");
+        await query(sqlNorm);
+        console.log("[MIGRATION] normalizacion_db aplicada");
+      }
+    } catch (e) {
+      console.error("[MIGRATION] normalizacion_db error:", e);
     }
 
     if (process.env.SEED === "true") {

@@ -624,6 +624,11 @@ router.post("/", async (req, res) => {
     const justificacion = toTextOrNull(b.justificacion);
     const ejercicio = toNumOrNull(b.ejercicio);
     const mes_pago_date = toTextOrNull(b.mes_pago_date);
+    const firma_enlace_label = toTextOrNull(b.firma_enlace_label);
+    const firma_enlace_nombre = toTextOrNull(b.firma_enlace_nombre);
+    const firma_area_label = toTextOrNull(b.firma_area_label);
+    const firma_area_nombre = toTextOrNull(b.firma_area_nombre);
+    const firma_direccion_nombre = toTextOrNull(b.firma_direccion_nombre);
     const lados = Array.isArray(b.lados) ? b.lados : [];
 
     if (!allowAll && !validateLadosArea(lados, areaIds)) {
@@ -657,10 +662,12 @@ router.post("/", async (req, res) => {
 
     const cab = await client.query(
       `INSERT INTO public.reconducciones
-        (oficio, fecha_elaboracion, tipo_movimiento, justificacion, estatus, ejercicio, mes_pago_date, created_by)
-       VALUES ($1,$2,$3,$4,'BORRADOR',$5,$6,$7)
+        (oficio, fecha_elaboracion, tipo_movimiento, justificacion, estatus, ejercicio, mes_pago_date, created_by,
+         firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre)
+       VALUES ($1,$2,$3,$4,'BORRADOR',$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
-      [oficio, fecha_elaboracion, tipo_movimiento, justificacion, ejercicio, mes_pago_date, actorId]
+      [oficio, fecha_elaboracion, tipo_movimiento, justificacion, ejercicio, mes_pago_date, actorId,
+       firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre]
     );
 
     const reconId = cab.rows[0].id;
@@ -819,6 +826,11 @@ router.put("/:id", async (req, res) => {
     const justificacion = toTextOrNull(b.justificacion);
     const ejercicio = toNumOrNull(b.ejercicio);
     const mes_pago_date = toTextOrNull(b.mes_pago_date);
+    const firma_enlace_label = toTextOrNull(b.firma_enlace_label);
+    const firma_enlace_nombre = toTextOrNull(b.firma_enlace_nombre);
+    const firma_area_label = toTextOrNull(b.firma_area_label);
+    const firma_area_nombre = toTextOrNull(b.firma_area_nombre);
+    const firma_direccion_nombre = toTextOrNull(b.firma_direccion_nombre);
 
     await client.query(
       `UPDATE public.reconducciones
@@ -829,9 +841,15 @@ router.put("/:id", async (req, res) => {
               ejercicio = $6,
               mes_pago_date = $7,
               updated_at = now(),
-              updated_by = $8
+              updated_by = $8,
+              firma_enlace_label = $9,
+              firma_enlace_nombre = $10,
+              firma_area_label = $11,
+              firma_area_nombre = $12,
+              firma_direccion_nombre = $13
         WHERE id = $1`,
-      [id, oficio, fecha_elaboracion, tipo_movimiento, justificacion, ejercicio, mes_pago_date, actorId]
+      [id, oficio, fecha_elaboracion, tipo_movimiento, justificacion, ejercicio, mes_pago_date, actorId,
+       firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre]
     );
 
     await Promise.all([

@@ -309,4 +309,65 @@ router.get("/partidas-permitidas-detalle", async (req, res) => {
   }
 });
 
+// GET /api/catalogos/partidas-con-fuente
+// Retorna todas las partidas del DG+DA+Proyecto con su fuente asignada
+// Usado para el nuevo flujo multi-fuente de suficiencias
+router.get("/partidas-con-fuente", async (req, res) => {
+  try {
+    let dg = normalizeKey(req.query.dg_clave);
+    let da = normalizeDigits(req.query.da_clave);
+
+    if (!dg || !da) {
+      const ud = await getUserDGDA(req);
+      dg = normalizeKey(ud.dg);
+      da = normalizeDigits(ud.da);
+    }
+
+    let proyClave = normalizeDigits(req.query.proy_clave);
+
+    if (!dg || !da || !proyClave) {
+      return res.status(400).json({ error: "Faltan parámetros (dg_clave, da_clave, proy_clave)" });
+    }
+
+    const r = await query(
+      `
+      SELECT
+        TRIM(pp.partida_clave)                          AS partida_clave,
+        COALESCE(p.descripcion, 'SIN DESCRIPCION')      AS partida_descripcion,
+        TRIM(pp.fuente_clave)                           AS fuente_clave,
+        f.id                                            AS fuente_id,
+        COALESCE(f.fuente, pp.fuente_clave)             AS fuente_nombre
+      FROM public.partidas_permitidas pp
+      LEFT JOIN public.partidas p
+        ON TRIM(p.clave) = TRIM(pp.partida_clave)
+      LEFT JOIN public.fuentes f
+        ON TRIM(f.clave) = TRIM(pp.fuente_clave)
+      WHERE TRIM(pp.dgeneral_clave)  = $1
+        AND TRIM(pp.dauxiliar_clave) = $2
+        AND TRIM(pp.proyecto_clave)  = $3
+      ORDER BY pp.fuente_clave, pp.partida_clave
+      `,
+      [dg, da, proyClave]
+    );
+
+    const allowedMil = canViewPartidasMil(dg, da);
+    const rows = Array.isArray(r.rows) ? r.rows : [];
+    const filtered = allowedMil
+      ? rows
+      : rows.filter((row) => !isPartidaMilKey(row.partida_clave));
+
+    if (!allowedMil && filtered.length !== rows.length) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "PARTIDAS_MIL_CON_FUENTE",
+        data: { dg, da, proyClave },
+      });
+    }
+
+    return res.json({ ok: true, partidas: filtered });
+  } catch (e) {
+    console.error("GET /api/catalogos/partidas-con-fuente", e);
+    return res.status(500).json({ error: "Error obteniendo partidas con fuente" });
+  }
+});
+
 export default router;

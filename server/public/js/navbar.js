@@ -20,10 +20,12 @@
     </nav>
     <nav class="navbar navbar-expand-lg shadow-sm cp-tabs-nav">
       <div class="container-fluid">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#cpTabsNav" aria-controls="cpTabsNav" aria-expanded="false" aria-label="Abrir menú">
-          <span class="navbar-toggler-icon"></span>
+        <button class="cp-hamburger" type="button" data-bs-toggle="collapse" data-bs-target="#cpTabsNav" aria-controls="cpTabsNav" aria-expanded="false" aria-label="Abrir menú">
+          <span class="cp-ham-line"></span>
+          <span class="cp-ham-line"></span>
+          <span class="cp-ham-line"></span>
         </button>
-        <div class="collapse navbar-collapse" id="cpTabsNav">
+        <div class="collapse navbar-collapse mt-3" id="cpTabsNav">
           <ul class="navbar-nav me-auto cp-tabs">
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Operación</a>
@@ -73,6 +75,28 @@
     const wrapper = document.createElement("div");
     wrapper.innerHTML = navHtml;
     document.body.prepend(wrapper);
+  }
+
+  function setupHamburger() {
+    const btn = document.querySelector(".cp-hamburger");
+    const menu = document.getElementById("cpTabsNav");
+    if (!btn || !menu) return;
+
+    // Alternar clase is-active al hacer click
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("is-active");
+    });
+
+    // Sincronizar con el estado real del colapso de Bootstrap
+    menu.addEventListener("show.bs.collapse", () => {
+      btn.classList.add("is-active");
+      btn.setAttribute("aria-expanded", "true");
+    });
+
+    menu.addEventListener("hide.bs.collapse", () => {
+      btn.classList.remove("is-active");
+      btn.setAttribute("aria-expanded", "false");
+    });
   }
 
   function setActive() {
@@ -179,6 +203,7 @@
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       mountNavbar();
+      setupHamburger();
       setActive();
       setFavicon();
       applyReconHistorialVisibility();
@@ -187,6 +212,7 @@
     });
   } else {
     mountNavbar();
+    setupHamburger();
     setActive();
     setFavicon();
     applyReconHistorialVisibility();

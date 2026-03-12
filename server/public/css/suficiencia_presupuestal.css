@@ -291,3 +291,222 @@ svg {
 .cp-readonly[type="date"] {
   appearance: none;
 }
+
+/* ======================================================
+   QR CARD
+   ====================================================== */
+.cp-qr-card {
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 6px;
+  text-align: center;
+  background: #f8f9fa;
+}
+
+.cp-qr-label {
+  font-size: 10px;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+
+.cp-qr-img {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-qr-empty {
+  font-size: 10px;
+  color: #adb5bd;
+}
+
+/* ======================================================
+   TABLA DETALLE — wrapper responsivo
+   ====================================================== */
+.table-detalle-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-detalle-wrap > table {
+  min-width: 640px;
+}
+
+/* ======================================================
+   HEADER DEL DOCUMENTO (logo + título + no-folio)
+   ====================================================== */
+.doc-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+/* ======================================================
+   TABLA FORMATO — siempre scrolleable en pantallas pequeñas
+   ====================================================== */
+.formato-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ======================================================
+   IMPUESTOS ROW — wrap limpio en mobile
+   ====================================================== */
+.impuestos-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* ======================================================
+   RESPONSIVIDAD MOBILE (<576px)
+   ====================================================== */
+@media (max-width: 575px) {
+
+  /* Contenedor principal */
+  .form-container {
+    width: calc(100% - 12px);
+    padding: 10px;
+    margin: 8px auto;
+  }
+
+  /* Header del documento: logo, título y número de suficiencia
+     pasan a columna vertical */
+  .form-container .row.mb-3 .col-3,
+  .form-container .row.mb-3 .col-6 {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+    text-align: center !important;
+  }
+
+  .form-container .row.mb-3 .col-3 img {
+    max-height: 50px !important;
+  }
+
+  /* QR: ocultar en mobile para ahorrar espacio */
+  .cp-qr-card {
+    display: none !important;
+  }
+
+  /* Tabla formato: scroll horizontal */
+  .table.formato {
+    min-width: 520px;
+  }
+
+  /* Tabla detalle principal */
+  .form-container .table.table-bordered:not(.formato) {
+    min-width: 560px;
+  }
+
+  /* Reducir font-size en tablas */
+  .form-container table td,
+  .form-container table th {
+    font-size: 11px !important;
+  }
+
+  /* Action bar: izquierda y derecha en columna */
+  .cp-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cp-actions__left,
+  .cp-actions__right {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+
+  .cp-actions__left .btn,
+  .cp-actions__right .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Status box: ancho completo */
+  .suf-status-box {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Impuestos: cada item en su propia línea */
+  .d-flex.flex-wrap.align-items-center.justify-content-end.gap-3.mb-3 {
+    justify-content: flex-start !important;
+  }
+
+  .d-flex.flex-wrap.align-items-center.justify-content-end.gap-3.mb-3
+    > .d-flex.align-items-center.gap-2 {
+    flex-wrap: wrap;
+  }
+
+  /* Inputs de tasa (ISR/IEPS) en mobile */
+  input[name="isr_tasa"],
+  input[id="isr_tasa"],
+  input[name="ieps_tasa"],
+  input[id="ieps_tasa"] {
+    width: 100px !important;
+  }
+
+  /* Panel selección de partidas */
+  #panel-seleccion-partidas .d-flex {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Botones + y - de filas */
+  .form-container .d-flex.gap-2 .btn-sm {
+    min-width: 36px;
+  }
+}
+
+/* ======================================================
+   RESPONSIVIDAD TABLET (576px–767px)
+   ====================================================== */
+@media (min-width: 576px) and (max-width: 767px) {
+
+  .form-container {
+    width: calc(100% - 20px);
+    padding: 14px;
+  }
+
+  .table.formato {
+    min-width: 620px;
+  }
+
+  .form-container table td,
+  .form-container table th {
+    font-size: 11px !important;
+  }
+
+  .cp-qr-card {
+    display: none !important;
+  }
+}
+
+/* ======================================================
+   RESPONSIVIDAD TABLET MD (768px–991px)
+   ====================================================== */
+@media (min-width: 768px) and (max-width: 991px) {
+
+  .form-container {
+    width: calc(100% - 28px);
+    padding: 14px;
+  }
+
+  .table.formato {
+    min-width: 700px;
+  }
+
+  .form-container table td,
+  .form-container table th {
+    font-size: 11.5px !important;
+  }
+}

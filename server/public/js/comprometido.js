@@ -908,98 +908,12 @@
     } catch {}
 
     // Encabezados de solicitante y firmantes
-    const roles = await (async () => {
-      const getRolesStore = () => {
-        try {
-          const raw = localStorage.getItem("cp_comp_roles") || "{}";
-          const obj = JSON.parse(raw);
-          return {
-            enlace_label: "",
-            enlace_firma: "",
-            area_label: "",
-            area_firma: "",
-            direccion_firma: "",
-            ...(obj && typeof obj === "object" ? obj : {}),
-          };
-        } catch {
-          return {
-            enlace_label: "",
-            enlace_firma: "",
-            area_label: "",
-            area_firma: "",
-            direccion_firma: "",
-          };
-        }
-      };
-      const saveRolesStore = (map) => {
-        try {
-          localStorage.setItem("cp_comp_roles", JSON.stringify(map || {}));
-        } catch {}
-      };
-      const roles = getRolesStore();
-      const missing = [
-        "enlace_label",
-        "enlace_firma",
-        "area_label",
-        "area_firma",
-        "direccion_firma",
-      ].filter((k) => !String(roles[k] || "").trim());
-      if (!window.Swal || !missing.length) return roles;
-      const html = `
-        <div class="text-start">
-          <p class="mb-2">Captura encabezados y firmantes (Comprometido):</p>
-          <div class="row g-2">
-            <div class="col-8">
-              <label class="form-label small">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
-              <input type="text" class="form-control form-control-sm" id="roles_enlace_label" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA" value="${roles.enlace_label || ""}">
-            </div>
-            <div class="col-4">
-              <label class="form-label small">Firmante Enlace</label>
-              <input type="text" class="form-control form-control-sm" id="roles_enlace_firma" placeholder="Nombre del firmante" value="${roles.enlace_firma || ""}">
-            </div>
-          </div>
-          <div class="row g-2 mt-2">
-            <div class="col-8">
-              <label class="form-label small">ÁREA SOLICITANTE</label>
-              <input type="text" class="form-control form-control-sm" id="roles_area_label" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS..." value="${roles.area_label || ""}">
-            </div>
-            <div class="col-4">
-              <label class="form-label small">Firmante Área</label>
-              <input type="text" class="form-control form-control-sm" id="roles_area_firma" placeholder="Nombre del firmante" value="${roles.area_firma || ""}">
-            </div>
-          </div>
-          <div class="row g-2 mt-2">
-            <div class="col-8">
-              <label class="form-label small">Dirección Solicitante</label>
-              <input type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
-            </div>
-            <div class="col-4">
-              <label class="form-label small">Firmante Dirección</label>
-              <input type="text" class="form-control form-control-sm" id="roles_direccion_firma" placeholder="Nombre del firmante" value="${roles.direccion_firma || ""}">
-            </div>
-          </div>
-        </div>`;
-      const res = await Swal.fire({
-        title: "Datos del Solicitante (Comprometido)",
-        html,
-        focusConfirm: false,
-        width: 800,
-        confirmButtonText: "Usar",
-        showCancelButton: true,
-      });
-      if (!res.isConfirmed) throw new Error("Cancelado por el usuario.");
-      roles.enlace_label =
-        String(document.getElementById("roles_enlace_label")?.value || "").trim();
-      roles.enlace_firma =
-        String(document.getElementById("roles_enlace_firma")?.value || "").trim();
-      roles.area_label =
-        String(document.getElementById("roles_area_label")?.value || "").trim();
-      roles.area_firma =
-        String(document.getElementById("roles_area_firma")?.value || "").trim();
-      roles.direccion_firma =
-        String(document.getElementById("roles_direccion_firma")?.value || "").trim();
-      saveRolesStore(roles);
-      return roles;
+    // Las firmas se heredan automáticamente desde la suficiencia en el backend
+    const roles = (() => {
+      try {
+        const raw = localStorage.getItem("cp_comp_roles") || "{}";
+        return JSON.parse(raw);
+      } catch { return {}; }
     })();
 
     const collectCategoryFields = () => {

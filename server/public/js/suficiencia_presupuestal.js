@@ -51,6 +51,12 @@
   let metasAllowedIds = new Set();
   let metasRequestKey = "";
 
+  // --- NUEVO FLUJO MULTI-FUENTE ---
+  let esUsuarioL00117 = false;
+  let partidasConFuente = []; // [{ partida_clave, partida_descripcion, fuente_clave, fuente_id, fuente_nombre }]
+  let seleccionPartidasModal = {}; // { partida_clave: { importe, descripcion, checked } }
+  let gruposPorFuente = {}; // { fuente_clave: [{ partida_clave, concepto_partida, importe, descripcion }] }
+
   // ---------------------------
   // AUTH
   // ---------------------------
@@ -124,7 +130,10 @@
         data?.error ||
         data?.message ||
         `HTTP ${r.status} en ${url}`;
-      throw new Error(msg);
+      const err = new Error(msg);
+      // Propagar errores_saldo si existen (para manejo específico en catch)
+      if (data?.errores_saldo) err.errores_saldo = data.errores_saldo;
+      throw err;
     }
     return data;
   }
@@ -742,6 +751,7 @@
             value="$ 0.00"
             inputmode="decimal"
             autocomplete="off">
+          <small class="sp-saldo-badge d-none mt-1" style="font-size:0.7em; display:block!important;"></small>
         </td>
       </tr>
     `;
@@ -1118,6 +1128,96 @@
     el.value = String(percent);
   }
 
+  // =====================================================
+  // SALDO DISPONIBLE POR PARTIDA/MES
+  // =====================================================
+
+  // Cache de saldos consultados: clave → { saldo, presupuesto_base, ts }
+  const _saldoCache = {};
+
+  async function consultarSaldoPartida(clave, mesPago) {
+    if (!clave || !mesPago) return null;
+    const user = getLoggedUser();
+    const idDg = user?.id_dgeneral ?? dgeneralInfo?.id ?? null;
+    const idDa = user?.id_dauxiliar ?? dauxiliarInfo?.id ?? null;
+    const idProyecto = get("id_proyecto") || null;
+    const idFuente = get("fuente") || null;
+    if (!idDg || !idDa || !idProyecto || !idFuente) return null;
+
+    const key = `${idDg}-${idDa}-${idFuente}-${idProyecto}-${clave}-${mesPago}`;
+    const cached = _saldoCache[key];
+    if (cached && Date.now() - cached.ts < 15000) return cached.data;
+
+    try {
+      const params = new URLSearchParams({
+        id_dgeneral: idDg,
+        id_dauxiliar: idDa,
+        id_fuente: idFuente,
+        id_proyecto: idProyecto,
+        clave: clave.toUpperCase(),
+        mes_pago: mesPago.toUpperCase(),
+      });
+      const r = await fetch(`${API}/api/suficiencias/saldo-partida?${params}`, {
+        headers: authHeaders(),
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      _saldoCache[key] = { data, ts: Date.now() };
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  function formatMXN(n) {
+    return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n ?? 0);
+  }
+
+  async function actualizarSaldoBadge(tr) {
+    if (!tr) return;
+    const sel = tr.querySelector(".sp-clave");
+    const impInput = tr.querySelector(".sp-importe");
+    const badge = tr.querySelector(".sp-saldo-badge");
+    if (!sel || !impInput || !badge) return;
+
+    const clave = String(sel.value || "").trim();
+    const mesPago = String(get("mes_pago") || "").trim();
+    if (!clave || !mesPago) {
+      badge.className = "sp-saldo-badge d-none";
+      return;
+    }
+
+    const data = await consultarSaldoPartida(clave, mesPago);
+    if (!data) {
+      badge.className = "sp-saldo-badge d-none";
+      return;
+    }
+
+    const saldo = Number(data.saldo_disponible ?? 0);
+    const base = Number(data.presupuesto_base ?? 0);
+    const importe = moneyParse(impInput.value);
+
+    badge.style.display = "block";
+    badge.classList.remove("d-none");
+    if (saldo <= 0) {
+      badge.className = "sp-saldo-badge text-danger fw-semibold";
+      badge.textContent = `Disp: ${formatMXN(saldo)} / Base: ${formatMXN(base)}`;
+    } else if (importe > saldo) {
+      badge.className = "sp-saldo-badge text-danger fw-semibold";
+      badge.textContent = `⚠ Excede saldo. Disp: ${formatMXN(saldo)}`;
+    } else {
+      badge.className = "sp-saldo-badge text-success";
+      badge.textContent = `Disp: ${formatMXN(saldo)}`;
+    }
+  }
+
+  function actualizarTodosLosSaldos() {
+    if (!detalleBody) return;
+    detalleBody.querySelectorAll("tr").forEach((tr) => actualizarSaldoBadge(tr));
+  }
+
+  // =====================================================
+
   document.addEventListener("change", (e) => {
     if (!e.target || !e.target.classList.contains("sp-clave")) return;
 
@@ -1135,11 +1235,23 @@
     e.target.classList.toggle("is-invalid", !concepto);
 
     refreshTotales();
+    // Actualizar badge de saldo para esta fila
+    actualizarSaldoBadge(e.target.closest("tr"));
   });
 
   document.addEventListener("input", (e) => {
     if (e.target && e.target.classList.contains("sp-importe")) {
       refreshTotales();
+      actualizarSaldoBadge(e.target.closest("tr"));
+    }
+  });
+
+  // Actualizar saldos cuando cambia mes_pago
+  document.addEventListener("change", (e) => {
+    if (e.target && e.target.getAttribute("name") === "mes_pago") {
+      // Limpiar cache al cambiar mes
+      Object.keys(_saldoCache).forEach((k) => delete _saldoCache[k]);
+      actualizarTodosLosSaldos();
     }
   });
 
@@ -1293,6 +1405,397 @@
 
     updateClaveProgramatica();
     if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
+  }
+
+  // ---------------------------
+  // Detectar si es usuario L00/117 (flujo original) o nuevo flujo multi-fuente
+  // ---------------------------
+  function detectarModoFlujo() {
+    const user = getLoggedUser();
+    const dg = _norm(dgeneralInfo?.clave || user?.dgeneral_clave);
+    const da = _normNum(dauxiliarInfo?.clave || user?.dauxiliar_clave);
+    esUsuarioL00117 = (dg === "L00" && da === "117");
+    aplicarModoFlujo();
+  }
+
+  function aplicarModoFlujo() {
+    // Solo ocultamos las celdas de FUENTE, nunca el <tr> completo (que contiene PROYECTO)
+    const thFuente = document.getElementById("th-fuente");
+    const tdFuente = document.getElementById("td-fuente");
+    const panelPartidas = document.getElementById("panel-seleccion-partidas");
+    // Sección de botones add/remove row del detalle
+    const seccionDetalle = document.querySelector(".d-flex.align-items-center.justify-content-between.mb-2");
+
+    if (esUsuarioL00117) {
+      // Flujo original: fuente visible, detalle manual
+      if (thFuente) thFuente.style.display = "";
+      if (tdFuente) tdFuente.style.display = "";
+      if (panelPartidas) panelPartidas.style.display = "none";
+      if (seccionDetalle) seccionDetalle.style.display = "";
+    } else {
+      // Nuevo flujo: solo ocultar celdas de fuente, PROYECTO sigue visible
+      if (thFuente) thFuente.style.display = "none";
+      if (tdFuente) tdFuente.style.display = "none";
+      if (panelPartidas) panelPartidas.style.display = "";
+      if (seccionDetalle) seccionDetalle.style.display = "none";
+    }
+  }
+
+  // ---------------------------
+  // Cargar partidas con fuente para el nuevo flujo
+  // ---------------------------
+  async function cargarPartidasConFuente() {
+    const user = getLoggedUser();
+    const dg = _norm(dgeneralInfo?.clave || user?.dgeneral_clave);
+    const da = _normNum(dauxiliarInfo?.clave || user?.dauxiliar_clave);
+    const idProyecto = Number(get("id_proyecto") || 0);
+    const proyClave = getProyectoClaveDigits(idProyecto);
+
+    if (!dg || !da || !proyClave) {
+      partidasConFuente = [];
+      return;
+    }
+
+    try {
+      const qs = new URLSearchParams({ dg_clave: dg, da_clave: da, proy_clave: proyClave });
+      const data = await fetchJson(`${API}/api/catalogos/partidas-con-fuente?${qs}`, {
+        headers: { ...authHeaders() },
+      });
+      partidasConFuente = Array.isArray(data?.partidas) ? data.partidas : [];
+    } catch (e) {
+      console.warn("[SP] Error cargando partidas-con-fuente:", e?.message);
+      partidasConFuente = [];
+    }
+  }
+
+  // ---------------------------
+  // Renderizar modal de selección de partidas
+  // ---------------------------
+  function renderListaPartidasModal() {
+    const container = document.getElementById("lista-partidas-modal");
+    if (!container) return;
+
+    if (!partidasConFuente.length) {
+      container.innerHTML = `<div class="alert alert-warning mb-0">No hay partidas disponibles para este proyecto.</div>`;
+      return;
+    }
+
+    // Agrupar por fuente
+    const grupos = {};
+    for (const p of partidasConFuente) {
+      const fk = p.fuente_clave;
+      if (!grupos[fk]) grupos[fk] = { nombre: p.fuente_nombre, id: p.fuente_id, partidas: [] };
+      grupos[fk].partidas.push(p);
+    }
+
+    let html = "";
+    for (const [fk, g] of Object.entries(grupos)) {
+      html += `
+        <div class="mb-3">
+          <div class="fw-semibold bg-light px-2 py-1 border rounded mb-1" style="font-size:12px;">
+            F.F. ${fk} — ${g.nombre}
+          </div>
+          <table class="table table-sm table-bordered mb-0">
+            <thead><tr>
+              <th style="width:40px;"></th>
+              <th style="width:90px;">Clave</th>
+              <th>Concepto</th>
+              <th style="width:150px;">Importe</th>
+              <th>Descripción</th>
+            </tr></thead>
+            <tbody>
+      `;
+      for (const p of g.partidas) {
+        const sel = seleccionPartidasModal[p.partida_clave] || {};
+        const checked = sel.checked ? "checked" : "";
+        const importe = sel.importe != null ? sel.importe : "";
+        const desc = sel.descripcion || "";
+        html += `
+          <tr data-partida="${p.partida_clave}" data-fuente="${fk}" data-fuente-id="${g.id}" data-fuente-nombre="${g.nombre}">
+            <td class="text-center align-middle">
+              <input type="checkbox" class="form-check-input mp-check" ${checked}
+                data-clave="${p.partida_clave}" />
+            </td>
+            <td class="align-middle small fw-semibold">${p.partida_clave}</td>
+            <td class="align-middle small">${p.partida_descripcion}</td>
+            <td>
+              <input type="text" class="form-control form-control-sm text-end mp-importe"
+                data-clave="${p.partida_clave}"
+                placeholder="$ 0.00"
+                value="${importe}"
+                ${checked ? "" : "disabled"} />
+            </td>
+            <td>
+              <input type="text" class="form-control form-control-sm mp-desc"
+                data-clave="${p.partida_clave}"
+                placeholder="Descripción"
+                value="${desc}"
+                ${checked ? "" : "disabled"} />
+            </td>
+          </tr>
+        `;
+      }
+      html += `</tbody></table></div>`;
+    }
+
+    container.innerHTML = html;
+    bindModalPartidaEvents();
+    actualizarResumenModal();
+  }
+
+  function bindModalPartidaEvents() {
+    const container = document.getElementById("lista-partidas-modal");
+    if (!container) return;
+
+    container.querySelectorAll(".mp-check").forEach((chk) => {
+      chk.addEventListener("change", () => {
+        const clave = chk.dataset.clave;
+        const tr = chk.closest("tr");
+        const impEl = tr?.querySelector(".mp-importe");
+        const descEl = tr?.querySelector(".mp-desc");
+
+        if (chk.checked) {
+          if (impEl) impEl.disabled = false;
+          if (descEl) descEl.disabled = false;
+          if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+          seleccionPartidasModal[clave].checked = true;
+        } else {
+          if (impEl) impEl.disabled = true;
+          if (descEl) descEl.disabled = true;
+          if (seleccionPartidasModal[clave]) seleccionPartidasModal[clave].checked = false;
+        }
+        actualizarResumenModal();
+      });
+    });
+
+    container.querySelectorAll(".mp-importe").forEach((el) => {
+      el.addEventListener("blur", () => {
+        const clave = el.dataset.clave;
+        const n = moneyParse(el.value);
+        el.value = n ? moneyFormat(n) : "";
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].importe = n;
+      });
+      el.addEventListener("focus", () => {
+        const n = moneyParse(el.value);
+        el.value = n ? String(n.toFixed(2)) : "";
+        setTimeout(() => el.select(), 0);
+      });
+    });
+
+    container.querySelectorAll(".mp-desc").forEach((el) => {
+      el.addEventListener("input", () => {
+        const clave = el.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].descripcion = el.value;
+      });
+    });
+  }
+
+  function actualizarResumenModal() {
+    const total = Object.values(seleccionPartidasModal).filter((s) => s.checked).length;
+    const resEl = document.getElementById("modal-resumen-seleccion");
+    if (resEl) resEl.textContent = total ? `${total} partida(s) seleccionada(s)` : "Ninguna partida seleccionada";
+  }
+
+  function confirmarSeleccionPartidas() {
+    // Sincronizar estado del modal al state
+    const container = document.getElementById("lista-partidas-modal");
+    if (container) {
+      container.querySelectorAll(".mp-check").forEach((chk) => {
+        const clave = chk.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].checked = chk.checked;
+      });
+      container.querySelectorAll(".mp-importe").forEach((el) => {
+        const clave = el.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].importe = moneyParse(el.value);
+      });
+      container.querySelectorAll(".mp-desc").forEach((el) => {
+        const clave = el.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].descripcion = el.value;
+      });
+    }
+
+    // Agrupar seleccionadas por fuente
+    gruposPorFuente = {};
+    for (const p of partidasConFuente) {
+      const sel = seleccionPartidasModal[p.partida_clave];
+      if (!sel?.checked) continue;
+      const fk = p.fuente_clave;
+      if (!gruposPorFuente[fk]) {
+        gruposPorFuente[fk] = {
+          fuente_clave: fk,
+          fuente_nombre: p.fuente_nombre,
+          fuente_id: p.fuente_id,
+          partidas: [],
+        };
+      }
+      gruposPorFuente[fk].partidas.push({
+        partida_clave: p.partida_clave,
+        concepto_partida: p.partida_descripcion,
+        importe: sel.importe || 0,
+        descripcion: sel.descripcion || "",
+      });
+    }
+
+    actualizarResumenPartidasPanel();
+    // Actualizar tabla de detalle visual para referencia
+    actualizarDetalleBodyDesdeSel();
+
+    const modal = bootstrap.Modal.getInstance(document.getElementById("modalSeleccionPartidas"));
+    modal?.hide();
+  }
+
+  function actualizarResumenPartidasPanel() {
+    const total = Object.values(seleccionPartidasModal).filter((s) => s.checked).length;
+    const nFuentes = Object.keys(gruposPorFuente).length;
+
+    const lblCount = document.getElementById("lbl-partidas-count");
+    const lblFuentes = document.getElementById("lbl-fuentes-count");
+    if (lblCount) { lblCount.textContent = total; lblCount.className = `badge ${total ? "bg-success" : "bg-secondary"}`; }
+    if (lblFuentes) { lblFuentes.textContent = nFuentes; lblFuentes.className = `badge ${nFuentes ? "bg-primary" : "bg-secondary"}`; }
+
+    const resumenDiv = document.getElementById("resumen-partidas-por-fuente");
+    if (!resumenDiv) return;
+
+    if (!nFuentes) {
+      resumenDiv.innerHTML = `<div class="text-muted small">Ninguna partida seleccionada. Haz clic en "Seleccionar Partidas".</div>`;
+      return;
+    }
+
+    const fmt = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+    let html = "";
+    for (const [fk, g] of Object.entries(gruposPorFuente)) {
+      const totalFuente = g.partidas.reduce((acc, p) => acc + (p.importe || 0), 0);
+      html += `
+        <div class="border rounded p-2 mb-2 bg-light">
+          <div class="fw-semibold small mb-1">F.F. ${fk} — ${g.fuente_nombre}</div>
+          <table class="table table-sm table-bordered mb-0 bg-white">
+            <thead><tr><th>Clave</th><th>Concepto</th><th class="text-end">Importe</th><th>Descripción</th></tr></thead>
+            <tbody>
+              ${g.partidas.map((p) => `
+                <tr>
+                  <td class="small">${p.partida_clave}</td>
+                  <td class="small">${p.concepto_partida}</td>
+                  <td class="text-end small">${fmt.format(p.importe)}</td>
+                  <td class="small">${p.descripcion}</td>
+                </tr>
+              `).join("")}
+              <tr class="table-light fw-semibold">
+                <td colspan="2" class="text-end small">Subtotal</td>
+                <td class="text-end small">${fmt.format(totalFuente)}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+    resumenDiv.innerHTML = html;
+  }
+
+  function actualizarDetalleBodyDesdeSel() {
+    if (!detalleBody) return;
+    detalleBody.innerHTML = "";
+    let renglon = 1;
+    for (const g of Object.values(gruposPorFuente)) {
+      for (const p of g.partidas) {
+        detalleBody.insertAdjacentHTML("beforeend", rowTemplate(renglon));
+        const sel = document.querySelector(`[name="r${renglon}_clave"]`);
+        if (sel) {
+          // Agregar opción si no existe
+          if (![...sel.options].some((o) => o.value === p.partida_clave)) {
+            const opt = document.createElement("option");
+            opt.value = p.partida_clave;
+            opt.textContent = `${p.partida_clave} - ${p.concepto_partida}`;
+            sel.appendChild(opt);
+          }
+          sel.value = p.partida_clave;
+        }
+        setVal(`r${renglon}_concepto`, p.concepto_partida);
+        setVal(`r${renglon}_descripcion`, p.descripcion);
+        setVal(`r${renglon}_importe`, moneyFormat(p.importe));
+        renglon++;
+      }
+    }
+    bindJustificacionGeneral();
+    updateJustificacionRowspan();
+    syncJustificacionToRows();
+    attachMoneyInputs(detalleBody);
+    refreshTotales();
+  }
+
+  // ---------------------------
+  // Construir lote de payloads para el nuevo flujo
+  // ---------------------------
+  function buildPayloadLote() {
+    const user = getLoggedUser();
+    const id_usuario = user?.id != null ? Number(user.id) : null;
+    const id_proyecto = get("id_proyecto") ? Number(get("id_proyecto")) : null;
+    const meta = get("meta") || null;
+    const departamento = get("dependencia_aux") || null;
+    const justGeneral = getJustificacionGeneralValue();
+
+    const suficiencias = [];
+    const rolesActuales = getRolesStore();
+
+    for (const g of Object.values(gruposPorFuente)) {
+      const detalle = g.partidas.map((p, idx) => ({
+        renglon: idx + 1,
+        clave: p.partida_clave,
+        concepto_partida: p.concepto_partida,
+        justificacion: justGeneral,
+        descripcion: p.descripcion,
+        importe: p.importe,
+      }));
+
+      const subtotal = detalle.reduce((acc, d) => acc + (d.importe || 0), 0);
+      const usaIva = useIVA();
+      const iva = usaIva ? subtotal * 0.16 : 0;
+      const isrTasaVal = useISR() ? clampPercent(get("isr_tasa")) : 0;
+      const isr = isrTasaVal ? subtotal * (isrTasaVal / 100) : 0;
+      const total = subtotal + iva + isr;
+
+      const fuenteLabel = `${g.fuente_clave} - ${g.fuente_nombre}`;
+
+      suficiencias.push({
+        id_usuario,
+        id_dgeneral: get("id_dgeneral") ? Number(get("id_dgeneral")) : null,
+        id_dauxiliar: get("id_dauxiliar") ? Number(get("id_dauxiliar")) : null,
+        id_proyecto,
+        id_fuente: g.fuente_id ? Number(g.fuente_id) : null,
+        fuente_clave: g.fuente_clave,
+        fuente: fuenteLabel,
+        fecha: get("fecha") || null,
+        dependencia: get("dependencia") || null,
+        departamento,
+        mes_pago: get("mes_pago") || null,
+        clave_programatica: get("clave_programatica") || null,
+        meta,
+        impuesto_tipo: getImpuestoTipo(),
+        isr_tasa: useISR() ? (get("isr_tasa") || null) : null,
+        ieps_tasa: null,
+        subtotal,
+        iva,
+        isr,
+        ieps: 0,
+        total,
+        pension_total: 0,
+        cantidad_con_letra: numeroALetrasMX(total),
+        detalle,
+
+        firma_enlace_label: rolesActuales.enlace_label || null,
+        firma_enlace_nombre: rolesActuales.enlace_firma || null,
+        firma_area_label: rolesActuales.area_label || null,
+        firma_area_nombre: rolesActuales.area_firma || null,
+        firma_direccion_nombre: rolesActuales.direccion_firma || null,
+      });
+    }
+
+    return { suficiencias };
   }
 
   // ---------------------------
@@ -1982,11 +2485,24 @@
       pension3,
       pension4,
       pension5,
+
+      // Firmas del solicitante (capturadas por ensureRolesValues)
+      ...(() => {
+        const roles = getRolesStore();
+        return {
+          firma_enlace_label: roles.enlace_label || null,
+          firma_enlace_nombre: roles.enlace_firma || null,
+          firma_area_label: roles.area_label || null,
+          firma_area_nombre: roles.area_firma || null,
+          firma_direccion_nombre: roles.direccion_firma || null,
+        };
+      })(),
     };
   }
 
   async function save() {
     refreshTotales();
+
     if (metaSelect && !metaSelect.disabled && metasRows.length) {
       const idMeta = String(metaSelect.value || "").trim();
       if (!idMeta) throw new Error("Selecciona una META antes de guardar.");
@@ -1996,17 +2512,78 @@
       if (!metaText) throw new Error("La META seleccionada es inválida.");
       setMetaValid("");
     }
+
+    // NUEVO FLUJO: multi-fuente para usuarios no L00/117
+    if (!esUsuarioL00117) {
+      const nGrupos = Object.keys(gruposPorFuente).length;
+      if (!nGrupos) {
+        throw new Error("Selecciona al menos una partida antes de guardar.");
+      }
+
+      if (!get("id_proyecto")) {
+        throw new Error("Selecciona un PROYECTO antes de guardar.");
+      }
+
+      const payloadLote = buildPayloadLote();
+      if (!payloadLote.suficiencias[0]?.id_usuario) {
+        throw new Error("No se detectó el usuario logueado. Vuelve a iniciar sesión.");
+      }
+
+      const saved = await fetchJson(`${API}/api/suficiencias/lote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payloadLote),
+      });
+
+      if (!saved?.ok || !Array.isArray(saved.creadas)) {
+        throw new Error("El servidor no devolvió los registros creados.");
+      }
+
+      // Si solo se creó una, cargarla en el formulario
+      if (saved.creadas.length === 1) {
+        lastSavedId = Number(saved.creadas[0].id);
+        if (btnDescargarPdf) btnDescargarPdf.disabled = false;
+        setVal("no_suficiencia", saved.creadas[0].no_suficiencia || "");
+        localStorage.setItem("cp_last_suf_id", String(lastSavedId));
+        sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
+        await uiSuccess(`Suficiencia creada: ${saved.creadas[0].no_suficiencia}`);
+      } else {
+        // Mostrar resumen de todas las creadas
+        const listHtml = saved.creadas.map((s) =>
+          `<li class="list-group-item d-flex justify-content-between">
+             <span class="fw-semibold">${s.no_suficiencia}</span>
+             <span class="text-muted small">F.F. ${s.fuente_clave}</span>
+           </li>`
+        ).join("");
+
+        await Swal.fire({
+          icon: "success",
+          title: `${saved.creadas.length} suficiencias creadas`,
+          html: `<ul class="list-group text-start">${listHtml}</ul>`,
+          confirmButtonText: "Aceptar",
+          confirmButtonColor: "#BC955C",
+        });
+
+        // Cargar la primera en el formulario
+        lastSavedId = Number(saved.creadas[0].id);
+        if (btnDescargarPdf) btnDescargarPdf.disabled = false;
+        setVal("no_suficiencia", saved.creadas[0].no_suficiencia || "");
+        localStorage.setItem("cp_last_suf_id", String(lastSavedId));
+        sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
+      }
+
+      scheduleQrRender();
+      return saved;
+    }
+
+    // FLUJO ORIGINAL: L00/117 (una fuente, un documento)
     const payloadBackend = buildPayload();
 
     if (!payloadBackend.id_usuario) {
-      throw new Error(
-        "No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión.",
-      );
+      throw new Error("No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión.");
     }
-    if (!payloadBackend.id_proyecto)
-      throw new Error("Selecciona un PROYECTO antes de guardar.");
-    if (!payloadBackend.id_fuente)
-      throw new Error("Selecciona una FUENTE antes de guardar.");
+    if (!payloadBackend.id_proyecto) throw new Error("Selecciona un PROYECTO antes de guardar.");
+    if (!payloadBackend.id_fuente) throw new Error("Selecciona una FUENTE antes de guardar.");
 
     const saved = await fetchJson(`${API}/api/suficiencias`, {
       method: "POST",
@@ -2014,35 +2591,26 @@
       body: JSON.stringify(payloadBackend),
     });
 
-    if (!saved || !saved.id)
-      throw new Error("El servidor no devolvió el ID del registro.");
+    if (!saved || !saved.id) throw new Error("El servidor no devolvió el ID del registro.");
 
     lastSavedId = Number(saved.id);
-    try {
-      if (btnDescargarPdf)
-        btnDescargarPdf.disabled = !(Number.isFinite(lastSavedId) && lastSavedId > 0);
-    } catch {}
+    if (btnDescargarPdf) btnDescargarPdf.disabled = !(Number.isFinite(lastSavedId) && lastSavedId > 0);
 
     localStorage.setItem("cp_last_suf_id", String(lastSavedId));
     sessionStorage.setItem("cp_last_suf_id", String(lastSavedId));
 
     const aComp = document.getElementById("linkComprometido");
     if (aComp) aComp.href = `comprometido.html?id=${lastSavedId}`;
-
     const aDev = document.getElementById("linkDevengado");
     if (aDev) aDev.href = `devengado.html?id=${lastSavedId}`;
 
-    if (saved.no_suficiencia)
-      setVal("no_suficiencia", String(saved.no_suficiencia));
-    else if (saved.folio_num != null)
-      setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
+    if (saved.no_suficiencia) setVal("no_suficiencia", String(saved.no_suficiencia));
+    else if (saved.folio_num != null) setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
 
     const remaining = getRemainingFromSaved(saved);
     const expiresText = remaining.expiresText || "—";
     updateSufStatusUI(saved);
-    await uiSuccess(
-      `Suficiencia creada. Tiempo restante: ${remaining.days} días ${remaining.hours} horas. Caduca el: ${expiresText}`,
-    );
+    await uiSuccess(`Suficiencia creada. Tiempo restante: ${remaining.days} días ${remaining.hours} horas. Caduca el: ${expiresText}`);
     scheduleSufAlerts(saved);
     scheduleQrRender();
     return saved;
@@ -2149,6 +2717,107 @@
       if (!el) return;
       el.value = moneyFormat(moneyParse(el.value));
     });
+  }
+
+  // ---------------------------
+  // ROLES / FIRMANTES — accesible globalmente en el módulo
+  // ---------------------------
+  function getRolesStore() {
+    try {
+      const raw = localStorage.getItem("cp_suf_roles") || "{}";
+      const obj = JSON.parse(raw);
+      return {
+        enlace_label: "",
+        enlace_firma: "",
+        area_label: "",
+        area_firma: "",
+        direccion_firma: "",
+        ...(obj && typeof obj === "object" ? obj : {}),
+      };
+    } catch {
+      return {
+        enlace_label: "",
+        enlace_firma: "",
+        area_label: "",
+        area_firma: "",
+        direccion_firma: "",
+      };
+    }
+  }
+
+  function saveRolesStore(map) {
+    try {
+      localStorage.setItem("cp_suf_roles", JSON.stringify(map || {}));
+    } catch {}
+  }
+
+  async function ensureRolesValues(forceShow = false) {
+    const roles = getRolesStore();
+    const missing = [
+      "enlace_label",
+      "enlace_firma",
+      "area_label",
+      "area_firma",
+      "direccion_firma",
+    ].filter((k) => !String(roles[k] || "").trim());
+    if (!window.Swal || (!forceShow && !missing.length)) return roles;
+    const html = `
+      <div class="text-start">
+        <p class="mb-2">Captura los datos para encabezados y firmantes:</p>
+        <div class="row g-2">
+          <div class="col-8">
+            <label class="form-label small">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
+            <input type="text" class="form-control form-control-sm" id="roles_enlace_label" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA" value="${roles.enlace_label || ""}">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Firmante Enlace</label>
+            <input type="text" class="form-control form-control-sm" id="roles_enlace_firma" placeholder="Nombre del firmante" value="${roles.enlace_firma || ""}">
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-8">
+            <label class="form-label small">ÁREA SOLICITANTE</label>
+            <input type="text" class="form-control form-control-sm" id="roles_area_label" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS..." value="${roles.area_label || ""}">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Firmante Área</label>
+            <input type="text" class="form-control form-control-sm" id="roles_area_firma" placeholder="Nombre del firmante" value="${roles.area_firma || ""}">
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-8">
+            <label class="form-label small">Dirección Solicitante</label>
+            <input type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Firmante Dirección</label>
+            <input type="text" class="form-control form-control-sm" id="roles_direccion_firma" placeholder="Nombre del firmante" value="${roles.direccion_firma || ""}">
+          </div>
+        </div>
+      </div>`;
+    const result = await Swal.fire({
+      title: "Datos de Solicitante y Firmantes",
+      html,
+      focusConfirm: false,
+      width: 800,
+      confirmButtonText: "Guardar",
+      showCancelButton: true,
+    });
+    if (!result.isConfirmed) {
+      throw new Error("Captura cancelada: faltan datos de encabezados y firmantes.");
+    }
+    roles.enlace_label =
+      (document.getElementById("roles_enlace_label")?.value || "").trim();
+    roles.enlace_firma =
+      (document.getElementById("roles_enlace_firma")?.value || "").trim();
+    roles.area_label =
+      (document.getElementById("roles_area_label")?.value || "").trim();
+    roles.area_firma =
+      (document.getElementById("roles_area_firma")?.value || "").trim();
+    roles.direccion_firma =
+      (document.getElementById("roles_direccion_firma")?.value || "").trim();
+    saveRolesStore(roles);
+    return roles;
   }
 
   // ---------------------------
@@ -2420,101 +3089,6 @@
         saveExtrasStore(store);
       }
       return store;
-    };
-    const getRolesStore = () => {
-      try {
-        const raw = localStorage.getItem("cp_suf_roles") || "{}";
-        const obj = JSON.parse(raw);
-        return {
-          enlace_label: "",
-          enlace_firma: "",
-          area_label: "",
-          area_firma: "",
-          direccion_firma: "",
-          ...(obj && typeof obj === "object" ? obj : {}),
-        };
-      } catch {
-        return {
-          enlace_label: "",
-          enlace_firma: "",
-          area_label: "",
-          area_firma: "",
-          direccion_firma: "",
-        };
-      }
-    };
-    const saveRolesStore = (map) => {
-      try {
-        localStorage.setItem("cp_suf_roles", JSON.stringify(map || {}));
-      } catch {}
-    };
-    const ensureRolesValues = async () => {
-      const roles = getRolesStore();
-      const missing = [
-        "enlace_label",
-        "enlace_firma",
-        "area_label",
-        "area_firma",
-        "direccion_firma",
-      ].filter((k) => !String(roles[k] || "").trim());
-      if (!window.Swal || !missing.length) return roles;
-      const html = `
-        <div class="text-start">
-          <p class="mb-2">Captura los datos para encabezados y firmantes:</p>
-          <div class="row g-2">
-            <div class="col-8">
-              <label class="form-label small">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
-              <input type="text" class="form-control form-control-sm" id="roles_enlace_label" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA" value="${roles.enlace_label || ""}">
-            </div>
-            <div class="col-4">
-              <label class="form-label small">Firmante Enlace</label>
-              <input type="text" class="form-control form-control-sm" id="roles_enlace_firma" placeholder="Nombre del firmante" value="${roles.enlace_firma || ""}">
-            </div>
-          </div>
-          <div class="row g-2 mt-2">
-            <div class="col-8">
-              <label class="form-label small">ÁREA SOLICITANTE</label>
-              <input type="text" class="form-control form-control-sm" id="roles_area_label" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS..." value="${roles.area_label || ""}">
-            </div>
-            <div class="col-4">
-              <label class="form-label small">Firmante Área</label>
-              <input type="text" class="form-control form-control-sm" id="roles_area_firma" placeholder="Nombre del firmante" value="${roles.area_firma || ""}">
-            </div>
-          </div>
-          <div class="row g-2 mt-2">
-            <div class="col-8">
-              <label class="form-label small">Dirección Solicitante</label>
-              <input type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
-            </div>
-            <div class="col-4">
-              <label class="form-label small">Firmante Dirección</label>
-              <input type="text" class="form-control form-control-sm" id="roles_direccion_firma" placeholder="Nombre del firmante" value="${roles.direccion_firma || ""}">
-            </div>
-          </div>
-        </div>`;
-      const result = await Swal.fire({
-        title: "Datos de Solicitante y Firmantes",
-        html,
-        focusConfirm: false,
-        width: 800,
-        confirmButtonText: "Guardar",
-        showCancelButton: true,
-      });
-      if (!result.isConfirmed) {
-        throw new Error("Captura cancelada: faltan datos de encabezados y firmantes.");
-      }
-      roles.enlace_label =
-        (document.getElementById("roles_enlace_label")?.value || "").trim();
-      roles.enlace_firma =
-        (document.getElementById("roles_enlace_firma")?.value || "").trim();
-      roles.area_label =
-        (document.getElementById("roles_area_label")?.value || "").trim();
-      roles.area_firma =
-        (document.getElementById("roles_area_firma")?.value || "").trim();
-      roles.direccion_firma =
-        (document.getElementById("roles_direccion_firma")?.value || "").trim();
-      saveRolesStore(roles);
-      return roles;
     };
     const findFirmasByName = () => {
       const out = { firma1: [], firma2: [], firma3: [] };
@@ -3014,12 +3588,53 @@
     btnSi?.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
+        // Invalidar cache de saldos para obtener datos frescos al guardar
+        Object.keys(_saldoCache).forEach((k) => delete _saldoCache[k]);
         btnSi.disabled = true;
-        await save();
+        // Cerrar modal de confirmación ANTES del Swal para evitar el focus-trap de Bootstrap
         modal?.hide();
+        // Esperar a que el modal termine de cerrar antes de abrir Swal
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        // Capturar datos de firmantes (siempre muestra el diálogo)
+        await ensureRolesValues(true);
+        await save();
+        // Actualizar badges después de guardar (saldo cambió)
+        Object.keys(_saldoCache).forEach((k) => delete _saldoCache[k]);
+        actualizarTodosLosSaldos();
       } catch (err) {
         console.error("[SP] save error:", err);
-        await uiError(err?.message || "Error al guardar");
+        // Detectar error de saldo insuficiente con detalle por partida
+        const msg = err?.message || "";
+        if (msg.toLowerCase().includes("saldo insuficiente") && hasSwal()) {
+          // Intentar obtener los errores de saldo del fetchJson (pueden estar en err.errores_saldo)
+          const erroresSaldo = err?.errores_saldo;
+          let htmlDetalle = "";
+          if (Array.isArray(erroresSaldo) && erroresSaldo.length) {
+            htmlDetalle = erroresSaldo.map(e =>
+              `<tr>
+                <td class="text-start fw-semibold">${e.clave}</td>
+                <td class="text-end text-danger">${formatMXN(e.importe_solicitado)}</td>
+                <td class="text-end text-success">${formatMXN(e.saldo_disponible)}</td>
+                <td class="text-end text-muted">${formatMXN(e.presupuesto_base)}</td>
+              </tr>`
+            ).join("");
+            htmlDetalle = `<table class="table table-sm table-bordered mt-2 text-sm">
+              <thead><tr><th>Partida</th><th>Solicitado</th><th>Disponible</th><th>Base</th></tr></thead>
+              <tbody>${htmlDetalle}</tbody>
+            </table>`;
+          }
+          await Swal.fire({
+            icon: "error",
+            title: "Saldo insuficiente",
+            html: `<p class="text-muted small mb-1">El monto solicitado supera el presupuesto disponible.</p>${htmlDetalle || `<p>${msg}</p>`}`,
+            confirmButtonText: "Entendido",
+            confirmButtonColor: "#d33",
+          });
+          // Actualizar badges para reflejar saldo real
+          actualizarTodosLosSaldos();
+        } else {
+          await uiError(msg || "Error al guardar");
+        }
       } finally {
         btnSi.disabled = false;
       }
@@ -3106,7 +3721,17 @@
         updateClaveProgramatica();
         await syncMetaFromProyecto();
         refreshTotales();
-        await applyFuenteFilters();
+        if (!esUsuarioL00117) {
+          // Limpiar selección anterior al cambiar proyecto
+          seleccionPartidasModal = {};
+          gruposPorFuente = {};
+          actualizarResumenPartidasPanel();
+          if (detalleBody) detalleBody.innerHTML = "";
+          // Pre-cargar partidas en background
+          await cargarPartidasConFuente();
+        } else {
+          await applyFuenteFilters();
+        }
       });
 
     metaSelect?.addEventListener("change", () => {
@@ -3125,6 +3750,25 @@
       applySelectedMetaToHidden();
       setMetaValid("");
     });
+
+    // Botón abrir modal selección partidas
+    const btnElegirPartidas = document.getElementById("btn-elegir-partidas");
+    if (btnElegirPartidas) {
+      btnElegirPartidas.addEventListener("click", async () => {
+        await cargarPartidasConFuente();
+        renderListaPartidasModal();
+        const modalEl = document.getElementById("modalSeleccionPartidas");
+        if (modalEl) new bootstrap.Modal(modalEl).show();
+      });
+    }
+
+    // Botón confirmar en modal de partidas
+    const btnConfirmarPartidas = document.getElementById("btn-confirmar-partidas");
+    if (btnConfirmarPartidas) {
+      btnConfirmarPartidas.addEventListener("click", () => {
+        confirmarSeleccionPartidas();
+      });
+    }
 
     bindTaxEvents();
 
@@ -3345,6 +3989,7 @@
     } catch (e) {
       console.warn("[SP] dependencias:", e.message);
     }
+    detectarModoFlujo();
     applyCancelarSufVisibility(canViewCancelarSuf());
 
     await loadProyectosCatalog();

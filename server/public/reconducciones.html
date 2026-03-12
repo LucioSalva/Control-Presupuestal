@@ -25,9 +25,12 @@
           <div class="sub-title">Formato de control interno</div>
         </div>
         <div class="text-end">
-          <div class="mb-2">
+          <div class="mb-2 d-flex gap-2">
             <button id="btn-nuevo-recon" class="btn btn-outline-secondary btn-sm">
               <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
+            </button>
+            <button id="btn-buscar-recon" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-search me-1"></i>Buscar
             </button>
           </div>
           <div class="small text-muted">ID</div>
@@ -350,6 +353,50 @@
         <textarea id="rc-justificacion" rows="3" class="form-control"></textarea>
       </div>
 
+      <!-- Sección: Oficio PDF -->
+      <div class="card mt-3 d-none" id="card-oficio-pdf">
+        <div class="card-header rc-table-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-file-earmark-pdf me-1 text-danger"></i>Oficio de Reconducción (PDF)</span>
+          <span class="badge bg-secondary" id="oficio-status-badge">Sin oficio</span>
+        </div>
+        <div class="card-body">
+          <div id="oficio-existente" class="d-none mb-3">
+            <div class="d-flex align-items-center gap-3 p-2 border rounded bg-light">
+              <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+              <div class="flex-grow-1">
+                <div class="fw-semibold" id="oficio-nombre-archivo">—</div>
+                <div class="text-muted small" id="oficio-fecha-subida">—</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button id="btn-descargar-oficio" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-download me-1"></i>Ver PDF
+                </button>
+                <button id="btn-reemplazar-oficio" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-arrow-repeat me-1"></i>Reemplazar
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="oficio-upload-area">
+            <div class="text-muted small mb-2">
+              <i class="bi bi-info-circle me-1"></i>
+              Sube el oficio físico escaneado en PDF como respaldo del trámite. Máximo 10 MB.
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input type="file" id="oficio-file-input" accept=".pdf,application/pdf" class="form-control form-control-sm" style="max-width:350px">
+              <button id="btn-subir-oficio" class="btn btn-sm btn-success" disabled>
+                <i class="bi bi-cloud-upload me-1"></i>Subir PDF
+              </button>
+            </div>
+            <div id="oficio-upload-progress" class="mt-2 d-none">
+              <div class="progress" style="height:6px">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width:100%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card mt-3">
         <div class="card-body">
           <h5 class="text-center mb-2">Datos de Solicitante y Firmantes</h5>
@@ -403,6 +450,82 @@
       </div>
     </div>
   </main>
+
+  <!-- Modal buscar reconducción -->
+  <div class="modal fade" id="modalBuscarRecon" tabindex="-1" aria-labelledby="modalBuscarReconLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalBuscarReconLabel">
+            <i class="bi bi-search me-2"></i>Buscar Reconducción
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label small">No. de Reconducción / Folio</label>
+              <input type="text" id="buscar-recon-folio" class="form-control form-control-sm" placeholder="Ej. ECA-2026-03-RCP-0001">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Estatus</label>
+              <select id="buscar-recon-estatus" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="BORRADOR">Borrador</option>
+                <option value="ENVIADO">Enviado</option>
+                <option value="AUTORIZADO">Autorizado</option>
+                <option value="APLICADO">Aplicado</option>
+                <option value="CANCELADO">Cancelado</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Tipo de movimiento</label>
+              <select id="buscar-recon-tipo" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="TRASPASO">Traspaso</option>
+                <option value="RECONDUCCION">Reconducción</option>
+                <option value="AMPLIACION">Ampliación</option>
+                <option value="REDUCCION">Reducción</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button id="btn-ejecutar-busqueda-recon" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-search me-1"></i>Buscar
+              </button>
+            </div>
+          </div>
+          <div id="buscar-recon-loading" class="text-center d-none py-3">
+            <div class="spinner-border spinner-border-sm text-primary"></div>
+            <span class="ms-2 text-muted small">Buscando...</span>
+          </div>
+          <div id="buscar-recon-sin-resultados" class="text-center text-muted d-none py-3">
+            <i class="bi bi-inbox fs-4"></i>
+            <div class="mt-1 small">No se encontraron reconducciones</div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>No. Reconducción</th>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Estatus</th>
+                  <th class="text-end">Total Origen</th>
+                  <th class="text-end">Total Destino</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="buscar-recon-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="/js/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

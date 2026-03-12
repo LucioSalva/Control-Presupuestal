@@ -110,6 +110,14 @@ router.post("/", async (req, res) => {
     const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
     const noComprometido = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
 
+    // Obtener firmas de la suficiencia para propagarlas al comprometido
+    const rSufFirmas = await client.query(
+      `SELECT firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre
+       FROM suficiencias WHERE id = $1 LIMIT 1`,
+      [idSuf]
+    );
+    const sufData = rSufFirmas.rows[0] ?? {};
+
     const sqlHead = `
       INSERT INTO comprometidos (
         id_suficiencia,
@@ -137,14 +145,16 @@ router.post("/", async (req, res) => {
         isr,
         ieps,
         total,
-        cantidad_con_letra
+        cantidad_con_letra,
+        firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre
       )
       VALUES (
         $1, $2,
         $3, $4, $5, $6,
         $7,
         $8, $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21, $22, $23
+        $15, $16, $17, $18, $19, $20, $21, $22, $23,
+        $24, $25, $26, $27, $28
       )
       RETURNING id, folio_num, no_comprometido;
     `;
@@ -191,6 +201,11 @@ router.post("/", async (req, res) => {
       ieps, // $21
       total, // $22
       toNullIfEmpty(b.cantidad_con_letra), // $23
+      sufData.firma_enlace_label ?? null,    // $24
+      sufData.firma_enlace_nombre ?? null,   // $25
+      sufData.firma_area_label ?? null,      // $26
+      sufData.firma_area_nombre ?? null,     // $27
+      sufData.firma_direccion_nombre ?? null, // $28
     ];
 
     const rHead = await client.query(sqlHead, headParams);

@@ -183,19 +183,19 @@
       <!-- ROW 3: PROYECTO + FUENTE -->
       <tr>
         <th class="table-header">PROYECTO:</th>
-        <td>
+        <td colspan="3">
           <select class="form-select form-select-sm" name="id_proyecto">
             <option value="">-- Selecciona un proyecto --</option>
           </select>
         </td>
-
-        <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
-        <td>
+<!-- 
+        <th class="table-header" id="th-fuente">FUENTE DE FINANCIAMIENTO:</th>
+        <td id="td-fuente">
           <select class="form-select form-select-sm" name="fuente">
             <option value="">-- Selecciona una fuente --</option>
           </select>
           <input type="hidden" name="id_fuente" />
-        </td>
+        </td> -->
       </tr>
 
       <!-- ROW 4: CLAVE + PROGRAMACION -->
@@ -231,6 +231,21 @@
         </td>
       </tr>
     </table>
+
+    <!-- PANEL SELECCIÓN DE PARTIDAS (nuevo flujo multi-fuente, oculto para L00/117) -->
+    <div id="panel-seleccion-partidas" style="display:none;" class="mb-3">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="fw-bold" style="font-size:11px;">
+          Partidas seleccionadas: <span id="lbl-partidas-count" class="badge bg-secondary">0</span>
+          &nbsp;|&nbsp; Fuentes detectadas: <span id="lbl-fuentes-count" class="badge bg-primary">0</span>
+        </div>
+        <button id="btn-elegir-partidas" type="button" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-grid-3x3-gap me-1"></i>Seleccionar Partidas
+        </button>
+      </div>
+      <!-- Tabla resumen de partidas agrupadas por fuente -->
+      <div id="resumen-partidas-por-fuente"></div>
+    </div>
 
     <!-- Detalle (dinámico) -->
     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -438,6 +453,35 @@
     </div>
 
     <!-- Se eliminó sección de encabezados y firmantes (se captura al descargar PDF) -->
+  </div>
+
+  <!-- Modal selección de partidas (nuevo flujo multi-fuente) -->
+  <div class="modal fade" id="modalSeleccionPartidas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+      <div class="modal-content shadow">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-grid-3x3-gap me-2"></i>Seleccionar Partidas</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body p-2">
+          <p class="small text-muted mb-2">
+            Selecciona las partidas y asigna el importe. Las suficiencias se crearán agrupadas por fuente de financiamiento automáticamente.
+          </p>
+          <div id="lista-partidas-modal">
+            <div class="text-center py-4 text-muted">Cargando partidas...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="me-auto small text-muted">
+            <span id="modal-resumen-seleccion">Ninguna partida seleccionada</span>
+          </div>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" id="btn-confirmar-partidas" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>Confirmar selección
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Modal confirmación -->

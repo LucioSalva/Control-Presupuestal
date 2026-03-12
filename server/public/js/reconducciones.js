@@ -137,6 +137,8 @@
   };
   const hasRecientes = !!(el.filtroEstatus && el.tablaBody);
 
+  const modalBuscarRecon = new bootstrap.Modal(document.getElementById("modalBuscarRecon"));
+
   const sideEls = {
     ORIGEN: {
       prefix: "origen",
@@ -1062,8 +1064,13 @@
       addResourceRow(side);
       addMetaRow(side);
     });
+    ["firma-enlace-label", "firma-enlace-nombre", "firma-area-label", "firma-area-nombre", "firma-direccion-nombre"].forEach((id) => {
+      const inp = document.getElementById(id);
+      if (inp && !inp.disabled) inp.value = "";
+    });
     updateTotals();
     scheduleQrRender();
+    cargarInfoOficio(null);
   }
 
   async function loadRecon(id) {
@@ -1084,6 +1091,18 @@
         if (mesKey) el.rcMes.value = mesKey;
       }
       el.rcJustificacion.value = data?.cabecera?.justificacion || "";
+
+      // Cargar firmantes
+      if (document.getElementById("firma-enlace-label"))
+        document.getElementById("firma-enlace-label").value = data?.cabecera?.firma_enlace_label || "";
+      if (document.getElementById("firma-enlace-nombre"))
+        document.getElementById("firma-enlace-nombre").value = data?.cabecera?.firma_enlace_nombre || "";
+      if (document.getElementById("firma-area-label"))
+        document.getElementById("firma-area-label").value = data?.cabecera?.firma_area_label || "";
+      if (document.getElementById("firma-area-nombre"))
+        document.getElementById("firma-area-nombre").value = data?.cabecera?.firma_area_nombre || "";
+      if (document.getElementById("firma-direccion-nombre"))
+        document.getElementById("firma-direccion-nombre").value = data?.cabecera?.firma_direccion_nombre || "";
 
       ["ORIGEN", "DESTINO"].forEach((side) => {
         const s = sideEls[side];
@@ -1124,14 +1143,165 @@
       });
       updateTotals();
       scheduleQrRender();
+      cargarInfoOficio(state.reconId);
     } catch (err) {
       uiError(err.message || "Error cargando reconducción");
     }
   }
 
+  // Búsqueda de reconducciones en el modal
+  async function ejecutarBusquedaRecon() {
+    const folio = (document.getElementById("buscar-recon-folio")?.value || "").trim();
+    const estatus = (document.getElementById("buscar-recon-estatus")?.value || "").trim();
+    const tipo = (document.getElementById("buscar-recon-tipo")?.value || "").trim();
+
+    const loading = document.getElementById("buscar-recon-loading");
+    const sinResultados = document.getElementById("buscar-recon-sin-resultados");
+    const tbody = document.getElementById("buscar-recon-tbody");
+
+    loading?.classList.remove("d-none");
+    sinResultados?.classList.add("d-none");
+    if (tbody) tbody.innerHTML = "";
+
+    try {
+      // Usa el endpoint existente GET /api/reconducciones que ya devuelve el listado
+      const data = await fetchJson(`${API}/api/reconducciones`, { headers: authHeaders() });
+      let rows = Array.isArray(data) ? data : [];
+
+      // Filtrar localmente
+      if (folio) rows = rows.filter((r) => String(r.oficio || r.id || "").toLowerCase().includes(folio.toLowerCase()));
+      if (estatus) rows = rows.filter((r) => String(r.estatus || "").toUpperCase() === estatus);
+      if (tipo) rows = rows.filter((r) => String(r.tipo_movimiento || "").toUpperCase() === tipo);
+
+      if (!rows.length) {
+        sinResultados?.classList.remove("d-none");
+        return;
+      }
+
+      if (tbody) {
+        tbody.innerHTML = rows.map((r) => `
+          <tr>
+            <td class="text-muted small">${r.id}</td>
+            <td class="fw-semibold">${r.oficio || "—"}</td>
+            <td>${formatDate(r.fecha_elaboracion)}</td>
+            <td><span class="badge bg-light text-dark border">${r.tipo_movimiento || "—"}</span></td>
+            <td><span class="badge ${
+              r.estatus === "APLICADO" ? "bg-success" :
+              r.estatus === "ENVIADO" ? "bg-primary" :
+              r.estatus === "AUTORIZADO" ? "bg-info text-dark" :
+              r.estatus === "CANCELADO" ? "bg-danger" : "bg-secondary"
+            }">${r.estatus || "—"}</span></td>
+            <td class="text-end">${formatCurrency(r.origen_total || 0)}</td>
+            <td class="text-end">${formatCurrency(r.destino_total || 0)}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary rc-btn-abrir-modal" data-id="${r.id}">
+                <i class="bi bi-folder2-open me-1"></i>Abrir
+              </button>
+            </td>
+          </tr>
+        `).join("");
+      }
+    } catch (err) {
+      uiError(err.message || "Error buscando reconducciones");
+    } finally {
+      loading?.classList.add("d-none");
+    }
+  }
+
+  // Captura firmas vía Swal si faltan campos obligatorios
+  async function ensureFirmasRecon() {
+    const enlaceLabel = (document.getElementById("firma-enlace-label")?.value || "").trim();
+    const enlaceNombre = (document.getElementById("firma-enlace-nombre")?.value || "").trim();
+    const areaLabel = (document.getElementById("firma-area-label")?.value || "").trim();
+    const areaNombre = (document.getElementById("firma-area-nombre")?.value || "").trim();
+    const direccionNombre = (document.getElementById("firma-direccion-nombre")?.value || "").trim();
+
+    // Si ya están todos los campos obligatorios, no pedir nada
+    if (enlaceNombre && areaNombre && direccionNombre) {
+      return { enlace_label: enlaceLabel, enlace_nombre: enlaceNombre, area_label: areaLabel, area_nombre: areaNombre, direccion_nombre: direccionNombre };
+    }
+
+    // Mostrar Swal para capturar los que faltan
+    const html = `
+      <div class="text-start">
+        <p class="mb-2 text-muted small">Captura los datos de solicitante y firmantes para el dictamen:</p>
+        <div class="row g-2">
+          <div class="col-8">
+            <label class="form-label small">Coordinación Administrativa (ENLACE SOLICITANTE)</label>
+            <input type="text" class="form-control form-control-sm" id="swal_enlace_label" value="${enlaceLabel}" placeholder="Ej. COORDINACIÓN ADMINISTRATIVA">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Firmante Enlace *</label>
+            <input type="text" class="form-control form-control-sm" id="swal_enlace_nombre" value="${enlaceNombre}" placeholder="Nombre del firmante">
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-8">
+            <label class="form-label small">ÁREA SOLICITANTE</label>
+            <input type="text" class="form-control form-control-sm" id="swal_area_label" value="${areaLabel}" placeholder="Ej. SUBDIRECCIÓN DE TECNOLOGÍAS...">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Firmante Área *</label>
+            <input type="text" class="form-control form-control-sm" id="swal_area_nombre" value="${areaNombre}" placeholder="Nombre del firmante">
+          </div>
+        </div>
+        <div class="row g-2 mt-2">
+          <div class="col-8">
+            <label class="form-label small">Dirección Solicitante</label>
+            <input type="text" class="form-control form-control-sm" disabled value="Se toma de NOMBRE DE LA DEPENDENCIA GENERAL">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Firmante Dirección *</label>
+            <input type="text" class="form-control form-control-sm" id="swal_direccion_nombre" value="${direccionNombre}" placeholder="Nombre del firmante">
+          </div>
+        </div>
+      </div>`;
+
+    const result = await Swal.fire({
+      title: "Datos de Solicitante y Firmantes",
+      html,
+      width: 800,
+      focusConfirm: false,
+      confirmButtonText: "Guardar",
+      showCancelButton: true,
+      cancelButtonText: "Omitir",
+      preConfirm: () => {
+        const eNombre = (document.getElementById("swal_enlace_nombre")?.value || "").trim();
+        const aNombre = (document.getElementById("swal_area_nombre")?.value || "").trim();
+        const dNombre = (document.getElementById("swal_direccion_nombre")?.value || "").trim();
+        if (!eNombre || !aNombre || !dNombre) {
+          Swal.showValidationMessage("Los firmantes son obligatorios (Enlace, Área y Dirección)");
+          return false;
+        }
+        return true;
+      },
+    });
+
+    if (result.isConfirmed) {
+      const vals = {
+        enlace_label: (document.getElementById("swal_enlace_label")?.value || "").trim(),
+        enlace_nombre: (document.getElementById("swal_enlace_nombre")?.value || "").trim(),
+        area_label: (document.getElementById("swal_area_label")?.value || "").trim(),
+        area_nombre: (document.getElementById("swal_area_nombre")?.value || "").trim(),
+        direccion_nombre: (document.getElementById("swal_direccion_nombre")?.value || "").trim(),
+      };
+      // Llenar campos del formulario
+      if (document.getElementById("firma-enlace-label")) document.getElementById("firma-enlace-label").value = vals.enlace_label;
+      if (document.getElementById("firma-enlace-nombre")) document.getElementById("firma-enlace-nombre").value = vals.enlace_nombre;
+      if (document.getElementById("firma-area-label")) document.getElementById("firma-area-label").value = vals.area_label;
+      if (document.getElementById("firma-area-nombre")) document.getElementById("firma-area-nombre").value = vals.area_nombre;
+      if (document.getElementById("firma-direccion-nombre")) document.getElementById("firma-direccion-nombre").value = vals.direccion_nombre;
+      return vals;
+    }
+
+    // Si cancela, retorna los valores actuales (aunque estén vacíos)
+    return { enlace_label: enlaceLabel, enlace_nombre: enlaceNombre, area_label: areaLabel, area_nombre: areaNombre, direccion_nombre: direccionNombre };
+  }
+
   async function guardarRecon() {
     if (!validateHeader()) return;
     const oficioActual = state.reconId ? getOficioValue() : "";
+    const firmas = await ensureFirmasRecon();
     const payload = {
       oficio: oficioActual ? oficioActual : null,
       fecha_elaboracion: el.rcFecha.value || null,
@@ -1139,6 +1309,11 @@
       justificacion: el.rcJustificacion.value || null,
       ejercicio: numOrNull(el.rcEjercicio.value),
       mes_pago_date: buildMesPagoDate(),
+      firma_enlace_label: firmas.enlace_label || null,
+      firma_enlace_nombre: firmas.enlace_nombre || null,
+      firma_area_label: firmas.area_label || null,
+      firma_area_nombre: firmas.area_nombre || null,
+      firma_direccion_nombre: firmas.direccion_nombre || null,
       lados: [collectLado("ORIGEN"), collectLado("DESTINO")],
       recursos: [...collectRecursos("ORIGEN"), ...collectRecursos("DESTINO")],
       metas: [...collectMetas("ORIGEN"), ...collectMetas("DESTINO")],
@@ -1160,6 +1335,7 @@
         setReconId(resp?.cabecera?.id);
         setStatusBadge(resp?.cabecera?.estatus || "BORRADOR");
         if (resp?.cabecera?.oficio) setOficioValue(resp.cabecera.oficio);
+        cargarInfoOficio(resp?.cabecera?.id);
       }
       await loadRecientes();
       scheduleQrRender();
@@ -1302,6 +1478,131 @@
     el.btnCancelar.addEventListener("click", cancelarRecon);
     attachSideEvents("ORIGEN");
     attachSideEvents("DESTINO");
+
+    // Modal buscar reconducción
+    document.getElementById("btn-buscar-recon")?.addEventListener("click", () => {
+      modalBuscarRecon.show();
+      ejecutarBusquedaRecon();
+    });
+    document.getElementById("btn-ejecutar-busqueda-recon")?.addEventListener("click", ejecutarBusquedaRecon);
+    document.getElementById("buscar-recon-folio")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") ejecutarBusquedaRecon();
+    });
+    // Click en botón "Abrir" dentro del modal
+    document.getElementById("buscar-recon-tbody")?.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest(".rc-btn-abrir-modal");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      modalBuscarRecon.hide();
+      await loadRecon(id);
+    });
+  }
+
+  // =====================================================
+  //  OFICIO PDF — Subida y descarga del oficio escaneado
+  // =====================================================
+
+  async function cargarInfoOficio(idReconduccion) {
+    const card = document.getElementById("card-oficio-pdf");
+    if (!idReconduccion) {
+      card.classList.add("d-none");
+      return;
+    }
+    card.classList.remove("d-none");
+    try {
+      const res = await fetch(`${API}/api/reconducciones/${idReconduccion}/oficio`, {
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      actualizarUIOficio(data);
+    } catch (e) {
+      console.error("[OFICIO] Error cargando info:", e);
+    }
+  }
+
+  function actualizarUIOficio(oficio) {
+    const badge = document.getElementById("oficio-status-badge");
+    const existente = document.getElementById("oficio-existente");
+    const uploadArea = document.getElementById("oficio-upload-area");
+
+    if (oficio && oficio.id) {
+      badge.textContent = "Con oficio";
+      badge.className = "badge bg-success";
+      existente.classList.remove("d-none");
+      uploadArea.classList.add("d-none");
+      document.getElementById("oficio-nombre-archivo").textContent = oficio.nombre_archivo;
+      const fecha = oficio.fecha_subida
+        ? new Date(oficio.fecha_subida).toLocaleString("es-MX")
+        : "—";
+      document.getElementById("oficio-fecha-subida").textContent = `Subido: ${fecha}`;
+    } else {
+      badge.textContent = "Sin oficio";
+      badge.className = "badge bg-secondary";
+      existente.classList.add("d-none");
+      uploadArea.classList.remove("d-none");
+      document.getElementById("oficio-file-input").value = "";
+      document.getElementById("btn-subir-oficio").disabled = true;
+    }
+  }
+
+  async function subirOficio() {
+    const idRc = state.reconId;
+    if (!idRc) {
+      uiWarn("Primero guarda la reconducción antes de subir el oficio.");
+      return;
+    }
+    const fileInput = document.getElementById("oficio-file-input");
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const progress = document.getElementById("oficio-upload-progress");
+    const btn = document.getElementById("btn-subir-oficio");
+    progress.classList.remove("d-none");
+    btn.disabled = true;
+
+    try {
+      const formData = new FormData();
+      formData.append("oficio", file);
+
+      const res = await fetch(`${API}/api/reconducciones/${idRc}/oficio`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al subir el oficio");
+
+      Swal.fire({ icon: "success", title: "PDF subido", text: "El oficio se guardó correctamente.", timer: 2000, showConfirmButton: false });
+      actualizarUIOficio(data);
+    } catch (e) {
+      uiError(e.message || "Error al subir el oficio");
+    } finally {
+      progress.classList.add("d-none");
+      btn.disabled = false;
+    }
+  }
+
+  function bindOficioEvents() {
+    document.getElementById("oficio-file-input").addEventListener("change", function () {
+      document.getElementById("btn-subir-oficio").disabled = !this.files.length;
+    });
+
+    document.getElementById("btn-subir-oficio").addEventListener("click", subirOficio);
+
+    document.getElementById("btn-descargar-oficio").addEventListener("click", () => {
+      const idRc = state.reconId;
+      if (!idRc) return;
+      const token = getToken();
+      const url = `${API}/api/reconducciones/${idRc}/oficio/descargar${token ? "?token=" + encodeURIComponent(token) : ""}`;
+      window.open(url, "_blank");
+    });
+
+    document.getElementById("btn-reemplazar-oficio").addEventListener("click", () => {
+      document.getElementById("oficio-existente").classList.add("d-none");
+      document.getElementById("oficio-upload-area").classList.remove("d-none");
+      document.getElementById("oficio-file-input").value = "";
+      document.getElementById("btn-subir-oficio").disabled = true;
+    });
   }
 
   async function init() {
@@ -1313,6 +1614,7 @@
       await loadSaldosGlobal();
       resetForm();
       bindEvents();
+      bindOficioEvents();
       await loadRecientes();
       const params = new URLSearchParams(window.location.search);
       const id = Number(params.get("id"));
