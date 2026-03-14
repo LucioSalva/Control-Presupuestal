@@ -1,3 +1,23 @@
+﻿/**
+ * ================================================================
+ *  CONTROL PRESUPUESTAL MUNICIPAL
+ *  Humberto Salvador Ruiz Lucio
+ * ================================================================
+ *  Módulo: Servidor Principal Express
+ *  Archivo: server.js
+ *
+ *  © 2025–2026 Humberto Salvador Ruiz Lucio.
+ *  Todos los derechos reservados.
+ *
+ *  AVISO LEGAL: Este software es propiedad exclusiva del
+ *  Humberto Salvador Ruiz Lucio. Su reproducción,
+ *  distribución o modificación sin autorización escrita previa
+ *  del titular queda estrictamente prohibida y será perseguida
+ *  conforme a las leyes aplicables en los Estados Unidos Mexicanos.
+ *
+ *  Software de uso interno exclusivo. No compartir.
+ * ================================================================
+ */
 // =====================================================
 //  IMPORTS Y CONFIG
 // =====================================================
@@ -6,6 +26,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs/promises";
+import { existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
@@ -131,6 +152,21 @@ app.use("/api/login", loginLimiter);
 // =====================================================
 //  STATIC (FRONTEND)
 // =====================================================
+
+// =====================================================
+//  ARCHIVOS JS: PRODUCCIÓN vs DESARROLLO
+//  En producción (NODE_ENV=production), si existe public/dist/js/,
+//  se sirven los archivos JS ofuscados desde ahí.
+//  En desarrollo, se sirven directamente de public/js/.
+// =====================================================
+const distJsDir = path.join(__dirname, "public", "dist", "js");
+if (process.env.NODE_ENV === "production" && existsSync(distJsDir)) {
+  app.use("/js", express.static(distJsDir));
+  console.log("[SERVER] Modo producción: sirviendo JS ofuscado de public/dist/js/");
+} else {
+  console.log("[SERVER] Modo desarrollo: sirviendo JS fuente de public/js/");
+}
+
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (_req, res) => {
   return res.sendFile(path.join(__dirname, "public", "login.html"));

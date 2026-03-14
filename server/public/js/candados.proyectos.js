@@ -1,3 +1,23 @@
+﻿/**
+ * ================================================================
+ *  CONTROL PRESUPUESTAL MUNICIPAL
+ *  Humberto Salvador Ruiz Lucio
+ * ================================================================
+ *  Módulo: Restricciones por Proyecto
+ *  Archivo: candados.proyectos.js
+ *
+ *  © 2025–2026 Humberto Salvador Ruiz Lucio.
+ *  Todos los derechos reservados.
+ *
+ *  AVISO LEGAL: Este software es propiedad exclusiva del
+ *  Humberto Salvador Ruiz Lucio. Su reproducción,
+ *  distribución o modificación sin autorización escrita previa
+ *  del titular queda estrictamente prohibida y será perseguida
+ *  conforme a las leyes aplicables en los Estados Unidos Mexicanos.
+ *
+ *  Software de uso interno exclusivo. No compartir.
+ * ================================================================
+ */
 window.DG_DA_PROYECTOS_FILTERS = {
   A00: {
       100: new Set(["0103010101|P", "0103010103|E"]),

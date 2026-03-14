@@ -1,4 +1,4 @@
-import assert from "assert/strict";
+﻿import assert from "assert/strict";
 import { filterMetasByHierarchy } from "./metas-filter.js";
 
 function run() {
