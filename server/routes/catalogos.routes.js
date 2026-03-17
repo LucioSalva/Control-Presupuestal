@@ -93,6 +93,21 @@ function canViewPartidasMil(dg, da) {
   return (dgKey === "L00" && daKey === "117") || dgKey === "E00";
 }
 
+async function isUserL00117(req) {
+  const dgId = Number(req.user?.id_dgeneral);
+  const daId = Number(req.user?.id_dauxiliar);
+  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
+
+  const [rDg, rDa] = await Promise.all([
+    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
+    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
+  ]);
+
+  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
+  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
+  return dgClave === "L00" && daClave === "117";
+}
+
 async function getUserDGDA(req) {
   const idDg = Number(req.user?.id_dgeneral);
   const idDa = Number(req.user?.id_dauxiliar);
@@ -148,7 +163,9 @@ router.get("/partidas-permitidas", async (req, res) => {
     const { dg, da } = await getUserDGDA(req);
     const allowed = canViewPartidasMil(dg, da);
 
-    if (isGodOrAdmin) {
+    // GOD/ADMIN y L00/117 ven todas las partidas sin filtro de DG/DA
+    const userIsL00117 = await isUserL00117(req);
+    if (isGodOrAdmin || userIsL00117) {
       const r = await query(`
         SELECT
           p.clave AS clave,
@@ -329,9 +346,18 @@ router.get("/partidas-permitidas-detalle", async (req, res) => {
   }
 });
 
+// =====================================================
+//  NOMBRES DE MESES EN ESPAÑOL PARA SALDO
+// =====================================================
+const MESES_ES = [
+  "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+];
+
 // GET /api/catalogos/partidas-con-fuente
-// Retorna todas las partidas del DG+DA+Proyecto con su fuente asignada
-// Usado para el nuevo flujo multi-fuente de suficiencias
+// Retorna todas las partidas del DG+DA+Proyecto con su fuente asignada,
+// incluyendo saldo_disponible y presupuesto_base de cada partida.
+// Parámetros opcionales: mes_pago (ej. "MARZO"), ejercicio (ej. 2026)
 router.get("/partidas-con-fuente", async (req, res) => {
   try {
     let dg = normalizeKey(req.query.dg_clave);
@@ -349,6 +375,40 @@ router.get("/partidas-con-fuente", async (req, res) => {
       return res.status(400).json({ error: "Faltan parámetros (dg_clave, da_clave, proy_clave)" });
     }
 
+    // Resolver mes y ejercicio — usar valores del query o calcular los actuales
+    const ahora = new Date();
+    const mesPago = normalizeKey(req.query.mes_pago) || MESES_ES[ahora.getMonth()];
+    const ejercicio = Number(req.query.ejercicio) || ahora.getFullYear();
+
+    // Obtener IDs numéricos de DG y DA a partir de sus claves
+    const [rDgId, rDaId] = await Promise.all([
+      query(`SELECT id FROM public.dgeneral WHERE TRIM(clave) = $1 LIMIT 1`, [dg]),
+      query(`SELECT id FROM public.dauxiliar WHERE TRIM(clave) = $1 LIMIT 1`, [da]),
+    ]);
+
+    const idDgeneral = Number(rDgId.rows?.[0]?.id ?? null);
+    const idDauxiliar = Number(rDaId.rows?.[0]?.id ?? null);
+
+    if (!Number.isFinite(idDgeneral) || idDgeneral <= 0 ||
+        !Number.isFinite(idDauxiliar) || idDauxiliar <= 0) {
+      return res.status(400).json({ error: "No se encontró el DG o DA especificado" });
+    }
+
+    // Obtener id del proyecto — preferir el ID directo si ya lo envía el cliente
+    let idProyecto = Number(req.query.id_proyecto || 0);
+    if (!Number.isFinite(idProyecto) || idProyecto <= 0) {
+      const rProy = await query(
+        `SELECT id FROM public.proyectos WHERE TRIM(clave) = $1 LIMIT 1`,
+        [proyClave]
+      );
+      idProyecto = Number(rProy.rows?.[0]?.id ?? null);
+    }
+
+    if (!Number.isFinite(idProyecto) || idProyecto <= 0) {
+      return res.status(400).json({ error: "No se encontró el proyecto especificado" });
+    }
+
+    // Obtener partidas con fuente para el DG+DA+Proyecto solicitado
     const r = await query(
       `
       SELECT
@@ -383,10 +443,41 @@ router.get("/partidas-con-fuente", async (req, res) => {
       });
     }
 
-    return res.json({ ok: true, partidas: filtered });
+    // Consultar saldo de cada partida en paralelo usando fn_saldo_disponible_partida
+    const conSaldo = await Promise.all(
+      filtered.map(async (partida) => {
+        const idFuente = Number(partida.fuente_id);
+        if (!Number.isFinite(idFuente) || idFuente <= 0) {
+          return { ...partida, saldo_disponible: null, presupuesto_base: null };
+        }
+
+        try {
+          const rSaldo = await query(
+            `SELECT saldo_disponible, presupuesto_base
+             FROM fn_saldo_disponible_partida($1, $2, $3, $4, $5, $6, $7)`,
+            [idDgeneral, idDauxiliar, idFuente, idProyecto, partida.partida_clave, mesPago, ejercicio]
+          );
+          const fila = rSaldo.rows?.[0];
+          return {
+            ...partida,
+            saldo_disponible: fila?.saldo_disponible != null ? Number(fila.saldo_disponible) : null,
+            presupuesto_base: fila?.presupuesto_base != null ? Number(fila.presupuesto_base) : null,
+          };
+        } catch (eSaldo) {
+          // Si el saldo falla para una partida individual, no cancelamos todo el request
+          console.error(
+            `[CATALOGOS][GET partidas-con-fuente] Error al obtener saldo para partida ${partida.partida_clave}:`,
+            eSaldo
+          );
+          return { ...partida, saldo_disponible: null, presupuesto_base: null };
+        }
+      })
+    );
+
+    return res.json({ ok: true, partidas: conSaldo });
   } catch (e) {
-    console.error("GET /api/catalogos/partidas-con-fuente", e);
-    return res.status(500).json({ error: "Error obteniendo partidas con fuente" });
+    console.error("[CATALOGOS][GET partidas-con-fuente] Error:", e);
+    return res.status(500).json({ error: "Error al obtener partidas" });
   }
 });
 

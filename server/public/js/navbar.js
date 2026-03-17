@@ -61,7 +61,6 @@
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Catálogos</a>
               <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="projects.html">Proyectos</a></li>
                 <li><a class="dropdown-item" href="partidas_base.html">Carga Partidas</a></li>
               </ul>
             </li>

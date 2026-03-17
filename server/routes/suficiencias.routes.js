@@ -435,9 +435,10 @@ router.post("/", async (req, res) => {
       ? new Date()
       : fechaBaseRaw;
 
+    const anio = String(fechaBase.getFullYear());
     const mes = String(fechaBase.getMonth() + 1).padStart(2, "0");
     const tipo = "SP";
-    const prefijo = `ECA-${mes}-${tipo}-`;
+    const prefijo = `ECA-${anio}-${mes}-${tipo}-`;
 
     const departamento = b.departamento ?? b.dependencia_aux ?? null;
 
@@ -729,7 +730,8 @@ router.get("/buscar", async (req, res) => {
       params.push(`%${numeroRaw}%`);
     }
 
-    if (role === "AREA") {
+    const userIsL00117 = await isUserL00117(req);
+    if (role === "AREA" && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
         params.push(req.user.id_dgeneral);
@@ -784,7 +786,8 @@ router.post("/:id/cancelar", async (req, res) => {
     const params = [id];
     let i = 2;
 
-    if (role === "AREA") {
+    const userIsL00117 = await isUserL00117(req);
+    if (role === "AREA" && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
         params.push(req.user.id_dgeneral);
@@ -838,7 +841,7 @@ router.post("/:id/cancelar", async (req, res) => {
     const whereUpdate = [`id = $1`];
     const paramsUpdate = [id, cancelUser, cancelReason];
     let j = 4;
-    if (role === "AREA") {
+    if (role === "AREA" && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         whereUpdate.push(`id_dgeneral = $${j++}`);
         paramsUpdate.push(req.user.id_dgeneral);
@@ -932,25 +935,33 @@ router.get("/:id", async (req, res) => {
       return res.status(400).json({ error: "id inválido" });
     }
 
-    const where = [`id = $1`];
+    const where = [`v.id = $1`];
     const params = [id];
     let i = 2;
 
-    if (role === "AREA") {
+    const userIsL00117 = await isUserL00117(req);
+    if (role === "AREA" && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
-        where.push(`id_dgeneral = $${i++}`);
+        where.push(`v.id_dgeneral = $${i++}`);
         params.push(req.user.id_dgeneral);
       }
       if (req.user?.id_dauxiliar != null) {
-        where.push(`id_dauxiliar = $${i++}`);
+        where.push(`v.id_dauxiliar = $${i++}`);
         params.push(req.user.id_dauxiliar);
       }
     }
 
-    // 1) Cabecera
+    // 1) Cabecera — JOIN con suficiencias para traer todos los campos financieros y de texto
     const rHead = await query(
-      `SELECT *
-       FROM v_suficiencias_estado
+      `SELECT v.*,
+         s.dependencia, s.departamento, s.fuente, s.mes_pago, s.clave_programatica,
+         s.meta, s.impuesto_tipo, s.isr_tasa, s.ieps_tasa,
+         s.subtotal, s.iva, s.isr, s.ieps, s.total, s.cantidad_con_letra,
+         s.firma_enlace_label, s.firma_enlace_nombre, s.firma_area_label,
+         s.firma_area_nombre, s.firma_direccion_nombre, s.cancel_reason,
+         s.id_proyecto, s.id_fuente
+       FROM v_suficiencias_estado v
+       JOIN suficiencias s ON s.id = v.id
        WHERE ${where.join(" AND ")}
        LIMIT 1`,
       params,

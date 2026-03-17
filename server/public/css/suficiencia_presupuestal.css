@@ -614,6 +614,23 @@ svg {
 }
 
 /* ======================================================
+   SEMÁFORO DE SALDO DE PARTIDA
+   ====================================================== */
+.sp-semaforo {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.sp-semaforo.verde    { background-color: #28a745; box-shadow: 0 0 4px #28a74580; }
+.sp-semaforo.amarillo { background-color: #ffc107; box-shadow: 0 0 4px #ffc10780; }
+.sp-semaforo.rojo     { background-color: #dc3545; box-shadow: 0 0 4px #dc354580; }
+.sp-semaforo.gris     { background-color: #adb5bd; }
+
+/* ======================================================
    PRINT
    ====================================================== */
 @media print {

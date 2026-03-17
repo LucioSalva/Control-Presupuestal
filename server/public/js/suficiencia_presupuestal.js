@@ -744,9 +744,12 @@
         </td>
 
         <td style="width: 12%;">
-          <select class="form-select form-select-sm sp-clave" name="r${i}_clave">
-            ${buildPartidasOptionsHtml("")}
-          </select>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="sp-semaforo sp-row-semaforo gris" title="Sin partida seleccionada"></span>
+            <select class="form-select form-select-sm sp-clave" name="r${i}_clave">
+              ${buildPartidasOptionsHtml("")}
+            </select>
+          </div>
         </td>
 
         <td style="width: 20%;">
@@ -1193,6 +1196,18 @@
     return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n ?? 0);
   }
 
+  // Semáforo de saldo: retorna clase CSS según porcentaje de saldo disponible
+  function getSemaforoClass(saldo, base) {
+    // Sin datos del API → gris (desconocido)
+    if (saldo == null && (base == null || base === undefined)) return "gris";
+    // Sin presupuesto base o saldo agotado → rojo
+    if (!base || Number(base) <= 0 || Number(saldo) < 1) return "rojo";
+    // Saldo >= 70% del base → verde
+    if (Number(saldo) / Number(base) >= 0.70) return "verde";
+    // Entre 0% y 70% → amarillo
+    return "amarillo";
+  }
+
   async function actualizarSaldoBadge(tr) {
     if (!tr) return;
     const sel = tr.querySelector(".sp-clave");
@@ -1204,18 +1219,37 @@
     const mesPago = String(get("mes_pago") || "").trim();
     if (!clave || !mesPago) {
       badge.className = "sp-saldo-badge d-none";
+      const semEl = tr.querySelector(".sp-row-semaforo");
+      if (semEl) { semEl.className = "sp-semaforo sp-row-semaforo gris"; semEl.title = "Sin partida seleccionada"; }
       return;
     }
 
     const data = await consultarSaldoPartida(clave, mesPago);
     if (!data) {
       badge.className = "sp-saldo-badge d-none";
+      const semEl = tr.querySelector(".sp-row-semaforo");
+      if (semEl) { semEl.className = "sp-semaforo sp-row-semaforo gris"; semEl.title = "Sin datos de saldo"; }
       return;
     }
 
     const saldo = Number(data.saldo_disponible ?? 0);
     const base = Number(data.presupuesto_base ?? 0);
     const importe = moneyParse(impInput.value);
+
+    // Semáforo visible para todos
+    const semaforoEl = tr.querySelector(".sp-row-semaforo");
+    if (semaforoEl) {
+      semaforoEl.className = `sp-semaforo sp-row-semaforo ${getSemaforoClass(saldo, base)}`;
+      semaforoEl.title = esUsuarioL00117
+        ? `Saldo: ${formatMXN(saldo)} / Base: ${formatMXN(base)}`
+        : getSemaforoClass(saldo, base) === "verde" ? "Disponible" : getSemaforoClass(saldo, base) === "amarillo" ? "Disponibilidad limitada" : "Sin disponibilidad";
+    }
+
+    // Badge con montos: solo para L00/117
+    if (!esUsuarioL00117) {
+      badge.className = "sp-saldo-badge d-none";
+      return;
+    }
 
     badge.style.display = "block";
     badge.classList.remove("d-none");
@@ -1392,15 +1426,13 @@
   // Dependencias desde usuario (dgeneral + dauxiliar)
   // ---------------------------
   async function loadDependenciasFromUser() {
-    setReadonly("dependencia", true);
-    setReadonly("dependencia_aux", true);
-
     const user = getLoggedUser();
+    const dgClaveUser = String(user?.dgeneral_clave || "").trim().toUpperCase();
+    const daClaveUser = String(user?.dauxiliar_clave || "").trim();
+    const isL00117 = dgClaveUser === "L00" && daClaveUser === "117";
+
     const idDg = user?.id_dgeneral != null ? Number(user.id_dgeneral) : null;
     const idDa = user?.id_dauxiliar != null ? Number(user.id_dauxiliar) : null;
-
-    setVal("id_dgeneral", idDg ?? "");
-    setVal("id_dauxiliar", idDa ?? "");
 
     const [dgCatalog, daCatalog] = await Promise.all([
       fetchJson(`${API}/api/catalogos/dgeneral`, {
@@ -1411,17 +1443,88 @@
       }),
     ]);
 
-    dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === idDg) || null;
-    dauxiliarInfo =
-      (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
+    if (isL00117) {
+      // L00/117: mostrar selects con catálogo completo
+      const inputDep = document.querySelector('[name="dependencia"]');
+      const inputDepAux = document.querySelector('[name="dependencia_aux"]');
+      const selDg = document.getElementById("sel-dg-l00117");
+      const selDa = document.getElementById("sel-da-l00117");
 
-    const depGenNombre =
-      dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
-    const depAuxNombre =
-      dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
+      if (inputDep) inputDep.classList.add("d-none");
+      if (inputDepAux) inputDepAux.classList.add("d-none");
+      if (selDg) selDg.classList.remove("d-none");
+      if (selDa) selDa.classList.remove("d-none");
 
-    setVal("dependencia", depGenNombre);
-    setVal("dependencia_aux", depAuxNombre);
+      // Poblar DG
+      if (selDg) {
+        selDg.innerHTML = '<option value="">-- Selecciona DG --</option>';
+        (dgCatalog || []).forEach((dg) => {
+          const opt = document.createElement("option");
+          opt.value = dg.id;
+          opt.textContent = `${dg.clave} — ${dg.dependencia}`;
+          if (Number(dg.id) === idDg) opt.selected = true;
+          selDg.appendChild(opt);
+        });
+      }
+
+      // Poblar DA
+      if (selDa) {
+        selDa.innerHTML = '<option value="">-- Selecciona DA --</option>';
+        (daCatalog || []).forEach((da) => {
+          const opt = document.createElement("option");
+          opt.value = da.id;
+          opt.textContent = `${da.clave} — ${da.dependencia}`;
+          if (Number(da.id) === idDa) opt.selected = true;
+          selDa.appendChild(opt);
+        });
+      }
+
+      // Info inicial (DG/DA propios de L00/117)
+      dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === idDg) || null;
+      dauxiliarInfo = (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
+
+      setVal("id_dgeneral", idDg ?? "");
+      setVal("id_dauxiliar", idDa ?? "");
+
+      // Listener DG change
+      if (selDg) {
+        selDg.addEventListener("change", function () {
+          const selId = Number(this.value) || null;
+          dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === selId) || null;
+          setVal("id_dgeneral", selId ?? "");
+          updateClaveProgramatica();
+          if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
+        });
+      }
+
+      // Listener DA change
+      if (selDa) {
+        selDa.addEventListener("change", function () {
+          const selId = Number(this.value) || null;
+          dauxiliarInfo = (daCatalog || []).find((x) => Number(x.id) === selId) || null;
+          setVal("id_dauxiliar", selId ?? "");
+          updateClaveProgramatica();
+          if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
+        });
+      }
+
+    } else {
+      // Resto de usuarios: comportamiento original (readonly)
+      setReadonly("dependencia", true);
+      setReadonly("dependencia_aux", true);
+
+      setVal("id_dgeneral", idDg ?? "");
+      setVal("id_dauxiliar", idDa ?? "");
+
+      dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === idDg) || null;
+      dauxiliarInfo = (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
+
+      const depGenNombre = dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
+      const depAuxNombre = dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
+
+      setVal("dependencia", depGenNombre);
+      setVal("dependencia_aux", depAuxNombre);
+    }
 
     updateClaveProgramatica();
     if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
@@ -1477,7 +1580,15 @@
     }
 
     try {
-      const qs = new URLSearchParams({ dg_clave: dg, da_clave: da, proy_clave: proyClave });
+      const qs = new URLSearchParams({ dg_clave: dg, da_clave: da, proy_clave: proyClave, id_proyecto: String(idProyecto) });
+
+      // Pasar mes_pago si ya está seleccionado; el backend usa el mes actual si no se envía
+      const mesPagoActual = String(get("mes_pago") || "").trim();
+      if (mesPagoActual) qs.set("mes_pago", mesPagoActual);
+
+      // Pasar ejercicio (usar 2026 como año del sistema)
+      qs.set("ejercicio", "2026");
+
       const data = await fetchJson(`${API}/api/catalogos/partidas-con-fuente?${qs}`, {
         headers: { ...authHeaders() },
       });
@@ -1520,6 +1631,7 @@
               <th style="width:40px;"></th>
               <th style="width:90px;">Partida</th>
               <th>Nombre de Partida</th>
+              ${esUsuarioL00117 ? '<th style="width:130px;">Saldo Disp.</th>' : ''}
             </tr></thead>
             <tbody>
       `;
@@ -1528,14 +1640,30 @@
         const checked = sel.checked ? "checked" : "";
         const importe = sel.importe != null ? sel.importe : "";
         const desc = sel.descripcion || "";
+        const semClass = getSemaforoClass(p.saldo_disponible, p.presupuesto_base);
+        const saldoTitle = esUsuarioL00117
+          ? `Saldo: ${formatMXN(p.saldo_disponible ?? 0)} / Base: ${formatMXN(p.presupuesto_base ?? 0)}`
+          : semClass === "verde" ? "Disponible" : semClass === "amarillo" ? "Disponibilidad limitada" : semClass === "rojo" ? "Sin disponibilidad" : "Sin datos";
         html += `
           <tr data-partida="${p.partida_clave}" data-fuente="${fk}" data-fuente-id="${g.id}" data-fuente-nombre="${g.nombre}">
             <td class="text-center align-middle">
               <input type="checkbox" class="form-check-input mp-check" ${checked}
                 data-clave="${p.partida_clave}" />
             </td>
-            <td class="align-middle small fw-semibold">${p.partida_clave}</td>
+            <td class="align-middle small fw-semibold">
+              <label style="display:flex;align-items:center;gap:4px;margin:0;cursor:pointer;">
+                <span class="sp-semaforo ${semClass}" title="${saldoTitle}"></span>
+                ${p.partida_clave}
+              </label>
+            </td>
             <td class="align-middle small">${p.partida_descripcion}</td>
+            ${esUsuarioL00117 ? `
+            <td class="align-middle small text-end">
+              <span class="${semClass === "rojo" ? "text-danger fw-bold" : semClass === "amarillo" ? "text-warning fw-semibold" : semClass === "gris" ? "text-muted" : "text-success"} fw-semibold">
+                ${formatMXN(p.saldo_disponible ?? 0)}
+              </span>
+            </td>
+            ` : ''}
           </tr>
         `;
       }
@@ -2263,7 +2391,13 @@
     const myDg = Number(user?.id_dgeneral);
     const myDa = Number(user?.id_dauxiliar);
 
+    // L00/117 puede ver y cargar suficiencias de cualquier DG/DA
+    const dgClave = String(user?.dgeneral_clave || "").trim().toUpperCase();
+    const daClave = String(user?.dauxiliar_clave || "").trim().toUpperCase();
+    const isL00117 = dgClave === "L00" && daClave === "117";
+
     if (
+      !isL00117 &&
       Number.isFinite(myDg) &&
       Number.isFinite(myDa) &&
       (Number(data.id_dgeneral) !== myDg || Number(data.id_dauxiliar) !== myDa)
@@ -2341,6 +2475,20 @@
     syncJustificacionToRows();
 
     attachMoneyInputs(detalleBody);
+
+    // Restaurar estado de checkboxes de impuestos para que refreshTotales calcule correctamente
+    const tipoImp = String(data.impuesto_tipo || "NONE").toUpperCase();
+    const chkIva = document.querySelector('[name="imp_iva"], #imp_iva');
+    const chkIsr = document.querySelector('[name="imp_isr"], #imp_isr');
+    const chkIeps = document.querySelector('[name="imp_ieps"], #imp_ieps');
+    if (chkIva && !chkIva.disabled) chkIva.checked = tipoImp === "IVA" || tipoImp === "MIXTO";
+    if (chkIsr && !chkIsr.disabled) chkIsr.checked = tipoImp === "ISR" || tipoImp === "MIXTO";
+    if (chkIeps && !chkIeps.disabled) chkIeps.checked = tipoImp === "IEPS" || tipoImp === "MIXTO";
+    const isrTasaEl = document.querySelector('[name="isr_tasa"], #isr_tasa');
+    if (isrTasaEl && data.isr_tasa != null) isrTasaEl.value = data.isr_tasa;
+    const iepsTasaEl = document.querySelector('[name="ieps_tasa"], #ieps_tasa');
+    if (iepsTasaEl && data.ieps_tasa != null) iepsTasaEl.value = data.ieps_tasa;
+
     refreshTotales();
     formatMoneyFields();
 
@@ -3095,7 +3243,7 @@
     const sizeDetalle = 9;
     const sizeTotales = 9;
     const sizeCantidadLetra = 9;
-    const sizeMeta = 15;
+    const sizeMeta = 18;
     const sizeFolios = 9;
 
     // CABECERA
@@ -3103,11 +3251,20 @@
       String(dgeneralInfo?.dependencia || "").trim() ||
       String(get("dependencia") || "").trim() ||
       String(getLoggedUser()?.dgeneral_nombre || "").trim();
+    // Auto-ajuste del tamaño de fuente según la longitud del nombre de dependencia
+    const depNameAutoSize = (() => {
+      const len = (depGeneralName || "").length;
+      if (len <= 22) return 17;
+      if (len <= 32) return 13;
+      if (len <= 42) return 10;
+      if (len <= 55) return 8;
+      return 7;
+    })();
     const wroteDep =
       setTextByPattern(
         ["dependencia", "general"],
         depGeneralName,
-        sizeDG,
+        depNameAutoSize,
         PDFLib?.TextAlignment?.Center,
       ) ||
       setTextMulti(
@@ -3120,16 +3277,23 @@
           "NOMBRE DE LA DEPENDENCIA GENERAL#1",
         ],
         depGeneralName,
-        sizeDG,
+        depNameAutoSize,
         PDFLib?.TextAlignment?.Center,
       );
+    const claveProgAutoSize = (() => {
+      const len = (payload.clave_programatica || "").length;
+      if (len <= 18) return 13;
+      if (len <= 25) return 11;
+      if (len <= 32) return 9;
+      return 7;
+    })();
     setTextMulti(
       [
         "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
         "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
       ],
       payload.clave_programatica || "",
-      sizeClaveProg,
+      claveProgAutoSize,
       PDFLib?.TextAlignment?.Center,
     );
     const claveProgDesc =
@@ -3193,18 +3357,54 @@
       fuenteDesc = rest.join(" - ").trim();
     }
 
-    setTextSafe(
-      "FUENTE DE FINANCIAMIENTO",
+    // Fuente de financiamiento: intentar múltiples nombres de campo
+    setTextMulti(
+      [
+        "FUENTE DE FINANCIAMIENTO",
+        "FUENTE DE FINANCIAMIENTO:",
+        "F.F",
+        "FUENTE",
+      ],
       fuenteClave || "",
       sizeFuenteClave,
       PDFLib?.TextAlignment?.Center,
-    );
-    setTextSafe(
-      "NOMBRE F.F",
+    ) ||
+      setTextByPattern(
+        ["fuente", "financiamiento"],
+        fuenteClave || "",
+        sizeFuenteClave,
+        PDFLib?.TextAlignment?.Center,
+      ) ||
+      setTextByPattern(
+        ["fuente"],
+        fuenteClave || "",
+        sizeFuenteClave,
+        PDFLib?.TextAlignment?.Center,
+      );
+    // Nombre F.F: intentar múltiples nombres de campo
+    setTextMulti(
+      [
+        "NOMBRE F.F",
+        "NOMBRE F.F:",
+        "NOMBRE DE LA FUENTE",
+        "NOMBRE FUENTE",
+      ],
       fuenteDesc || fuenteText || "",
       sizeFuenteNombre,
       PDFLib?.TextAlignment?.Center,
-    );
+    ) ||
+      setTextByPattern(
+        ["nombre", "f.f"],
+        fuenteDesc || fuenteText || "",
+        sizeFuenteNombre,
+        PDFLib?.TextAlignment?.Center,
+      ) ||
+      setTextByPattern(
+        ["nombre", "fuente"],
+        fuenteDesc || fuenteText || "",
+        sizeFuenteNombre,
+        PDFLib?.TextAlignment?.Center,
+      );
 
     const { d, m, y } = splitFechaParts(payload.fecha);
     setTextSafe("fechadia", d, sizeFecha);
@@ -3319,7 +3519,18 @@
       payload.cantidad_con_letra || "",
       sizeCantidadLetra,
     );
-    setTextSafe("Meta", payload.meta || "", sizeMeta);
+    try {
+      const metaField = form.getTextField("Meta");
+      metaField.setFontSize(sizeMeta);
+      metaField.setAlignment(PDFLib?.TextAlignment?.Center);
+      metaField.enableMultiline();
+      // Simular centrado vertical con salto de línea inicial
+      const metaText = payload.meta || "";
+      metaField.setText(metaText ? "\n" + metaText : "");
+      touchedFields.add("Meta");
+    } catch {
+      setTextSafe("Meta", payload.meta || "", sizeMeta, PDFLib?.TextAlignment?.Center);
+    }
 
     try {
       const UNIFORM_SIZE = 9;
@@ -3687,6 +3898,17 @@
           await applyFuenteFilters();
         }
       });
+
+    // Recargar partidas al cambiar el mes de pago (el saldo se calcula por mes)
+    const elMesPago = document.querySelector('[name="mes_pago"]') || document.getElementById("mes_pago");
+    if (elMesPago) {
+      elMesPago.addEventListener("change", async () => {
+        if (partidasConFuente.length > 0) {
+          await cargarPartidasConFuente();
+          renderListaPartidasModal();
+        }
+      });
+    }
 
     metaSelect?.addEventListener("change", () => {
       const id = String(metaSelect.value || "").trim();
