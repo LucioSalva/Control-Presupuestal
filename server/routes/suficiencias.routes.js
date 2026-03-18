@@ -951,15 +951,11 @@ router.get("/:id", async (req, res) => {
       }
     }
 
-    // 1) Cabecera — JOIN con suficiencias para traer todos los campos financieros y de texto
+    // 1) Cabecera — JOIN solo para agregar firma_* que no están en la vista
     const rHead = await query(
       `SELECT v.*,
-         s.dependencia, s.departamento, s.fuente, s.mes_pago, s.clave_programatica,
-         s.meta, s.impuesto_tipo, s.isr_tasa, s.ieps_tasa,
-         s.subtotal, s.iva, s.isr, s.ieps, s.total, s.cantidad_con_letra,
          s.firma_enlace_label, s.firma_enlace_nombre, s.firma_area_label,
-         s.firma_area_nombre, s.firma_direccion_nombre, s.cancel_reason,
-         s.id_proyecto, s.id_fuente
+         s.firma_area_nombre, s.firma_direccion_nombre
        FROM v_suficiencias_estado v
        JOIN suficiencias s ON s.id = v.id
        WHERE ${where.join(" AND ")}

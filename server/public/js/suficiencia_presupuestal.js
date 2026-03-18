@@ -771,7 +771,8 @@
           <input type="text"
             class="form-control form-control-sm text-end sp-importe"
             name="r${i}_importe"
-            value="$ 0.00"
+            value=""
+            placeholder="0.00"
             inputmode="decimal"
             autocomplete="off">
           <small class="sp-saldo-badge d-none mt-1" style="font-size:0.7em; display:block!important;"></small>
@@ -1632,6 +1633,8 @@
               <th style="width:90px;">Partida</th>
               <th>Nombre de Partida</th>
               ${esUsuarioL00117 ? '<th style="width:130px;">Saldo Disp.</th>' : ''}
+              <th style="width:130px;">Importe</th>
+              <th style="width:200px;">Descripción</th>
             </tr></thead>
             <tbody>
       `;
@@ -1664,6 +1667,18 @@
               </span>
             </td>
             ` : ''}
+            <td class="align-middle">
+              <input type="number" class="form-control form-control-sm mp-importe" min="0" step="0.01"
+                data-clave="${p.partida_clave}"
+                value="${importe}"
+                placeholder="0.00" style="width:110px;" />
+            </td>
+            <td class="align-middle">
+              <input type="text" class="form-control form-control-sm mp-descripcion"
+                data-clave="${p.partida_clave}"
+                value="${desc}"
+                placeholder="Descripción" style="min-width:160px;" />
+            </td>
           </tr>
         `;
       }
@@ -1682,13 +1697,26 @@
     container.querySelectorAll(".mp-check").forEach((chk) => {
       chk.addEventListener("change", () => {
         const clave = chk.dataset.clave;
-        if (chk.checked) {
-          if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-          seleccionPartidasModal[clave].checked = true;
-        } else {
-          if (seleccionPartidasModal[clave]) seleccionPartidasModal[clave].checked = false;
-        }
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].checked = chk.checked;
         actualizarResumenModal();
+      });
+    });
+
+    container.querySelectorAll(".mp-importe").forEach((inp) => {
+      inp.addEventListener("input", () => {
+        const clave = inp.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        const v = parseFloat(inp.value);
+        seleccionPartidasModal[clave].importe = Number.isFinite(v) ? v : 0;
+      });
+    });
+
+    container.querySelectorAll(".mp-descripcion").forEach((inp) => {
+      inp.addEventListener("input", () => {
+        const clave = inp.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].descripcion = inp.value.trim();
       });
     });
   }
@@ -1699,7 +1727,7 @@
     if (resEl) resEl.textContent = total ? `${total} partida(s) seleccionada(s)` : "Ninguna partida seleccionada";
   }
 
-  function confirmarSeleccionPartidas() {
+  async function confirmarSeleccionPartidas() {
     // Sincronizar estado del modal al state
     const container = document.getElementById("lista-partidas-modal");
     if (container) {
@@ -1707,6 +1735,17 @@
         const clave = chk.dataset.clave;
         if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
         seleccionPartidasModal[clave].checked = chk.checked;
+      });
+      container.querySelectorAll(".mp-importe").forEach((inp) => {
+        const clave = inp.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        const v = parseFloat(inp.value);
+        seleccionPartidasModal[clave].importe = Number.isFinite(v) ? v : 0;
+      });
+      container.querySelectorAll(".mp-descripcion").forEach((inp) => {
+        const clave = inp.dataset.clave;
+        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
+        seleccionPartidasModal[clave].descripcion = inp.value.trim();
       });
     }
 
@@ -1730,6 +1769,24 @@
         importe: sel.importe || 0,
         descripcion: sel.descripcion || "",
       });
+    }
+
+    // Advertir si alguna partida seleccionada tiene importe 0
+    const sinImporte = Object.entries(seleccionPartidasModal)
+      .filter(([, s]) => s.checked && !(s.importe > 0))
+      .map(([clave]) => clave);
+    if (sinImporte.length > 0) {
+      const lista = sinImporte.join(", ");
+      const continuar = await Swal.fire({
+        icon: "warning",
+        title: "Importes en cero",
+        html: `Las siguientes partidas tienen importe <strong>$0.00</strong>:<br><code>${lista}</code><br><br>¿Deseas continuar de todas formas?`,
+        showCancelButton: true,
+        confirmButtonText: "Continuar",
+        cancelButtonText: "Regresar a editar",
+        confirmButtonColor: "#BC955C",
+      });
+      if (!continuar.isConfirmed) return;
     }
 
     actualizarResumenPartidasPanel();
@@ -1763,12 +1820,13 @@
         <div class="border rounded p-2 mb-2 bg-light">
           <div class="fw-semibold small mb-1">F.F. ${fk} — ${g.fuente_nombre}</div>
           <table class="table table-sm table-bordered mb-0 bg-white">
-            <thead><tr><th>Partida</th><th>Nombre de Partida</th></tr></thead>
+            <thead><tr><th>Partida</th><th>Nombre de Partida</th><th class="text-end">Importe</th></tr></thead>
             <tbody>
               ${g.partidas.map((p) => `
                 <tr>
                   <td class="small">${p.partida_clave}</td>
                   <td class="small">${p.concepto_partida}</td>
+                  <td class="small text-end ${p.importe > 0 ? "text-success fw-semibold" : "text-danger"}">${formatMXN(p.importe ?? 0)}</td>
                 </tr>
               `).join("")}
             </tbody>
@@ -1824,15 +1882,23 @@
     const suficiencias = [];
     const rolesActuales = getRolesStore();
 
+    // Los renglones del DOM (r1_importe, r2_importe…) son la fuente de verdad,
+    // ya que actualizarDetalleBodyDesdeSel() los pobló desde gruposPorFuente
+    // y el usuario puede haberlos editado después.
+    let renglonDom = 1;
+
     for (const g of Object.values(gruposPorFuente)) {
-      const detalle = g.partidas.map((p, idx) => ({
-        renglon: idx + 1,
-        clave: p.partida_clave,
-        concepto_partida: p.concepto_partida,
-        justificacion: justGeneral,
-        descripcion: p.descripcion,
-        importe: p.importe,
-      }));
+      const detalle = g.partidas.map((p) => {
+        const r = renglonDom++;
+        return {
+          renglon: r,
+          clave: p.partida_clave,
+          concepto_partida: p.concepto_partida,
+          justificacion: justGeneral,
+          descripcion: get(`r${r}_descripcion`) || p.descripcion || "",
+          importe: moneyParse(get(`r${r}_importe`)) || p.importe || 0,
+        };
+      });
 
       const subtotal = detalle.reduce((acc, d) => acc + (d.importe || 0), 0);
       const usaIva = useIVA();
@@ -2490,6 +2556,16 @@
     if (iepsTasaEl && data.ieps_tasa != null) iepsTasaEl.value = data.ieps_tasa;
 
     refreshTotales();
+
+    // Los valores exactos de la BD siempre tienen precedencia sobre el recálculo local
+    setVal("subtotal", moneyFormat(safeNumber(data.subtotal)));
+    setVal("iva", moneyFormat(safeNumber(data.iva)));
+    setVal("isr", moneyFormat(safeNumber(data.isr)));
+    setVal("ieps", moneyFormat(safeNumber(data.ieps)));
+    setVal("pension_total", moneyFormat(safeNumber(data.pension_total)));
+    setVal("total", moneyFormat(safeNumber(data.total)));
+    setVal("cantidad_pago", moneyFormat(safeNumber(data.total)));
+    setVal("cantidad_con_letra", data.cantidad_con_letra || "");
     formatMoneyFields();
 
     lastSavedId = Number(data.id);
@@ -3941,8 +4017,8 @@
     // Botón confirmar en modal de partidas
     const btnConfirmarPartidas = document.getElementById("btn-confirmar-partidas");
     if (btnConfirmarPartidas) {
-      btnConfirmarPartidas.addEventListener("click", () => {
-        confirmarSeleccionPartidas();
+      btnConfirmarPartidas.addEventListener("click", async () => {
+        await confirmarSeleccionPartidas();
       });
     }
 

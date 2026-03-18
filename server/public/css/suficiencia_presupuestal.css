@@ -19,7 +19,7 @@ body {
 
 img,
 svg {
-  max-width: 100%;
+  max-width: 1100%;
   height: auto;
 }
 
@@ -36,14 +36,13 @@ svg {
 }
 
 .form-title {
-  text-align: center;
-  font-weight: 700;
   text-transform: uppercase;
 }
 
-.sub-title {
+.form-title, .sub-title{
   text-align: center;
   font-weight: 700;
+  margin-left: 100px;
 }
 
 /* ======================================================
