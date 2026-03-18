@@ -1760,13 +1760,12 @@
         <div class="border rounded p-2 mb-2 bg-light">
           <div class="fw-semibold small mb-1">F.F. ${fk} — ${g.fuente_nombre}</div>
           <table class="table table-sm table-bordered mb-0 bg-white">
-            <thead><tr><th>Partida</th><th>Nombre de Partida</th><th class="text-end">Importe</th></tr></thead>
+            <thead><tr><th>Partida</th><th>Nombre de Partida</th></tr></thead>
             <tbody>
               ${g.partidas.map((p) => `
                 <tr>
                   <td class="small">${p.partida_clave}</td>
                   <td class="small">${p.concepto_partida}</td>
-                  <td class="small text-end ${p.importe > 0 ? "text-success fw-semibold" : "text-danger"}">${formatMXN(p.importe ?? 0)}</td>
                 </tr>
               `).join("")}
             </tbody>
