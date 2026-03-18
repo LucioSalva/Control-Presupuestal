@@ -50,7 +50,7 @@ svg {
    ====================================================== */
 .doc-header {
   display: grid;
-  grid-template-columns: 90px 1fr 160px;
+  grid-template-columns: 90px 1fr 195px;
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
@@ -403,7 +403,7 @@ svg {
    ====================================================== */
 @media (min-width: 480px) and (max-width: 960px) {
   .doc-header {
-    grid-template-columns: 70px 1fr 130px;
+    grid-template-columns: 70px 1fr 160px;
     gap: 8px;
   }
 
@@ -589,7 +589,7 @@ svg {
   }
 
   .doc-header {
-    grid-template-columns: 70px 1fr 130px;
+    grid-template-columns: 70px 1fr 160px;
   }
 }
 

@@ -744,12 +744,13 @@
         </td>
 
         <td style="width: 12%;">
-          <div style="display:flex;align-items:center;gap:4px;">
-            <span class="sp-semaforo sp-row-semaforo gris" title="Sin partida seleccionada"></span>
-            <select class="form-select form-select-sm sp-clave" name="r${i}_clave">
-              ${buildPartidasOptionsHtml("")}
-            </select>
-          </div>
+          ${esUsuarioL00117
+            ? `<select class="form-select form-select-sm sp-clave" name="r${i}_clave">
+                 ${buildPartidasOptionsHtml("")}
+               </select>`
+            : `<input type="text" class="form-control form-control-sm cp-readonly text-center fw-semibold"
+                 name="r${i}_clave" readonly>`
+          }
         </td>
 
         <td style="width: 20%;">
@@ -1633,16 +1634,12 @@
               <th style="width:90px;">Partida</th>
               <th>Nombre de Partida</th>
               ${esUsuarioL00117 ? '<th style="width:130px;">Saldo Disp.</th>' : ''}
-              <th style="width:130px;">Importe</th>
-              <th style="width:200px;">Descripción</th>
             </tr></thead>
             <tbody>
       `;
       for (const p of g.partidas) {
         const sel = seleccionPartidasModal[p.partida_clave] || {};
         const checked = sel.checked ? "checked" : "";
-        const importe = sel.importe != null ? sel.importe : "";
-        const desc = sel.descripcion || "";
         const semClass = getSemaforoClass(p.saldo_disponible, p.presupuesto_base);
         const saldoTitle = esUsuarioL00117
           ? `Saldo: ${formatMXN(p.saldo_disponible ?? 0)} / Base: ${formatMXN(p.presupuesto_base ?? 0)}`
@@ -1667,18 +1664,6 @@
               </span>
             </td>
             ` : ''}
-            <td class="align-middle">
-              <input type="number" class="form-control form-control-sm mp-importe" min="0" step="0.01"
-                data-clave="${p.partida_clave}"
-                value="${importe}"
-                placeholder="0.00" style="width:110px;" />
-            </td>
-            <td class="align-middle">
-              <input type="text" class="form-control form-control-sm mp-descripcion"
-                data-clave="${p.partida_clave}"
-                value="${desc}"
-                placeholder="Descripción" style="min-width:160px;" />
-            </td>
           </tr>
         `;
       }
@@ -1703,22 +1688,6 @@
       });
     });
 
-    container.querySelectorAll(".mp-importe").forEach((inp) => {
-      inp.addEventListener("input", () => {
-        const clave = inp.dataset.clave;
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        const v = parseFloat(inp.value);
-        seleccionPartidasModal[clave].importe = Number.isFinite(v) ? v : 0;
-      });
-    });
-
-    container.querySelectorAll(".mp-descripcion").forEach((inp) => {
-      inp.addEventListener("input", () => {
-        const clave = inp.dataset.clave;
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        seleccionPartidasModal[clave].descripcion = inp.value.trim();
-      });
-    });
   }
 
   function actualizarResumenModal() {
@@ -1727,7 +1696,7 @@
     if (resEl) resEl.textContent = total ? `${total} partida(s) seleccionada(s)` : "Ninguna partida seleccionada";
   }
 
-  async function confirmarSeleccionPartidas() {
+  function confirmarSeleccionPartidas() {
     // Sincronizar estado del modal al state
     const container = document.getElementById("lista-partidas-modal");
     if (container) {
@@ -1735,17 +1704,6 @@
         const clave = chk.dataset.clave;
         if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
         seleccionPartidasModal[clave].checked = chk.checked;
-      });
-      container.querySelectorAll(".mp-importe").forEach((inp) => {
-        const clave = inp.dataset.clave;
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        const v = parseFloat(inp.value);
-        seleccionPartidasModal[clave].importe = Number.isFinite(v) ? v : 0;
-      });
-      container.querySelectorAll(".mp-descripcion").forEach((inp) => {
-        const clave = inp.dataset.clave;
-        if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
-        seleccionPartidasModal[clave].descripcion = inp.value.trim();
       });
     }
 
@@ -1769,24 +1727,6 @@
         importe: sel.importe || 0,
         descripcion: sel.descripcion || "",
       });
-    }
-
-    // Advertir si alguna partida seleccionada tiene importe 0
-    const sinImporte = Object.entries(seleccionPartidasModal)
-      .filter(([, s]) => s.checked && !(s.importe > 0))
-      .map(([clave]) => clave);
-    if (sinImporte.length > 0) {
-      const lista = sinImporte.join(", ");
-      const continuar = await Swal.fire({
-        icon: "warning",
-        title: "Importes en cero",
-        html: `Las siguientes partidas tienen importe <strong>$0.00</strong>:<br><code>${lista}</code><br><br>¿Deseas continuar de todas formas?`,
-        showCancelButton: true,
-        confirmButtonText: "Continuar",
-        cancelButtonText: "Regresar a editar",
-        confirmButtonColor: "#BC955C",
-      });
-      if (!continuar.isConfirmed) return;
     }
 
     actualizarResumenPartidasPanel();
@@ -1844,17 +1784,7 @@
     for (const g of Object.values(gruposPorFuente)) {
       for (const p of g.partidas) {
         detalleBody.insertAdjacentHTML("beforeend", rowTemplate(renglon));
-        const sel = document.querySelector(`[name="r${renglon}_clave"]`);
-        if (sel) {
-          // Agregar opción si no existe
-          if (![...sel.options].some((o) => o.value === p.partida_clave)) {
-            const opt = document.createElement("option");
-            opt.value = p.partida_clave;
-            opt.textContent = `${p.partida_clave} - ${p.concepto_partida}`;
-            sel.appendChild(opt);
-          }
-          sel.value = p.partida_clave;
-        }
+        setVal(`r${renglon}_clave`, p.partida_clave);
         setVal(`r${renglon}_concepto`, p.concepto_partida);
         setVal(`r${renglon}_descripcion`, p.descripcion);
         setVal(`r${renglon}_importe`, moneyFormat(p.importe));
@@ -2512,12 +2442,14 @@
         const sel = document.querySelector(`[name="r${i}_clave"]`);
         const clave = String(row.clave || "").trim();
         if (sel) {
-          sel.innerHTML = buildPartidasOptionsHtml(clave);
-          if (clave && ![...sel.options].some((o) => o.value === clave)) {
-            const opt = document.createElement("option");
-            opt.value = clave;
-            opt.textContent = `${clave} - (NO DISPONIBLE)`;
-            sel.appendChild(opt);
+          if (sel.tagName === "SELECT") {
+            sel.innerHTML = buildPartidasOptionsHtml(clave);
+            if (clave && ![...sel.options].some((o) => o.value === clave)) {
+              const opt = document.createElement("option");
+              opt.value = clave;
+              opt.textContent = `${clave} - (NO DISPONIBLE)`;
+              sel.appendChild(opt);
+            }
           }
           sel.value = clave || "";
         }
@@ -4017,8 +3949,8 @@
     // Botón confirmar en modal de partidas
     const btnConfirmarPartidas = document.getElementById("btn-confirmar-partidas");
     if (btnConfirmarPartidas) {
-      btnConfirmarPartidas.addEventListener("click", async () => {
-        await confirmarSeleccionPartidas();
+      btnConfirmarPartidas.addEventListener("click", () => {
+        confirmarSeleccionPartidas();
       });
     }
 

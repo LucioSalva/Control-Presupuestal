@@ -388,7 +388,7 @@ router.post("/lote", async (req, res) => {
 
       creadas.push({
         id: idSuf,
-        no_suficiencia: noSuficiencia,
+        no_suficiencia: rHead.rows[0].no_suficiencia || noSuficiencia,
         fuente_clave: suf.fuente_clave ?? null,
         fuente_nombre: suf.fuente ?? null,
         total,
