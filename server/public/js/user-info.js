@@ -1,0 +1,179 @@
+﻿/**
+ * ================================================================
+ *  CONTROL PRESUPUESTAL MUNICIPAL
+ *  Humberto Salvador Ruiz Lucio
+ * ================================================================
+ *  Módulo: Información de Usuario
+ *  Archivo: user-info.js
+ *
+ *  © 2025–2026 Humberto Salvador Ruiz Lucio.
+ *  Todos los derechos reservados.
+ *
+ *  AVISO LEGAL: Este software es propiedad exclusiva del
+ *  Humberto Salvador Ruiz Lucio. Su reproducción,
+ *  distribución o modificación sin autorización escrita previa
+ *  del titular queda estrictamente prohibida y será perseguida
+ *  conforme a las leyes aplicables en los Estados Unidos Mexicanos.
+ *
+ *  Software de uso interno exclusivo. No compartir.
+ * ================================================================
+ */
+// js/user-info.js
+
+document.addEventListener("DOMContentLoaded", () => {
+  const userRaw = localStorage.getItem("cp_usuario");
+  const token = localStorage.getItem("cp_token");
+
+  if (!userRaw || !token) {
+    window.location.replace("login.html");
+    return;
+  }
+
+  let user = null;
+  try {
+    user = JSON.parse(userRaw);
+  } catch {
+    window.location.replace("login.html");
+    return;
+  }
+
+  const info = document.getElementById("userInfo");
+  const btnLogout = document.getElementById("btnLogout");
+
+  const nombre = user?.nombre_completo || user?.usuario || "Usuario";
+
+  if (!localStorage.getItem("cp_login_time")) {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    localStorage.setItem("cp_login_time", `${hh}:${mm}`);
+  }
+
+  const loginTime = localStorage.getItem("cp_login_time") || "--:--";
+  if (info) {
+    info.textContent = `${nombre} - Ultimo Acceso: ${loginTime}`;
+  }
+
+  const partidasLinks = document.querySelectorAll('a[href="partidas_base.html"]');
+  const setPartidasVisible = (visible) => {
+    partidasLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+  };
+  setPartidasVisible(false);
+  const dashboardLinks = document.querySelectorAll(
+    'a[href="dashboard_partidas.html"]',
+  );
+  const graficaLinks = document.querySelectorAll(
+    'a[href="dashboard_partidas_grafica.html"]',
+  );
+  const historialLinks = document.querySelectorAll(
+    'a[href="suficiencia_historial.html"]',
+  );
+  const setDashboardVisible = (visible) => {
+    dashboardLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+    graficaLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+    historialLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+  };
+  setDashboardVisible(false);
+  const expLinks = document.querySelectorAll('a[href="expedientes_entrega.html"]');
+  const setExpVisible = (visible) => {
+    expLinks.forEach((link) => {
+      const item = link.closest("li") || link;
+      if (visible) item.classList.remove("d-none");
+      else item.classList.add("d-none");
+    });
+  };
+  setExpVisible(false);
+
+  async function resolveClaveFromCatalog(path, id) {
+    if (!Number.isFinite(id) || id <= 0) return "";
+    try {
+      const res = await fetch(path, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return "";
+      const rows = await res.json();
+      const found = Array.isArray(rows)
+        ? rows.find((x) => Number(x?.id) === id)
+        : null;
+      return String(found?.clave || "").trim().toUpperCase();
+    } catch {
+      return "";
+    }
+  }
+
+  (async () => {
+    let dgClave = String(user?.dgeneral_clave || "").trim().toUpperCase();
+    let daClave = String(user?.dauxiliar_clave || "").trim().toUpperCase();
+
+    // Sesiones viejas pueden no traer *_clave en cp_usuario.
+    if (!dgClave && Number.isFinite(Number(user?.id_dgeneral))) {
+      dgClave = await resolveClaveFromCatalog(
+        "/api/catalogos/dgeneral",
+        Number(user.id_dgeneral),
+      );
+    }
+    if (!daClave && Number.isFinite(Number(user?.id_dauxiliar))) {
+      daClave = await resolveClaveFromCatalog(
+        "/api/catalogos/dauxiliar",
+        Number(user.id_dauxiliar),
+      );
+    }
+
+    const canViewPartidas =
+      (dgClave === "L00" && daClave === "117") || dgClave === "E00";
+    setPartidasVisible(canViewPartidas);
+    setDashboardVisible(canViewPartidas);
+    const canViewExp =
+      (dgClave === "L00" && daClave === "117") || dgClave === "E00";
+    setExpVisible(canViewExp);
+  })();
+
+  if (btnLogout) {
+    btnLogout.addEventListener("click", async () => {
+      const apiBase = (
+        window.API_URL ||
+        ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+        window.location.port &&
+        window.location.port !== "3000"
+          ? "http://localhost:3000"
+          : window.location.origin) ||
+        "http://localhost:3000"
+      ).replace(/\/$/, "");
+
+      try {
+        await fetch(`${apiBase}/api/logout`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      } catch {}
+
+      localStorage.removeItem("cp_usuario");
+      localStorage.removeItem("cp_token");
+      localStorage.removeItem("cp_login_time");
+      localStorage.removeItem("cp_current_project");
+      localStorage.removeItem("token");
+      localStorage.removeItem("authToken");
+      sessionStorage.removeItem("cp_usuario");
+      sessionStorage.removeItem("cp_token");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("authToken");
+      window.location.replace("login.html");
+    });
+  }
+});

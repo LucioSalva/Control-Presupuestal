@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root {
+      visibility: hidden;
+    }
+  </style>
+
+  <script>
+    (function () {
+      try {
+        const u = localStorage.getItem("cp_usuario");
+        const t = localStorage.getItem("cp_token");
+
+        if (!u || !t) {
+          window.location.replace("login.html");
+          return;
+        }
+
+        document.documentElement.style.visibility = "visible";
+      } catch (e) {
+        document.documentElement.style.visibility = "visible";
+      }
+    })();
+  </script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Control de Presupuesto</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/navbar.css">
+
+  <style>
+    /* ===================================================
+       INDEX — Estilos específicos de la página principal
+       =================================================== */
+
+    /* KPI cards */
+    .index-kpi-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 88px;
+      transition: box-shadow 0.2s ease;
+    }
+
+    .index-kpi-card:hover {
+      box-shadow: 0 4px 18px rgba(105, 28, 50, 0.12);
+    }
+
+    .index-kpi-card .kpi-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #6c757d;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
+    }
+
+    .index-kpi-card .kpi-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #2b2b2b;
+      line-height: 1.2;
+    }
+
+    .index-kpi-card .kpi-icon {
+      font-size: 2rem;
+      opacity: 0.18;
+      color: #691c32;
+    }
+
+    /* Cards del layout principal */
+    .index-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+    }
+
+    .index-card .index-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 14px 16px 10px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .index-card .index-card-header h6 {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #2b2b2b;
+    }
+
+    .index-card .index-card-body {
+      padding: 14px 16px;
+    }
+
+    /* Tabla principal de presupuesto */
+    .index-card .table thead th {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      background-color: #691c32;
+      color: #ffffff;
+      border-bottom: none;
+      padding: 9px 12px;
+      white-space: nowrap;
+    }
+
+    .index-card .table tbody td {
+      font-size: 0.78rem;
+      vertical-align: middle;
+      padding: 8px 12px;
+      border-color: #f0f0f0;
+    }
+
+    .index-card .table tbody tr:hover {
+      background-color: rgba(105, 28, 50, 0.04);
+    }
+
+    /* Card del gráfico — fondo oscuro */
+    .chart-card {
+      background: #1c1c2e;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .chart-card .chart-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .chart-card .chart-card-header h6 {
+      color: #ffffff;
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .chart-card .chart-card-header .text-muted-2 {
+      color: rgba(255, 255, 255, 0.55) !important;
+    }
+
+    .chart-card .chart-card-body {
+      padding: 14px 16px;
+    }
+
+    /* Formulario lateral */
+    .form-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+    }
+
+    .form-card .form-card-header {
+      background: #691c32;
+      color: #ffffff;
+      border-radius: 12px 12px 0 0;
+      padding: 12px 16px;
+    }
+
+    .form-card .form-card-header h6 {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .form-card .form-card-body {
+      padding: 14px 16px;
+    }
+
+    .form-card .form-control,
+    .form-card .form-select {
+      border-radius: 7px;
+      border-color: #d0d5dc;
+      font-size: 0.8rem;
+    }
+
+    .form-card .form-control:focus,
+    .form-card .form-select:focus {
+      border-color: #691c32;
+      box-shadow: 0 0 0 0.2rem rgba(105, 28, 50, 0.18);
+    }
+
+    .form-card label.form-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 4px;
+    }
+
+    /* Alerta soft dentro de la card oscura */
+    .alert-soft {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      font-size: 0.78rem;
+    }
+
+    /* Zona de alertas superior */
+    #alert-zone .alert {
+      border-radius: 10px;
+      border: none;
+      font-size: 0.8rem;
+    }
+
+    /* ===================================================
+       RESPONSIVE — BREAKPOINTS OBLIGATORIOS
+       =================================================== */
+
+    /* MOBILE: 320–480px */
+    @media (max-width: 480px) {
+      .index-kpi-card {
+        padding: 12px 14px;
+        min-height: 76px;
+      }
+
+      .index-kpi-card .kpi-value {
+        font-size: 1rem;
+      }
+
+      .index-kpi-card .kpi-icon {
+        font-size: 1.5rem;
+      }
+
+      .index-card .index-card-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .index-card .index-card-header .d-flex {
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .index-card .index-card-header .d-flex .form-control,
+      .index-card .index-card-header .d-flex .btn {
+        width: 100%;
+      }
+
+      .chart-card .chart-card-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+
+    /* TABLET: 480–960px */
+    @media (min-width: 480px) and (max-width: 960px) {
+      .index-kpi-card .kpi-value {
+        font-size: 1.1rem;
+      }
+    }
+
+    /* DESKTOP: 960–1328px */
+    @media (min-width: 960px) and (max-width: 1328px) {
+      .index-kpi-card .kpi-value {
+        font-size: 1.15rem;
+      }
+    }
+
+    /* WIDESCREEN: >1328px */
+    @media (min-width: 1328px) {
+      .index-kpi-card {
+        min-height: 96px;
+      }
+
+      .index-kpi-card .kpi-value {
+        font-size: 1.3rem;
+      }
+
+      .index-kpi-card .kpi-icon {
+        font-size: 2.4rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="cp-navbar"></div>
+
+  <main class="container py-4">
+    <div id="alert-zone"></div>
+
+    <!-- ===================================================
+         KPIs
+         =================================================== -->
+    <div class="row g-3 mb-4" id="kpi-row">
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">Presupuesto total</div>
+            <div id="kpi-presupuesto" class="kpi-value">—</div>
+          </div>
+          <i class="bi bi-cash-coin kpi-icon"></i>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">Gastado</div>
+            <div id="kpi-gastado" class="kpi-value">—</div>
+          </div>
+          <i class="bi bi-graph-down-arrow kpi-icon"></i>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">Saldo disponible</div>
+            <div id="kpi-saldo" class="kpi-value">—</div>
+          </div>
+          <i class="bi bi-wallet2 kpi-icon"></i>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="index-kpi-card">
+          <div>
+            <div class="kpi-label">% ejercido</div>
+            <div id="kpi-porc" class="kpi-value">—</div>
+          </div>
+          <i class="bi bi-speedometer2 kpi-icon"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================
+         LAYOUT PRINCIPAL: Formulario | Tablas + Gráfico
+         =================================================== -->
+    <div class="row g-3">
+
+      <!-- Columna izquierda: Formulario de partidas -->
+      <div class="col-12 col-lg-4">
+        <div class="form-card mb-3">
+          <div class="form-card-header">
+            <h6><i class="bi bi-plus-circle me-2"></i>Partidas / Presupuesto</h6>
+          </div>
+          <div class="form-card-body">
+            <form id="form-partida" class="row g-2">
+              <div class="col-4">
+                <label class="form-label">Partida</label>
+                <input type="text" class="form-control form-control-sm" id="p-partida"
+                  placeholder="Clave" required>
+              </div>
+              <div class="col-8">
+                <label class="form-label">Presupuesto</label>
+                <input type="number" step="0.01" class="form-control form-control-sm"
+                  id="p-monto" placeholder="Monto" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Mes</label>
+                <input type="month" class="form-control form-control-sm" id="p-mes" required>
+              </div>
+              <div class="col-12 d-grid mt-1">
+                <button class="btn btn-success btn-sm" type="submit">
+                  <i class="bi bi-plus-circle me-1"></i>Agregar / Actualizar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Formulario de gastos (oculto por JS, no se modifica) -->
+        <div class="form-card mb-3 d-none">
+          <div class="form-card-header">
+            <h6><i class="bi bi-receipt me-2"></i>Gastos</h6>
+          </div>
+          <div class="form-card-body">
+            <form id="form-gasto" class="row g-2">
+              <div class="col-5">
+                <label class="form-label">Fecha</label>
+                <input type="date" class="form-control form-control-sm" id="g-fecha" required>
+              </div>
+              <div class="col-7">
+                <label class="form-label">Descripción</label>
+                <input type="text" class="form-control form-control-sm" id="g-desc"
+                  placeholder="Ej. Compra de equipo" required>
+              </div>
+              <div class="col-5">
+                <label class="form-label">Partida</label>
+                <input type="text" class="form-control form-control-sm" id="g-partida" placeholder="Partida">
+              </div>
+              <div class="col-7">
+                <label class="form-label">Monto</label>
+                <input type="number" step="0.01" class="form-control form-control-sm"
+                  id="g-monto" placeholder="Monto" required>
+              </div>
+              <div class="col-12 d-grid mt-1">
+                <button class="btn btn-success btn-sm" type="submit">
+                  <i class="bi bi-plus-circle me-1"></i>Agregar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna derecha: Tablas y gráfico -->
+      <div class="col-12 col-lg-8">
+
+        <!-- Tabla presupuesto por partida -->
+        <div class="index-card mb-3">
+          <div class="index-card-header">
+            <h6><i class="bi bi-table me-2" style="color:#691c32;"></i>Presupuesto por Partida</h6>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input id="f-partida" type="text"
+                class="form-control form-control-sm"
+                style="max-width:130px;"
+                placeholder="Filtrar partida">
+              <input id="f-buscar" type="text"
+                class="form-control form-control-sm"
+                style="max-width:130px;"
+                placeholder="Buscar">
+              <div class="btn-group btn-group-sm">
+                <button id="btn-aplicar" class="btn btn-primary">
+                  <i class="bi bi-funnel me-1"></i>Filtrar
+                </button>
+                <button id="btn-limpiar" class="btn btn-outline-secondary">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="index-card-body p-0">
+            <div class="table-responsive" style="max-height:380px;">
+              <table class="table table-sm align-middle mb-0" id="tabla-presupuesto">
+                <thead>
+                  <tr>
+                    <th>Partida</th>
+                    <th class="text-end">Presupuesto</th>
+                    <th class="text-end">Gastado</th>
+                    <th class="text-end">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráfico -->
+        <div class="chart-card mb-3">
+          <div class="chart-card-header">
+            <h6><i class="bi bi-bar-chart-line me-2"></i>Indicadores</h6>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+              <small class="text-muted-2">Agrupar por</small>
+              <select id="chart-group" class="form-select form-select-sm w-auto"
+                style="background-color:#2c2c40; color:#fff; border-color:rgba(255,255,255,0.2);">
+                <option value="mes" selected>Mes</option>
+                <option value="partida">Partida</option>
+                <option value="global">Global</option>
+              </select>
+              <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="checkbox" id="chart-stacked">
+                <label class="form-check-label text-white-50 small" for="chart-stacked">Apilar</label>
+              </div>
+            </div>
+          </div>
+          <div class="chart-card-body">
+            <canvas id="chart-mensual" height="120"></canvas>
+
+            <div class="alert alert-soft mt-3" id="missing-alert" style="display:none;">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <i class="bi bi-exclamation-triangle me-1"></i>
+                  <strong id="missing-count">0</strong> gastos sin Partida
+                </div>
+                <div class="btn-group btn-group-sm">
+                  <button id="btn-ver-missing" class="btn btn-outline-info btn-sm">Ver</button>
+                  <button id="btn-export-missing" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-download me-1"></i>CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Movimientos -->
+        <div class="index-card">
+          <div class="index-card-header">
+            <h6>
+              <i class="bi bi-arrow-left-right me-2" style="color:#691c32;"></i>
+              Movimientos (Gastos y Reconducciones)
+            </h6>
+            <small class="text-muted">Origen &rarr; Destino</small>
+          </div>
+          <div class="p-0">
+            <div class="table-responsive" style="max-height:260px;">
+              <table class="table table-sm align-middle mb-0" id="tabla-movs">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Concepto / Descripción</th>
+                    <th>Origen</th>
+                    <th>Destino</th>
+                    <th class="text-end">Monto</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /col derecha -->
+    </div><!-- /row -->
+  </main>
+
+  <!-- ===================================================
+       Modal: Gastos sin Partida
+       =================================================== -->
+  <div class="modal fade" id="modalMissing" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content" style="border-radius:12px; border:none; box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+        <div class="modal-header" style="background:#691c32; border-radius:12px 12px 0 0;">
+          <h6 class="modal-title text-white">
+            <i class="bi bi-exclamation-triangle me-2"></i>Gastos sin Partida
+          </h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive" style="max-height:60vh;">
+            <table class="table table-sm" id="tabla-missing">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Descripción</th>
+                  <th>Monto</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid #f0f0f0;">
+          <button id="btn-export-missing-footer" class="btn btn-success btn-sm">
+            <i class="bi bi-download me-1"></i>Exportar CSV
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/js/session-guard.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/user-info.js"></script>
+  <script src="/js/script.js"></script>
+  <script src="/js/partidas.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,309 @@
+/* ===================================================
+   EXPEDIENTES DE ENTREGA — Estilos específicos
+   =================================================== */
+
+.expedientes-entrega-page {
+  margin: 0;
+  background-color: #f5f5f5;
+}
+
+/* -----------------------------------------------
+   CARDS
+   ----------------------------------------------- */
+.expedientes-entrega-page .card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+}
+
+.expedientes-entrega-page .card-header-custom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid #f0f0f0;
+  margin-bottom: 16px;
+}
+
+.expedientes-entrega-page .card-header-custom .page-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  margin: 0;
+}
+
+.expedientes-entrega-page .card-header-custom .page-subtitle {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin: 2px 0 0;
+}
+
+/* -----------------------------------------------
+   SECCIÓN: TOPBAR DE ACCIONES (folio + botones)
+   ----------------------------------------------- */
+.exp-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 0 6px;
+}
+
+.exp-action-bar .exp-folio-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+
+.exp-action-bar .exp-btn-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* -----------------------------------------------
+   ETIQUETAS DE SECCIÓN
+   ----------------------------------------------- */
+.expedientes-entrega-page .form-section-title {
+  font-weight: 700;
+  font-size: 0.7rem;
+  color: #691c32;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* -----------------------------------------------
+   CAMPOS DE SOLO LECTURA
+   ----------------------------------------------- */
+.expedientes-entrega-page .readonly {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+}
+
+/* -----------------------------------------------
+   TABLAS
+   ----------------------------------------------- */
+.expedientes-entrega-page .table-responsive {
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 8px;
+}
+
+.expedientes-entrega-page .table thead th {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background-color: #691c32;
+  color: #ffffff;
+  border-bottom: none;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.expedientes-entrega-page .table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.expedientes-entrega-page .table tbody tr:hover {
+  background-color: rgba(105, 28, 50, 0.05);
+}
+
+.expedientes-entrega-page .table tbody td {
+  font-size: 0.78rem;
+  vertical-align: middle;
+  padding: 8px 12px;
+  border-color: #f0f0f0;
+}
+
+/* Fila seleccionada en tabla de origen */
+.expedientes-entrega-page .table tbody tr.row-selected,
+.expedientes-entrega-page .table tbody tr.row-selected:hover {
+  background-color: rgba(105, 28, 50, 0.1);
+  outline: 2px solid rgba(105, 28, 50, 0.3);
+  outline-offset: -2px;
+}
+
+/* -----------------------------------------------
+   SECTION CARD: cabecera de las card secundarias
+   ----------------------------------------------- */
+.exp-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.exp-card-header .exp-card-title {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #2b2b2b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.exp-card-header .exp-card-subtitle {
+  font-size: 0.72rem;
+  color: #6c757d;
+}
+
+/* -----------------------------------------------
+   BARRA DE FILTROS: Entregas Registradas
+   ----------------------------------------------- */
+.entregas-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: end;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.entregas-filter-wide {
+  grid-column: span 2;
+}
+
+/* -----------------------------------------------
+   BADGE ESTATUS
+   ----------------------------------------------- */
+.badge-entregado {
+  background-color: #d1e7dd;
+  color: #0a3622;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.badge-cancelado {
+  background-color: #f8d7da;
+  color: #58151c;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+/* -----------------------------------------------
+   FORMULARIO — mejoras generales
+   ----------------------------------------------- */
+.expedientes-entrega-page .form-control,
+.expedientes-entrega-page .form-select {
+  border-radius: 7px;
+  border-color: #d0d5dc;
+  font-size: 0.8rem;
+}
+
+.expedientes-entrega-page .form-control:focus,
+.expedientes-entrega-page .form-select:focus {
+  border-color: #691c32;
+  box-shadow: 0 0 0 0.2rem rgba(105, 28, 50, 0.18);
+}
+
+.expedientes-entrega-page .form-check-input:checked {
+  background-color: #691c32;
+  border-color: #691c32;
+}
+
+/* -----------------------------------------------
+   SEPARADOR VISUAL ENTRE SECCIONES DEL FORMULARIO
+   ----------------------------------------------- */
+.exp-divider {
+  border: none;
+  border-top: 1px dashed #e0e0e0;
+  margin: 12px 0;
+}
+
+/* ===================================================
+   RESPONSIVE — BREAKPOINTS OBLIGATORIOS
+   =================================================== */
+
+/* ---- MOBILE: 320–480px ---- */
+@media (max-width: 480px) {
+  .expedientes-entrega-page .card {
+    border-radius: 8px;
+  }
+
+  .exp-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .exp-action-bar .exp-btn-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .exp-action-bar .exp-btn-group .btn-guardar-full {
+    grid-column: span 2;
+  }
+
+  .exp-folio-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .entregas-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .entregas-filter-wide {
+    grid-column: span 1;
+  }
+
+  .expedientes-entrega-page .table thead th {
+    font-size: 0.62rem;
+    padding: 8px 8px;
+  }
+
+  .expedientes-entrega-page .table tbody td {
+    font-size: 0.72rem;
+    padding: 7px 8px;
+  }
+}
+
+/* ---- TABLET: 480–960px ---- */
+@media (min-width: 480px) and (max-width: 960px) {
+  .exp-action-bar .exp-btn-group {
+    flex-wrap: wrap;
+  }
+
+  .entregas-filters {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .entregas-filter-wide {
+    grid-column: span 2;
+  }
+}
+
+/* ---- DESKTOP: 960–1328px ---- */
+@media (min-width: 960px) and (max-width: 1328px) {
+  .entregas-filters {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .entregas-filter-wide {
+    grid-column: span 2;
+  }
+}
+
+/* ---- WIDESCREEN: >1328px ---- */
+@media (min-width: 1328px) {
+  .expedientes-entrega-page .table tbody td {
+    font-size: 0.82rem;
+  }
+
+  .entregas-filters {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}

@@ -1,0 +1,745 @@
+/* ======================================================
+   BASE GLOBAL
+   ====================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 12px;
+}
+
+body {
+  margin: 0;
+  background-color: #f5f5f5;
+  font-size: 1rem;
+}
+
+img,
+svg {
+  max-width: 1100%;
+  height: auto;
+}
+
+/* ======================================================
+   FORM CONTAINER
+   ====================================================== */
+.form-container {
+  width: min(1000px, calc(100% - 24px));
+  margin: 16px auto;
+  padding: 16px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.10);
+}
+
+.form-title {
+  text-transform: uppercase;
+}
+
+.form-title, .sub-title{
+  text-align: center;
+  font-weight: 700;
+  margin-left: 100px;
+}
+
+/* ======================================================
+   DOCUMENT HEADER (logo + titulo + folio)
+   ====================================================== */
+.doc-header {
+  display: grid;
+  grid-template-columns: 90px 1fr 195px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.doc-header__logo {
+  text-align: center;
+}
+
+.doc-header__logo img {
+  max-height: 70px;
+  width: auto;
+}
+
+.doc-header__titles {
+  text-align: center;
+}
+
+.doc-header__folio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ======================================================
+   ACTION TOOLBAR
+   ====================================================== */
+.cp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.09);
+  margin-bottom: 4px;
+}
+
+.cp-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.cp-toolbar__sep {
+  width: 1px;
+  height: 32px;
+  background: #dee2e6;
+  flex-shrink: 0;
+}
+
+.cp-toolbar__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8f9fa;
+  min-height: 38px;
+}
+
+.cp-toolbar__status .suf-status-meta {
+  font-size: 11px;
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+/* Botones del toolbar */
+.cp-toolbar .btn {
+  font-weight: 600;
+  border-radius: 8px 0 0 8px;
+}
+
+.cp-toolbar .btn-group .btn {
+  border-radius: 0;
+}
+
+.cp-toolbar .btn-group .btn:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.cp-toolbar .btn-group .btn:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.cp-toolbar .btn-group .btn:only-child {
+  border-radius: 8px;
+}
+
+/* Mantener compatibilidad con selectores JS que usen .cp-actions */
+.cp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.08);
+}
+
+.cp-actions .btn {
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+/* ======================================================
+   STATUS BOX (legacy + nuevo)
+   ====================================================== */
+.suf-status-box {
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 400px;
+  flex: 0 1 auto;
+}
+
+.suf-status-meta {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+/* ======================================================
+   TABLAS
+   ====================================================== */
+.table-wrap,
+.formato-wrap,
+.table-detalle-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table.formato {
+  width: 100%;
+  min-width: 860px;
+  table-layout: fixed;
+}
+
+.table.formato th,
+.table.formato td {
+  vertical-align: middle !important;
+  padding: 10px 12px !important;
+  line-height: 1.25;
+}
+
+.table.formato th {
+  background: #e9ecef;
+  font-weight: 700;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.table.formato input,
+.table.formato select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Cabecera uniforme de la tabla detalle */
+.detalle-header {
+  background-color: #e9ecef !important;
+  font-weight: 700;
+  text-align: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 10px 8px !important;
+  border-bottom: 2px solid #dee2e6 !important;
+}
+
+/* ======================================================
+   PANEL CONTROLES DE FILAS
+   ====================================================== */
+.cp-row-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.cp-row-controls__label {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #495057;
+}
+
+/* ======================================================
+   PANEL DE IMPUESTOS
+   ====================================================== */
+.cp-impuestos-card {
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  background: #f8f9fa;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.cp-impuestos-card__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #691c32;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cp-impuestos-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 20px;
+}
+
+.cp-impuesto-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.cp-impuesto-item input[type="number"] {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+/* ======================================================
+   AVISO LEGAL
+   ====================================================== */
+.cp-aviso-legal {
+  font-size: 11px;
+  text-align: justify;
+  background-color: #e9ecef;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 8px;
+}
+
+.cp-aviso-legal p:last-child {
+  margin-bottom: 0;
+}
+
+/* ======================================================
+   CAMPOS SOLO LECTURA
+   ====================================================== */
+.cp-readonly[readonly] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: #000;
+  text-align: center;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  pointer-events: none;
+}
+
+.cp-readonly[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.cp-readonly[type="date"] {
+  appearance: none;
+}
+
+/* ------ Dependencias: textarea sin apariencia de formulario, multilinea ------ */
+textarea.dep-nombre {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  resize: none;
+  overflow: hidden;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-size: 10.5px !important;
+  line-height: 1.4;
+  padding: 2px 4px;
+  color: #000;
+  width: 100%;
+}
+
+/* ------ Concepto de partida en tabla detalle: wrap multilinea ------ */
+input.cp-readonly[name$="_concepto"][readonly] {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 2em;
+  field-sizing: content;
+  text-align: left !important;
+  font-weight: 600;
+}
+
+/* ======================================================
+   CAMPOS DE TOTALES Y CANTIDADES (solo lectura, sin borde)
+   ====================================================== */
+
+/* Subtotal, IVA, ISR, IEPS, Pensión, Total */
+input.ro[readonly],
+input[name="subtotal"][readonly],
+input[name="iva"][readonly],
+input[name="isr"][readonly],
+input[name="ieps"][readonly],
+input[name="pension_total"][readonly],
+input[name="total"][readonly] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  pointer-events: none;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+  color: #000;
+}
+
+/* Total en negrita */
+input[name="total"][readonly] {
+  font-weight: 700;
+}
+
+/* Cantidad con letra */
+input[name="cantidad_con_letra"][readonly] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  pointer-events: none;
+  padding-left: 0 !important;
+  color: #000;
+  font-style: italic;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: visible !important;
+  height: auto !important;
+  field-sizing: content;
+}
+
+/* Cantidad en programación de pago */
+input[name="cantidad_pago"][readonly],
+input.as-text[readonly],
+input.input-no-click[readonly] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  pointer-events: none;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+  color: #000;
+  font-weight: 700;
+}
+
+/* ======================================================
+   QR CARD
+   ====================================================== */
+.cp-qr-card {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  background: #f8f9fa;
+}
+
+.cp-qr-label {
+  font-size: 10px;
+  color: #6c757d;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  margin-bottom: 4px;
+}
+
+.cp-qr-img {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-qr-empty {
+  font-size: 10px;
+  color: #adb5bd;
+}
+
+/* ======================================================
+   MODALES — mejora visual
+   ====================================================== */
+.modal-content {
+  border-radius: 14px !important;
+  border: none !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.18) !important;
+}
+
+.modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 20px;
+}
+
+.modal-footer {
+  border-top: 1px solid #f0f0f0;
+  padding: 14px 20px;
+}
+
+.modal-body {
+  padding: 18px 20px;
+}
+
+/* ======================================================
+   BREAKPOINT: TABLET MD (480px – 960px)
+   ====================================================== */
+@media (min-width: 480px) and (max-width: 960px) {
+  .doc-header {
+    grid-template-columns: 70px 1fr 160px;
+    gap: 8px;
+  }
+
+  .doc-header__logo img {
+    max-height: 55px;
+  }
+
+  .cp-toolbar {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .cp-toolbar__status .suf-status-meta {
+    max-width: 180px;
+  }
+}
+
+/* ======================================================
+   BREAKPOINT: DESKTOP NORMAL (960px – 1328px)
+   ====================================================== */
+@media (min-width: 960px) and (max-width: 1328px) {
+  html { font-size: 13px; }
+
+  .form-container {
+    width: min(1050px, calc(100% - 48px));
+  }
+
+  .form-title {
+    font-size: 14px;
+  }
+}
+
+/* ======================================================
+   BREAKPOINT: WIDESCREEN (>= 1328px)
+   ====================================================== */
+@media (min-width: 1328px) {
+  html { font-size: 13px; }
+
+  .form-container {
+    width: min(1200px, calc(100% - 64px));
+  }
+
+  .form-title {
+    font-size: 15px;
+  }
+
+  .cp-toolbar {
+    flex-wrap: nowrap;
+  }
+}
+
+/* ======================================================
+   BREAKPOINT: MOBILE (< 480px)
+   ====================================================== */
+@media (max-width: 480px) {
+  html { font-size: 11px; }
+
+  .form-container {
+    width: calc(100% - 12px);
+    padding: 10px;
+    margin: 8px auto;
+  }
+
+  /* Header apilado vertical */
+  .doc-header {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .doc-header__logo {
+    order: 1;
+  }
+
+  .doc-header__titles {
+    order: 2;
+  }
+
+  .doc-header__folio {
+    order: 3;
+    align-items: center;
+  }
+
+  .doc-header__logo img {
+    max-height: 50px;
+  }
+
+  .cp-qr-card {
+    display: none !important;
+  }
+
+  /* Toolbar mobile: dos filas, full-width */
+  .cp-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .cp-toolbar__group {
+    width: 100%;
+  }
+
+  .cp-toolbar__group .btn-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .cp-toolbar__group .btn-group .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .cp-toolbar__status {
+    width: 100%;
+  }
+
+  .cp-toolbar__status .suf-status-meta {
+    max-width: none;
+    white-space: normal;
+  }
+
+  .cp-toolbar__sep {
+    display: none;
+  }
+
+  /* Tablas: scroll horizontal */
+  .table.formato {
+    min-width: 520px;
+  }
+
+  .form-container .table.table-bordered:not(.formato) {
+    min-width: 560px;
+  }
+
+  /* Fuente más pequeña en tablas */
+  .form-container table td,
+  .form-container table th {
+    font-size: 11px !important;
+  }
+
+  /* Status box full width */
+  .suf-status-box {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Panel impuestos: items en columna */
+  .cp-impuestos-grid {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cp-impuesto-item input[type="number"] {
+    width: 100px;
+  }
+
+  /* Botones + / - de filas */
+  .form-container .d-flex.gap-2 .btn-sm {
+    min-width: 36px;
+  }
+}
+
+/* ======================================================
+   BREAKPOINT LEGADO: TABLET 576–767px
+   ====================================================== */
+@media (min-width: 576px) and (max-width: 767px) {
+  .form-container {
+    width: calc(100% - 20px);
+    padding: 14px;
+  }
+
+  .table.formato {
+    min-width: 620px;
+  }
+
+  .form-container table td,
+  .form-container table th {
+    font-size: 11px !important;
+  }
+
+  .cp-qr-card {
+    display: none !important;
+  }
+
+  .doc-header {
+    grid-template-columns: 70px 1fr 160px;
+  }
+}
+
+/* ======================================================
+   BREAKPOINT LEGADO: TABLET 768–991px
+   ====================================================== */
+@media (min-width: 768px) and (max-width: 991px) {
+  .form-container {
+    width: calc(100% - 28px);
+    padding: 14px;
+  }
+
+  .table.formato {
+    min-width: 700px;
+  }
+
+  .form-container table td,
+  .form-container table th {
+    font-size: 11.5px !important;
+  }
+}
+
+/* ======================================================
+   SEMÁFORO DE SALDO DE PARTIDA
+   ====================================================== */
+.sp-semaforo {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.sp-semaforo.verde    { background-color: #28a745; box-shadow: 0 0 4px #28a74580; }
+.sp-semaforo.amarillo { background-color: #ffc107; box-shadow: 0 0 4px #ffc10780; }
+.sp-semaforo.rojo     { background-color: #dc3545; box-shadow: 0 0 4px #dc354580; }
+.sp-semaforo.gris     { background-color: #adb5bd; }
+
+/* ======================================================
+   PRINT
+   ====================================================== */
+@media print {
+  body {
+    padding-top: 0;
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .form-container {
+    box-shadow: none;
+    border-radius: 0;
+    width: 100%;
+    padding: 0;
+  }
+
+  .cp-aviso-legal {
+    background-color: #e9ecef !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

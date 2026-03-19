@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root {
+      visibility: hidden;
+    }
+  </style>
+
+  <script>
+    (function () {
+      try {
+        const u = localStorage.getItem("cp_usuario");
+        const t = localStorage.getItem("cp_token");
+
+        if (!u || !t) {
+          window.location.replace("login.html");
+          return;
+        }
+
+        document.documentElement.style.visibility = "visible";
+      } catch (e) {
+        document.documentElement.style.visibility = "visible";
+      }
+    })();
+  </script>
+  <title>Control de Presupuesto — Proyectos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/navbar.css">
+
+  <style>
+    /* ===================================================
+       PROJECTS — Estilos específicos de la página
+       =================================================== */
+
+    .theme-projects {
+      background: #f5f5f5;
+    }
+
+    .projects-main {
+      padding-bottom: 48px;
+    }
+
+    /* -----------------------------------------------
+       KPI CARDS — primera y segunda fila
+       ----------------------------------------------- */
+    .card-kpi {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 18px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+      min-height: 88px;
+      transition: box-shadow 0.2s ease, transform 0.15s ease;
+    }
+
+    .card-kpi:hover {
+      box-shadow: 0 4px 18px rgba(105, 28, 50, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .card-kpi .title {
+      font-size: 0.72rem;
+      color: #6c757d;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
+    }
+
+    .card-kpi .value {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #2b2b2b;
+    }
+
+    .card-kpi .kpi-icon {
+      font-size: 2rem;
+      opacity: 0.15;
+      color: #691c32;
+    }
+
+    /* -----------------------------------------------
+       CARDS DE ALERTAS / TOP-5
+       ----------------------------------------------- */
+    .projects-info-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+      height: 100%;
+    }
+
+    .projects-info-card .card-header {
+      background: transparent;
+      border-bottom: 2px solid #f0f0f0;
+      padding: 12px 16px 10px;
+    }
+
+    .projects-info-card .card-header h6 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #2b2b2b;
+      margin: 0;
+    }
+
+    .projects-info-card .card-body {
+      padding: 12px 16px;
+    }
+
+    /* -----------------------------------------------
+       CARD PRINCIPAL: Listado de proyectos
+       ----------------------------------------------- */
+    .card-proyectos {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+    }
+
+    .card-proyectos .card-header {
+      background: transparent;
+      border-bottom: 2px solid #f0f0f0;
+      border-radius: 12px 12px 0 0;
+      padding: 16px 18px 14px;
+    }
+
+    .card-proyectos .card-header h5 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #2b2b2b;
+      margin: 0;
+    }
+
+    .card-proyectos .card-footer {
+      background: transparent;
+      border-top: 1px solid #f0f0f0;
+      border-radius: 0 0 12px 12px;
+      padding: 10px 18px;
+      font-size: 0.75rem;
+      color: #6c757d;
+    }
+
+    /* Buscador principal */
+    .search-input {
+      border-radius: 7px;
+      border-color: #d0d5dc;
+      font-size: 0.8rem;
+      min-width: 200px;
+    }
+
+    .search-input:focus {
+      border-color: #691c32;
+      box-shadow: 0 0 0 0.2rem rgba(105, 28, 50, 0.18);
+    }
+
+    /* Filtros de la tabla */
+    .projects-filter-row .form-control,
+    .projects-filter-row .form-select {
+      border-radius: 7px;
+      border-color: #d0d5dc;
+      font-size: 0.78rem;
+    }
+
+    .projects-filter-row .form-control:focus,
+    .projects-filter-row .form-select:focus {
+      border-color: #691c32;
+      box-shadow: 0 0 0 0.2rem rgba(105, 28, 50, 0.18);
+    }
+
+    /* -----------------------------------------------
+       TABLA DE PROYECTOS
+       ----------------------------------------------- */
+    .table-light-custom thead th {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      background-color: #691c32;
+      color: #ffffff;
+      border-bottom: none;
+      padding: 10px 14px;
+      white-space: nowrap;
+    }
+
+    .table-light-custom tbody td {
+      vertical-align: middle;
+      font-size: 0.78rem;
+      padding: 9px 14px;
+      border-color: #f0f0f0;
+    }
+
+    .table-light-custom tbody tr:hover {
+      background-color: rgba(105, 28, 50, 0.04);
+    }
+
+    /* Badges de saldo */
+    .badge-saldo-negativo {
+      background: #dc3545;
+      color: #ffffff;
+      font-size: 0.68rem;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .badge-saldo-positivo {
+      background: #198754;
+      color: #ffffff;
+      font-size: 0.68rem;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .row-saldo-negativo {
+      background: rgba(220, 53, 69, 0.05);
+    }
+
+    /* Pill de proyecto */
+    .pill-project {
+      letter-spacing: 0.3px;
+      font-size: 0.72rem;
+    }
+
+    /* -----------------------------------------------
+       CARD DETALLE DEL PROYECTO
+       ----------------------------------------------- */
+    .project-detail-card {
+      background: #ffffff;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+    }
+
+    .project-detail-card .card-header {
+      background: transparent;
+      border-bottom: 2px solid #f0f0f0;
+      border-radius: 12px 12px 0 0;
+      padding: 14px 18px 12px;
+    }
+
+    .project-detail-card .card-header h5 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #2b2b2b;
+      margin: 0;
+    }
+
+    .project-detail-card .card-body {
+      padding: 16px 18px;
+    }
+
+    /* Mini KPIs en el detalle */
+    .mini-kpi {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 10px 14px;
+      border: 1px solid #e9ecef;
+      transition: box-shadow 0.15s ease;
+    }
+
+    .mini-kpi:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .mini-kpi .label {
+      font-size: 0.7rem;
+      color: #6c757d;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 4px;
+    }
+
+    .mini-kpi .value {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #2b2b2b;
+    }
+
+    /* Metas */
+    .meta-card {
+      border: 1px solid #e9ecef;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .meta-card .meta-title {
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+
+    .meta-card .meta-sub {
+      font-size: 0.75rem;
+      color: #6c757d;
+    }
+
+    /* -----------------------------------------------
+       QR card (si existe)
+       ----------------------------------------------- */
+    .cp-qr-card {
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 6px;
+      background: #f8f9fa;
+      text-align: center;
+    }
+
+    .cp-qr-label {
+      font-size: 10px;
+      color: #6c757d;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .cp-qr-img img {
+      width: 45px;
+      height: 45px;
+      object-fit: contain;
+    }
+
+    .cp-qr-empty {
+      font-size: 10px;
+      color: #adb5bd;
+    }
+
+    /* ===================================================
+       RESPONSIVE — BREAKPOINTS OBLIGATORIOS
+       =================================================== */
+
+    /* MOBILE: 320–480px */
+    @media (max-width: 480px) {
+      .card-kpi {
+        padding: 12px 14px;
+        min-height: 76px;
+      }
+
+      .card-kpi .value {
+        font-size: 0.95rem;
+      }
+
+      .card-kpi .kpi-icon {
+        font-size: 1.6rem;
+      }
+
+      .card-proyectos .card-header {
+        padding: 12px 14px 10px;
+      }
+
+      .card-proyectos .card-header .d-flex {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .search-input {
+        width: 100%;
+        min-width: unset;
+      }
+
+      .projects-filter-row .d-grid,
+      .projects-filter-row .btn {
+        width: 100%;
+      }
+
+      .project-detail-card .card-header .d-flex {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .project-detail-card .card-header .d-flex .btn {
+        width: 100%;
+      }
+
+      .table-light-custom thead th {
+        font-size: 0.62rem;
+        padding: 8px 8px;
+      }
+
+      .table-light-custom tbody td {
+        font-size: 0.72rem;
+        padding: 7px 8px;
+      }
+    }
+
+    /* TABLET: 480–960px */
+    @media (min-width: 480px) and (max-width: 960px) {
+      .card-kpi .value {
+        font-size: 1rem;
+      }
+
+      .projects-filter-row .col-12 {
+        margin-bottom: 2px;
+      }
+    }
+
+    /* DESKTOP: 960–1328px */
+    @media (min-width: 960px) and (max-width: 1328px) {
+      .card-kpi .value {
+        font-size: 1.05rem;
+      }
+    }
+
+    /* WIDESCREEN: >1328px */
+    @media (min-width: 1328px) {
+      .card-kpi {
+        min-height: 96px;
+        padding: 16px 22px;
+      }
+
+      .card-kpi .value {
+        font-size: 1.2rem;
+      }
+
+      .card-kpi .kpi-icon {
+        font-size: 2.4rem;
+      }
+
+      .table-light-custom tbody td {
+        font-size: 0.82rem;
+      }
+    }
+  </style>
+</head>
+
+<body class="theme-projects">
+  <div id="cp-navbar"></div>
+
+  <main class="projects-main container">
+
+    <!-- ===================================================
+         KPIs — Fila 1
+         =================================================== -->
+    <div class="row g-3 mb-3 mt-4" id="kpi-row">
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Proyectos</div>
+            <div id="kpi-projects" class="value">—</div>
+          </div>
+          <i class="bi bi-diagram-3 kpi-icon"></i>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Presupuesto total</div>
+            <div id="kpi-presupuesto" class="value">—</div>
+          </div>
+          <i class="bi bi-piggy-bank kpi-icon"></i>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Gastado total</div>
+            <div id="kpi-gastado" class="value">—</div>
+          </div>
+          <i class="bi bi-cash-stack kpi-icon"></i>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Saldo total</div>
+            <div id="kpi-saldo" class="value">—</div>
+          </div>
+          <i class="bi bi-graph-up-arrow kpi-icon"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs — Fila 2 -->
+    <div class="row g-3 mb-4" id="kpi-row-2">
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Reconducido total</div>
+            <div id="kpi-reconducido" class="value">—</div>
+          </div>
+          <i class="bi bi-arrow-repeat kpi-icon"></i>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="card-kpi d-flex justify-content-between align-items-center">
+          <div>
+            <div class="title">Sobregiros</div>
+            <div id="kpi-sobregiros" class="value">—</div>
+          </div>
+          <i class="bi bi-exclamation-triangle kpi-icon" style="color:#dc3545; opacity:0.25;"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================
+         Alertas + Top 5
+         =================================================== -->
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-lg-6">
+        <div class="projects-info-card">
+          <div class="card-header">
+            <h6><i class="bi bi-exclamation-triangle me-2" style="color:#dc3545;"></i>Alertas de sobregiro</h6>
+          </div>
+          <div class="card-body">
+            <div id="overdraft-summary" class="text-secondary small mb-2">—</div>
+            <ul id="overdraft-list" class="list-group list-group-flush small"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="projects-info-card">
+          <div class="card-header">
+            <h6><i class="bi bi-trophy me-2" style="color:#d4af37;"></i>Top 5 por gasto</h6>
+          </div>
+          <div class="card-body">
+            <ul id="top-spend-list" class="list-group list-group-flush small"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================
+         LISTADO DE PROYECTOS
+         =================================================== -->
+    <div class="card-proyectos shadow-sm">
+      <div class="card-header">
+        <!-- Titulo + buscador -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+          <div>
+            <h5><i class="bi bi-grid-3x3-gap me-2" style="color:#691c32;"></i>Listado de proyectos</h5>
+            <small class="text-secondary">
+              Haz clic en "Ver detalle" para abrir el proyecto.
+            </small>
+          </div>
+          <div class="d-flex gap-2">
+            <input id="search-project" type="text" class="form-control form-control-sm search-input"
+              placeholder="Buscar proyecto...">
+            <button id="btn-clear" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Limpiar">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="row g-2 mt-3 align-items-end projects-filter-row">
+          <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label small text-secondary mb-1">Dependencia General (DG)</label>
+            <select id="filter-dg" class="form-select form-select-sm">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label small text-secondary mb-1">Dependencia Auxiliar (DA)</label>
+            <select id="filter-da" class="form-select form-select-sm">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label small text-secondary mb-1">Ejercicio</label>
+            <input id="filter-year" type="number" min="2000" max="2100"
+              class="form-control form-control-sm" placeholder="2026">
+          </div>
+          <div class="col-12 col-sm-6 col-md-4">
+            <label class="form-label small text-secondary mb-1">&nbsp;</label>
+            <div class="d-flex gap-2">
+              <button id="btn-apply-filters" class="btn btn-sm btn-primary flex-fill">
+                <i class="bi bi-funnel me-1"></i>Aplicar
+              </button>
+              <button id="btn-clear-filters" class="btn btn-sm btn-outline-secondary flex-fill">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Limpiar
+              </button>
+              <button id="btn-export" class="btn btn-sm btn-outline-success flex-fill">
+                <i class="bi bi-file-earmark-arrow-down me-1"></i>Exportar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-light-custom mb-0">
+            <thead>
+              <tr>
+                <th>Proyecto</th>
+                <th class="text-end">Partidas</th>
+                <th class="text-end">Presupuesto</th>
+                <th class="text-end">Gastado</th>
+                <th class="text-end">Reconducido</th>
+                <th class="text-end">Saldo</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-projects">
+              <tr>
+                <td colspan="7" class="text-center py-4 text-secondary">
+                  <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                  Cargando proyectos...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card-footer d-flex justify-content-between">
+        <span id="summary-label">0 proyecto(s) mostrados.</span>
+        <span>Actualizado automaticamente.</span>
+      </div>
+    </div>
+
+    <!-- ===================================================
+         DETALLE DEL PROYECTO (oculto por defecto)
+         =================================================== -->
+    <div id="project-detail-card" class="project-detail-card mt-4 d-none">
+      <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+          <h5 id="detail-title">Detalle de proyecto</h5>
+          <small id="detail-subtitle" class="text-secondary">—</small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button id="btn-open-project" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Abrir proyecto
+          </button>
+          <button id="btn-close-detail" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x-lg me-1"></i>Cerrar
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Mini KPIs del detalle -->
+        <div class="row g-3 mb-4">
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Presupuesto</div>
+              <div id="detail-presupuesto" class="value">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Gastado</div>
+              <div id="detail-gastado" class="value">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Reconducido</div>
+              <div id="detail-reconducido" class="value">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="mini-kpi">
+              <div class="label">Saldo</div>
+              <div id="detail-saldo" class="value">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tablas de detalle -->
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <h6 class="text-secondary mb-2">
+              <i class="bi bi-table me-1"></i>Detalle por partida
+            </h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-light-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>Partida</th>
+                    <th class="text-end">Presupuesto</th>
+                    <th class="text-end">Gastado</th>
+                    <th class="text-end">Reconducido</th>
+                    <th class="text-end">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody id="detail-by-partida"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <h6 class="text-secondary mb-2">
+              <i class="bi bi-calendar3 me-1"></i>Comparativo mensual
+            </h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-light-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>Mes</th>
+                    <th class="text-end">Presupuesto</th>
+                    <th class="text-end">Gastado</th>
+                    <th class="text-end">Reconducido</th>
+                    <th class="text-end">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody id="detail-by-month"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metas -->
+        <div class="mt-4">
+          <h6 class="text-secondary mb-2">
+            <i class="bi bi-bullseye me-1"></i>Metas del proyecto
+          </h6>
+          <div id="detail-metas" class="row g-2"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="/js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/session-guard.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/projects.js"></script>
+  <script src="/js/user-info.js"></script>
+</body>
+
+</html>

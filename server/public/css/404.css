@@ -1,0 +1,127 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap");
+
+:root{
+  --vino:#691c32;
+  --vino-dark:#5a1629;
+  --dorado:#f4b000;
+  --text:#1f2937;
+  --muted:#6b7280;
+}
+
+/* Fondo general */
+.cp-404{
+  min-height:100vh;
+  background:#ffffff;
+  padding:40px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:"Montserrat", sans-serif;
+  font-weight:400;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight:700;
+}
+
+/* Card principal */
+.cp-404-card{
+  width:100%;
+  max-width:560px;
+  background:#ffffff;
+  border-radius:18px;
+  padding:48px 36px;
+  box-shadow:
+    0 30px 80px rgba(0,0,0,.08),
+    0 6px 18px rgba(0,0,0,.05);
+  animation: fadeUp .6s ease-out;
+}
+
+/* Animación elegante */
+@keyframes fadeUp{
+  from{ opacity:0; transform:translateY(16px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+/* 404 grande */
+.cp-404-code{
+  font-size:96px;
+  font-weight:900;
+  letter-spacing:6px;
+  color:var(--vino);
+  line-height:1;
+  margin-bottom:16px;
+}
+
+.cp-404-code span{
+  color:var(--dorado);
+}
+
+/* Título */
+.cp-404-title{
+  font-size:26px;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:10px;
+}
+
+/* Texto */
+.cp-404-text{
+  font-size:15px;
+  color:var(--muted);
+  line-height:1.6;
+  margin-bottom:32px;
+}
+
+/* Acciones */
+.cp-404-actions{
+  margin-bottom:26px;
+}
+
+/* Botón principal */
+.btn-vino{
+  background:linear-gradient(135deg, var(--vino), var(--vino-dark));
+  border:none;
+  color:#ffffff;
+  padding:12px 26px;
+  font-weight:700;
+  border-radius:12px;
+  box-shadow:0 14px 30px rgba(105,28,50,.35);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+
+.btn-vino:hover{
+  transform:translateY(-1px);
+  box-shadow:0 18px 40px rgba(105,28,50,.45);
+  color:#ffffff;
+}
+
+/* Footer discreto */
+.cp-404-footer{
+  font-size:12px;
+  color:#9ca3af;
+  border-top:1px solid #e5e7eb;
+  padding-top:16px;
+}
+
+/* ===========================
+   RESPONSIVE
+=========================== */
+@media(max-width:576px){
+  .cp-404-card{
+    padding:36px 22px;
+  }
+
+  .cp-404-code{
+    font-size:72px;
+  }
+
+  .cp-404-title{
+    font-size:20px;
+  }
+}

@@ -1,0 +1,496 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap");
+
+/* ===========================
+   VARIABLES NAVBAR
+   =========================== */
+:root {
+  --cp-vino: #691c32;
+  --cp-vino-dark: #5a1629;
+  --cp-gold: #d4af37;
+  --cp-text: #ffffff;
+
+  /* Alturas de navbar — desktop por defecto */
+  --cp-nav-main-h: 56px;
+  --cp-nav-tabs-h: 44px;
+}
+
+/* ===========================
+   BODY PADDING-TOP
+   Compensa los dos navbars fijos
+   =========================== */
+body {
+  padding-top: calc(var(--cp-nav-main-h) + var(--cp-nav-tabs-h));
+  font-family: "Montserrat", sans-serif;
+  font-weight: 400;
+}
+
+/* ===========================
+   NAVBAR PRINCIPAL (superior)
+   =========================== */
+.cp-main-nav {
+  background: var(--cp-vino) !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  min-height: var(--cp-nav-main-h);
+}
+
+.cp-main-nav .container-fluid {
+  min-height: var(--cp-nav-main-h);
+  padding-top: 6px;
+  padding-bottom: 6px;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.cp-main-nav .navbar-brand {
+  color: #ffffff !important;
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 1rem;
+}
+
+/* Área de usuario */
+.cp-main-nav .cp-user-actions {
+  min-width: 0;
+  flex-wrap: nowrap;
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cp-main-nav .cp-user {
+  max-width: min(360px, 34vw);
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Logo centrado */
+.cp-main-nav .cp-logo-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.cp-main-nav .cp-logo,
+.cp-main-nav .navbar-logo {
+  height: 44px;
+  width: auto;
+  max-width: 260px;
+  max-height: 44px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Botones outline-light (Cerrar sesión) */
+.cp-main-nav .btn-outline-light {
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #fff;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.cp-main-nav .btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #fff;
+  color: #fff;
+}
+
+/* ===========================
+   NAVBAR TABS (segundo navbar)
+   =========================== */
+.cp-tabs-nav {
+  background: var(--cp-vino) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0;
+  position: fixed;
+  top: var(--cp-nav-main-h);
+  left: 0;
+  right: 0;
+  z-index: 1029;
+  min-height: var(--cp-nav-tabs-h);
+}
+
+.cp-tabs-nav .container-fluid {
+  min-height: var(--cp-nav-tabs-h);
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* Nav links */
+.cp-tabs-nav .nav-link {
+  border-radius: 0 !important;
+  background: var(--cp-vino) !important;
+  color: #ffffff !important;
+  padding: 10px 16px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cp-tabs-nav .nav-link:hover {
+  background: var(--cp-vino-dark) !important;
+  color: #ffffff !important;
+}
+
+.cp-tabs-nav .nav-link.active {
+  background: var(--cp-vino-dark) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+/* Dropdown menu del segundo navbar */
+.cp-tabs-nav .dropdown-menu {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+}
+
+.cp-tabs-nav .dropdown-item {
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s;
+}
+
+.cp-tabs-nav .dropdown-item:hover,
+.cp-tabs-nav .dropdown-item:focus {
+  background: rgba(105, 28, 50, 0.1);
+  color: var(--cp-vino);
+}
+
+/* ===========================
+   HAMBURGER ANIMADO
+   Visible solo en mobile (<992px)
+   =========================== */
+.cp-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  transition: background 0.2s;
+  margin: 3px 0;
+}
+
+.cp-hamburger:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cp-hamburger:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.cp-ham-line {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #ffffff;
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform-origin: center;
+}
+
+/* Estado activo (menú abierto) */
+.cp-hamburger.is-active .cp-ham-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.cp-hamburger.is-active .cp-ham-line:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.cp-hamburger.is-active .cp-ham-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ===========================
+   BREAKPOINT: DESKTOP (≥992px)
+   Menú horizontal, sin hamburger
+   =========================== */
+@media (min-width: 992px) {
+  .cp-hamburger {
+    display: none !important;
+  }
+
+  .cp-tabs-nav .navbar-nav.cp-tabs {
+    gap: 0 !important;
+    margin: 0 !important;
+  }
+
+  .cp-tabs-nav .nav-item {
+    margin: 0 !important;
+  }
+
+  .cp-tabs-nav .nav-link {
+    border-right: 1px solid rgba(255, 255, 255, 0.14) !important;
+  }
+
+  .cp-tabs-nav .nav-item:last-child .nav-link {
+    border-right: none !important;
+  }
+
+  /* Logo tamaño desktop */
+  .cp-main-nav .navbar-logo {
+    height: 44px;
+    max-height: 44px;
+  }
+}
+
+/* ===========================
+   BREAKPOINT: TABLET-MD (768–991px)
+   Hamburger visible, brand mediano
+   =========================== */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  :root {
+    --cp-nav-main-h: 60px;
+    --cp-nav-tabs-h: 46px;
+  }
+
+  .cp-hamburger {
+    display: flex !important;
+  }
+
+  .cp-tabs-nav .navbar-collapse {
+    background: var(--cp-vino);
+    padding: 8px 0 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .cp-tabs-nav .nav-link {
+    border-radius: 8px !important;
+    margin: 2px 8px;
+    padding: 10px 14px !important;
+  }
+
+  /* Dropdown en mobile: expande en flujo normal */
+  .cp-tabs-nav .dropdown-menu {
+    position: static !important;
+    transform: none !important;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    padding: 0 0 0 16px;
+    background: transparent;
+  }
+
+  .cp-tabs-nav .dropdown-item {
+    color: rgba(255, 255, 255, 0.85) !important;
+    background: transparent !important;
+    font-size: 13px;
+    padding: 7px 12px;
+  }
+
+  .cp-tabs-nav .dropdown-item:hover {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* Logo tablet */
+  .cp-main-nav .navbar-logo {
+    height: 38px;
+    max-height: 40px;
+  }
+
+  .cp-main-nav .cp-user {
+    max-width: min(220px, 28vw);
+    font-size: 0.82rem;
+  }
+}
+
+/* ===========================
+   BREAKPOINT: MOBILE-SM (576–767px)
+   =========================== */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  :root {
+    --cp-nav-main-h: 58px;
+    --cp-nav-tabs-h: 46px;
+  }
+
+  .cp-hamburger {
+    display: flex !important;
+  }
+
+  .cp-tabs-nav .navbar-collapse {
+    background: var(--cp-vino);
+    padding: 8px 0 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .cp-tabs-nav .nav-link {
+    border-radius: 8px !important;
+    margin: 2px 8px;
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+  }
+
+  .cp-tabs-nav .dropdown-menu {
+    position: static !important;
+    transform: none !important;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    padding: 0 0 0 16px;
+    background: transparent;
+  }
+
+  .cp-tabs-nav .dropdown-item {
+    color: rgba(255, 255, 255, 0.85) !important;
+    background: transparent !important;
+    font-size: 13px;
+    padding: 7px 12px;
+  }
+
+  .cp-tabs-nav .dropdown-item:hover {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* Logo sm */
+  .cp-main-nav .navbar-logo {
+    height: 34px;
+    max-height: 36px;
+  }
+
+  .cp-main-nav .navbar-brand {
+    font-size: 0.9rem;
+  }
+
+  .cp-main-nav .cp-user {
+    max-width: 140px;
+    font-size: 0.78rem;
+  }
+}
+
+/* ===========================
+   BREAKPOINT: MOBILE-XS (0–575px)
+   Navbar compacto, logo mini,
+   user info oculto
+   =========================== */
+@media (max-width: 575.98px) {
+  :root {
+    --cp-nav-main-h: 56px;
+    --cp-nav-tabs-h: 46px;
+  }
+
+  .cp-hamburger {
+    display: flex !important;
+  }
+
+  /* Ocultar texto del usuario en xs */
+  .cp-main-nav .cp-user {
+    display: none !important;
+  }
+
+  /* Logo mini en xs */
+  .cp-main-nav .navbar-logo {
+    height: 28px;
+    max-height: 32px;
+    max-width: 120px;
+  }
+
+  .cp-main-nav .navbar-brand {
+    font-size: 0.82rem;
+  }
+
+  /* Botón cerrar sesión: solo icono */
+  .cp-main-nav #btnLogout .d-sm-inline {
+    display: none !important;
+  }
+
+  .cp-main-nav #btnLogout .d-sm-none {
+    display: inline !important;
+  }
+
+  /* Colapsado del menú */
+  .cp-tabs-nav .navbar-collapse {
+    background: var(--cp-vino);
+    padding: 6px 0 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .cp-tabs-nav .nav-link {
+    border-radius: 8px !important;
+    margin: 2px 6px;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+  }
+
+  .cp-tabs-nav .dropdown-menu {
+    position: static !important;
+    transform: none !important;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    padding: 0 0 0 14px;
+    background: transparent;
+  }
+
+  .cp-tabs-nav .dropdown-item {
+    color: rgba(255, 255, 255, 0.85) !important;
+    background: transparent !important;
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .cp-tabs-nav .dropdown-item:hover {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+  }
+}
+
+/* ===========================
+   DESKTOP GRANDE (≥1200px)
+   =========================== */
+@media (min-width: 1200px) {
+  .cp-main-nav .navbar-logo {
+    height: 44px;
+    max-height: 50px;
+    max-width: 280px;
+  }
+
+  .cp-main-nav .navbar-brand {
+    font-size: 1.05rem;
+  }
+
+  .cp-main-nav .cp-user {
+    max-width: 400px;
+    font-size: 0.9rem;
+  }
+}
+
+/* ===========================
+   MODO IMPRESIÓN
+   =========================== */
+@media print {
+  .cp-main-nav,
+  .cp-tabs-nav {
+    display: none !important;
+  }
+
+  body {
+    padding-top: 0 !important;
+  }
+}

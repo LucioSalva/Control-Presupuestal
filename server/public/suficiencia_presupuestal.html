@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root {
+      visibility: hidden;
+    }
+  </style>
+
+  <script>
+    (function () {
+      try {
+        const u = localStorage.getItem("cp_usuario");
+        const t = localStorage.getItem("cp_token");
+
+        if (!u || !t) {
+          window.location.replace("login.html");
+          return;
+        }
+
+        document.documentElement.style.visibility = "visible";
+      } catch (e) {
+        document.documentElement.style.visibility = "visible";
+      }
+    })();
+  </script>
+  <title>Suficiencia Presupuestal 2025</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/navbar.css" />
+  <link rel="stylesheet" href="/css/suficiencia_presupuestal.css" />
+</head>
+
+<body>
+  <div id="cp-navbar"></div>
+
+  <!-- ================================================
+       TOOLBAR DE ACCIONES
+       ================================================ -->
+  <div class="container mt-5 mb-2 no-print">
+    <div class="cp-toolbar mt-3">
+
+      <!-- GRUPO IZQUIERDO: Guardar + PDF + Instructivo + Cancelar -->
+      <div class="cp-toolbar__group">
+        <div class="btn-group" role="group" aria-label="Acciones principales">
+          <button id="btn-guardar" class="btn btn-primary btn-sm" title="Guardar suficiencia">
+            <i class="bi bi-save me-1"></i>Guardar
+          </button>
+          <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm" title="Descargar PDF">
+            <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+          </button>
+          <a href="/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank"
+             class="btn btn-outline-secondary btn-sm" title="Abrir instructivo en PDF">
+            <i class="bi bi-file-earmark-text me-1"></i>Instructivo
+          </a>
+          <button id="btn-cancelar-suf" class="btn btn-outline-dark btn-sm" title="Cancelar suficiencia">
+            <i class="bi bi-x-circle me-1"></i>Cancelar
+          </button>
+        </div>
+      </div>
+
+      <!-- SEPARADOR -->
+      <div class="cp-toolbar__sep d-none d-md-block"></div>
+
+      <!-- STATUS BOX -->
+      <div id="sufStatusBox" class="cp-toolbar__status">
+        <span id="sufEstadoBadge" class="badge bg-secondary">Sin cargar</span>
+        <span class="suf-status-meta small text-muted">
+          Restante: <span id="sufRestanteText">—</span> · Caduca: <span id="sufCaducaText">—</span>
+        </span>
+      </div>
+
+      <!-- SEPARADOR -->
+      <div class="cp-toolbar__sep d-none d-md-block"></div>
+
+      <!-- GRUPO DERECHO: Nuevo + Buscar -->
+      <div class="cp-toolbar__group ms-md-auto">
+        <div class="btn-group" role="group" aria-label="Navegación">
+          <button id="btn-nuevo-suf" type="button" class="btn btn-outline-secondary btn-sm" title="Nueva suficiencia">
+            <i class="bi bi-file-earmark-plus me-1"></i>Nuevo
+          </button>
+          <button id="btnAbrirBuscarSuf" type="button" class="btn btn-outline-primary btn-sm" title="Buscar suficiencia">
+            <i class="bi bi-search me-1"></i>Buscar
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================
+       MODAL: BUSCAR SUFICIENCIA
+       ================================================ -->
+  <div class="modal fade" id="modalBuscarSuf" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-search me-2 text-secondary"></i>Buscar suficiencia
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-8">
+              <label class="form-label mb-1 fw-semibold">Folio de suficiencia</label>
+              <input id="txtNumeroSuf" type="text" class="form-control" placeholder="ECA-2026-01-SP-0001"
+                autocomplete="off">
+            </div>
+
+            <div class="col-12 col-md-4 d-grid">
+              <button id="btnBuscarNumero" type="button" class="btn btn-primary">
+                <i class="bi bi-search me-1"></i>Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x me-1"></i>Cerrar
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================================================
+       FORMULARIO PRINCIPAL
+       ================================================ -->
+  <div class="form-container">
+
+    <!-- HEADER: logo | títulos | folio + QR -->
+    <div class="doc-header mb-3">
+
+      <div class="doc-header__logo">
+        <img src="/img/ayuntamiento-de-ecatepec.webp" alt="Escudo Ecatepec" />
+      </div>
+
+      <div class="doc-header__titles">
+        <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
+        <div class="sub-title mt-1">
+          SUFICIENCIA PRESUPUESTAL — EJERCICIO FISCAL 2026
+        </div>
+      </div>
+
+      <div class="doc-header__folio">
+        <table class="table table-bordered mb-0">
+          <tr>
+            <th class="table-header" style="background-color: #d6d6d6; font-size:11px;">
+              No. de Suficiencia
+            </th>
+          </tr>
+          <tr>
+            <td>
+              <input type="text" class="form-control form-control-sm cp-readonly text-center"
+                name="no_suficiencia" readonly
+                style="font-size:10.5px; letter-spacing:0.3px;" />
+            </td>
+          </tr>
+        </table>
+
+        <div class="cp-qr-card mt-2">
+          <div class="cp-qr-label">QR Documento</div>
+          <div id="qr-suf" class="cp-qr-img">
+            <div class="cp-qr-empty">Sin QR</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- /doc-header -->
+
+    <!-- TABLA DE DATOS DEL DOCUMENTO -->
+    <div class="formato-wrap">
+      <table class="table table-bordered mb-2 formato">
+        <colgroup>
+          <col class="c-lbl" />
+          <col class="c-val" />
+          <col class="c-lbl" />
+          <col class="c-val" />
+        </colgroup>
+
+        <tr>
+          <th class="table-header">FECHA DE ELABORACIÓN:</th>
+          <td colspan="3">
+            <input type="date" class="form-control form-control-sm cp-readonly" name="fecha" readonly />
+          </td>
+        </tr>
+
+        <!-- ROW 2: DEPENDENCIA GENERAL + AUX -->
+        <tr>
+          <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
+          <td>
+            <textarea class="form-control form-control-sm cp-readonly dep-nombre" name="dependencia" readonly rows="2"></textarea>
+            <select class="form-select form-select-sm d-none" id="sel-dg-l00117">
+              <option value="">-- Selecciona DG --</option>
+            </select>
+            <input type="hidden" name="id_dgeneral" />
+          </td>
+
+          <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
+          <td>
+            <textarea class="form-control form-control-sm cp-readonly dep-nombre" name="dependencia_aux" readonly rows="2"></textarea>
+            <select class="form-select form-select-sm d-none" id="sel-da-l00117">
+              <option value="">-- Selecciona DA --</option>
+            </select>
+            <input type="hidden" name="id_dauxiliar" />
+          </td>
+        </tr>
+
+        <!-- ROW 3: PROYECTO -->
+        <tr>
+          <th class="table-header">PROYECTO:</th>
+          <td colspan="3">
+            <select class="form-select form-select-sm" name="id_proyecto">
+              <option value="">-- Selecciona un proyecto --</option>
+            </select>
+          </td>
+        </tr>
+
+        <!-- ROW 4: CLAVE + PROGRAMACION -->
+        <tr>
+          <th class="table-header">CLAVE PROGRAMÁTICA:</th>
+          <td>
+            <input type="text" class="form-control form-control-sm cp-readonly" name="clave_programatica" readonly />
+            <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
+          </td>
+
+          <th class="table-header">
+            PROGRAMACIÓN DE PAGO:
+          </th>
+          <td>
+            <select class="form-select form-select-sm" name="mes_pago">
+              <option value="ENERO">ENERO</option>
+              <option value="FEBRERO">FEBRERO</option>
+              <option value="MARZO">MARZO</option>
+              <option value="ABRIL">ABRIL</option>
+              <option value="MAYO">MAYO</option>
+              <option value="JUNIO">JUNIO</option>
+              <option value="JULIO">JULIO</option>
+              <option value="AGOSTO">AGOSTO</option>
+              <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+              <option value="OCTUBRE">OCTUBRE</option>
+              <option value="NOVIEMBRE">NOVIEMBRE</option>
+              <option value="DICIEMBRE">DICIEMBRE</option>
+            </select>
+
+            <input type="text"
+              class="form-control form-control-sm as-text td-text text-strong text-end input-no-click mt-2"
+              name="cantidad_pago" placeholder="Cantidad" readonly />
+          </td>
+        </tr>
+      </table>
+    </div>
+    <!-- /formato-wrap -->
+
+    <!-- PANEL SELECCIÓN DE PARTIDAS (multi-fuente, oculto para L00/117) -->
+    <div id="panel-seleccion-partidas" style="display:none;" class="mb-3">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="fw-bold" style="font-size:11px;">
+          Partidas seleccionadas: <span id="lbl-partidas-count" class="badge bg-secondary">0</span>
+          &nbsp;|&nbsp; Fuentes detectadas: <span id="lbl-fuentes-count" class="badge bg-primary">0</span>
+        </div>
+        <button id="btn-elegir-partidas" type="button" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-grid-3x3-gap me-1"></i>Seleccionar Partidas
+        </button>
+      </div>
+      <div id="resumen-partidas-por-fuente"></div>
+    </div>
+
+    <!-- CONTROLES DE FILAS + TABLA DETALLE -->
+    <div class="cp-row-controls">
+      <div class="cp-row-controls__label">
+        <i class="bi bi-list-ul me-1"></i>Detalle
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Gestión de filas">
+        <button id="btn-remove-row" type="button" class="btn btn-outline-danger" title="Quitar última fila">
+          <i class="bi bi-dash-lg"></i>
+        </button>
+        <button id="btn-add-row" type="button" class="btn btn-outline-primary" title="Agregar fila">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="table-detalle-wrap">
+      <table class="table table-bordered mb-3">
+        <thead>
+          <tr>
+            <th class="detalle-header" style="width: 5%">No.</th>
+            <th class="detalle-header" style="width: 12%">Clave</th>
+            <th class="detalle-header" style="width: 20%">Concepto de partida</th>
+            <th class="detalle-header" style="width: 20%">Justificación</th>
+            <th class="detalle-header" style="width: 33%">Descripción</th>
+            <th class="detalle-header" style="width: 10%">Importe solicitado</th>
+          </tr>
+        </thead>
+        <tbody id="detalleBody"></tbody>
+      </table>
+    </div>
+
+    <!-- META + TOTALES -->
+    <table class="table table-bordered mb-2">
+      <tr>
+        <th class="table-header align-middle text-center" style="width: 15%; background-color: #d6d6d6"
+          rowspan="6">
+          META:
+        </th>
+        <td class="align-middle" style="width: 65%" rowspan="6">
+          <div class="d-flex align-items-center h-100">
+            <div class="w-100">
+              <label for="metaSelect" class="form-label small mb-1 fw-semibold">Meta</label>
+              <select id="metaSelect" name="id_meta" class="form-select form-select-sm" aria-describedby="metaHelp">
+                <option value="">-- Selecciona un proyecto --</option>
+              </select>
+              <div id="metaHelp" class="form-text small text-muted mt-1"></div>
+              <input type="hidden" name="meta" value="" />
+            </div>
+          </div>
+        </td>
+
+        <th class="table-header text-end" style="width: 10%; background-color: #d6d6d6">SUBTOTAL:</th>
+        <td style="width: 10%">
+          <input type="text" class="form-control form-control-sm text-end ro" name="subtotal" value="0.00" readonly />
+        </td>
+      </tr>
+
+      <tr>
+        <th class="table-header text-end" style="background-color: #d6d6d6">IVA:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm text-end ro" name="iva" value="0.00" readonly />
+        </td>
+      </tr>
+
+      <tr>
+        <th class="table-header text-end" style="background-color: #d6d6d6">ISR:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm text-end ro" name="isr" value="0.00" readonly />
+        </td>
+      </tr>
+
+      <tr>
+        <th class="table-header text-end" style="background-color: #d6d6d6">IEPS:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm text-end ro" name="ieps" value="0.00" readonly />
+        </td>
+      </tr>
+      <tr>
+        <th class="table-header text-end" style="background-color: #d6d6d6">PENSIÓN:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm text-end ro" name="pension_total" value="0.00"
+            readonly />
+        </td>
+      </tr>
+      <tr>
+        <th class="table-header text-end fw-bold" style="background-color: #d6d6d6">TOTAL:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm text-end ro fw-bold" name="total" value="0.00" readonly />
+        </td>
+      </tr>
+    </table>
+
+    <table class="table table-bordered mb-4">
+      <tr>
+        <th class="table-header" style="width: 15%; background-color: #d6d6d6">
+          CANTIDAD CON LETRA:
+        </th>
+        <td style="width: 85%">
+          <input type="text" class="form-control form-control-sm ro" name="cantidad_con_letra" readonly />
+        </td>
+      </tr>
+    </table>
+
+    <!-- PANEL IMPUESTOS -->
+    <div class="cp-impuestos-card mb-3">
+      <div class="cp-impuestos-card__title">
+        <i class="bi bi-percent"></i>
+        Impuestos aplicables
+        <button type="button" class="btn btn-link p-0 ms-auto text-muted" id="infoImpuestos"
+          title="Información de impuestos" style="font-size:13px; text-decoration:none; line-height:1;">
+          <i class="bi bi-info-circle"></i>
+        </button>
+      </div>
+
+      <div class="cp-impuestos-grid">
+
+        <!-- IVA -->
+        <div class="cp-impuesto-item">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_iva" id="imp_iva" />
+            <label class="form-check-label fw-semibold" for="imp_iva">IVA 16%</label>
+          </div>
+        </div>
+
+        <!-- ISR -->
+        <div class="cp-impuesto-item">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_isr" id="imp_isr" />
+            <label class="form-check-label fw-semibold" for="imp_isr">ISR</label>
+          </div>
+          <input type="number" class="form-control form-control-sm text-end" name="isr_tasa"
+            placeholder="Ej. 10 %" min="0" max="100" step="0.01" id="isr_tasa" />
+        </div>
+
+        <!-- IEPS -->
+        <div class="cp-impuesto-item" id="iepsControls">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_ieps" id="imp_ieps" />
+            <label class="form-check-label fw-semibold" for="imp_ieps">IEPS</label>
+          </div>
+          <input type="number" class="form-control form-control-sm text-end" id="ieps_tasa" name="ieps_tasa"
+            placeholder="Ej. 8 %" min="0" max="100" step="0.01" />
+        </div>
+
+        <!-- PENSIÓN ALIMENTICIA -->
+        <div class="cp-impuesto-item" id="pensionControls">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" name="imp_pension" id="imp_pension" />
+            <label class="form-check-label fw-semibold" for="imp_pension">Pensión alimenticia</label>
+          </div>
+          <div class="btn-group btn-group-sm ms-1" role="group">
+            <button type="button" class="btn btn-outline-secondary" id="btnAddPension" title="Agregar pensión">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" id="btnInfoPension" title="Información">
+              <i class="bi bi-info-circle"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- contenedor dinámico de pensiones -->
+      <div id="pensionList" class="w-100 d-none mt-2"></div>
+    </div>
+    <!-- /cp-impuestos-card -->
+
+    <!-- AVISO LEGAL -->
+    <div class="cp-aviso-legal">
+      <p class="mb-2">
+        La presente suficiencia presupuestal únicamente acredita la
+        disponibilidad de recursos en la(s) clave(s) indicada(s), sin que ello
+        implique autorización para realizar procesos de licitación,
+        adjudicación, contratación, adquisición, pago o validación documental,
+        los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
+      </p>
+      <p class="mb-2">
+        Esta autorización se emite con base en el techo presupuestal aprobado
+        para la unidad administrativa correspondiente, siendo también
+        responsabilidad del ÁREA SOLICITANTE la planeación, administración,
+        verificación y comprobación del uso de los recursos.
+      </p>
+      <p class="mb-2">
+        El ejercicio del gasto deberá apegarse a lo establecido en el
+        Clasificador por Objeto del Gasto Estatal y Municipal, incluido en el
+        Manual para la Planeación, Programación y Presupuesto de Egresos
+        Municipal vigente, en los Lineamientos Generales para la Evaluación de
+        Programas Presupuestarios Municipales, y en la normatividad municipal,
+        estatal y complementaria aplicable.
+      </p>
+      <p class="mb-0">
+        El recurso deberá ejercerse en el mismo mes de emisión de esta
+        suficiencia; en caso contrario, perderá validez y deberá tramitarse
+        nuevamente con fecha del mes en curso.
+      </p>
+    </div>
+
+  </div>
+  <!-- /form-container -->
+
+  <!-- ================================================
+       MODAL: SELECCIÓN DE PARTIDAS (multi-fuente)
+       ================================================ -->
+  <div class="modal fade" id="modalSeleccionPartidas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-grid-3x3-gap me-2 text-secondary"></i>Seleccionar Partidas
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">
+            Selecciona las partidas y asigna el importe. Las suficiencias se crearán agrupadas por fuente de
+            financiamiento automáticamente.
+          </p>
+          <div id="lista-partidas-modal">
+            <div class="text-center py-4 text-muted">Cargando partidas...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="me-auto small text-muted">
+            <span id="modal-resumen-seleccion">Ninguna partida seleccionada</span>
+          </div>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x me-1"></i>Cancelar
+          </button>
+          <button type="button" id="btn-confirmar-partidas" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>Confirmar selección
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================
+       MODAL: CONFIRMACIÓN DE GUARDADO
+       ================================================ -->
+  <div class="modal fade" id="modalConfirm" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-question-circle me-2 text-warning"></i>Confirmación
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          ¿Estás seguro de guardar la Suficiencia Presupuestal?
+        </div>
+        <div class="modal-footer">
+          <button id="btn-no-seguro" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-1"></i>No estoy seguro
+          </button>
+          <button id="btn-si-seguro" type="button" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i>Sí, guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.2.2/build/qrcode.min.js"></script>
+  <script src="/js/session-guard.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/script.js"></script>
+  <script src="/js/user-info.js"></script>
+  <script src="/js/candados.proyectos.js"></script>
+  <script src="/js/candados.fuentes.js"></script>
+  <script type="module" src="/js/suficiencia_presupuestal.js"></script>
+</body>
+
+</html>

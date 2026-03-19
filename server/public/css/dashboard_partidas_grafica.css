@@ -1,0 +1,220 @@
+/* ===================================================
+   DASHBOARD PARTIDAS GRÁFICA — CSS
+   Tema: Claro / Vino (#691c32) / Montserrat
+   =================================================== */
+
+:root {
+  --dpg-vino:       #691c32;
+  --dpg-vino-dark:  #5a1629;
+  --dpg-gold:       #bc955c;
+  --dpg-gold-soft:  #efe2cf;
+  --dpg-bg:         #f4f1ed;
+  --dpg-card-bg:    #ffffff;
+  --dpg-border:     #e2d5c3;
+  --dpg-text-muted: #6c757d;
+}
+
+/* ===== BODY ===== */
+.dashboard-partidas-page {
+  background: var(--dpg-bg);
+}
+
+/* ===================================================
+   TOPBAR DE PÁGINA
+   =================================================== */
+.dpg-page-topbar {
+  background: var(--dpg-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--dpg-border);
+  box-shadow: 0 2px 12px rgba(105, 28, 50, 0.07);
+  padding: 18px 24px;
+  margin-bottom: 20px;
+}
+
+.dpg-topbar-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--dpg-vino) 0%, #9b2c40 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(105, 28, 50, 0.28);
+}
+
+.dpg-topbar-icon i {
+  font-size: 1.4rem;
+  color: #ffffff;
+}
+
+.dpg-topbar-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--dpg-vino);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.dpg-topbar-subtitle {
+  font-size: 0.8rem;
+  color: var(--dpg-text-muted);
+  margin: 2px 0 0;
+}
+
+/* ===================================================
+   CARD DE FILTROS
+   =================================================== */
+.dpg-filters-card {
+  background: var(--dpg-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--dpg-border);
+  border-top: 3px solid var(--dpg-gold);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+.dpg-filters-card .card-header {
+  background: linear-gradient(90deg, var(--dpg-gold-soft), #fff8f0);
+  border-bottom: 1px solid var(--dpg-border);
+  border-radius: 13px 13px 0 0;
+  padding: 10px 20px;
+}
+
+.dpg-filters-card .card-header span {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #5f3b09;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.dpg-filters-card .card-body {
+  padding: 18px 20px;
+}
+
+.dpg-filters-card .form-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--dpg-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.dpg-filters-card .form-select,
+.dpg-filters-card .form-control {
+  font-size: 0.85rem;
+  border-color: var(--dpg-border);
+  border-radius: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.dpg-filters-card .form-select:focus,
+.dpg-filters-card .form-control:focus {
+  border-color: var(--dpg-vino);
+  box-shadow: 0 0 0 3px rgba(105, 28, 50, 0.12);
+}
+
+.dpg-btn-apply {
+  background: linear-gradient(135deg, var(--dpg-vino) 0%, #9b2c40 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  border-radius: 10px !important;
+  padding: 9px 18px !important;
+  box-shadow: 0 4px 14px rgba(105, 28, 50, 0.3) !important;
+  transition: transform 0.15s, box-shadow 0.15s !important;
+  letter-spacing: 0.3px;
+}
+
+.dpg-btn-apply:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(105, 28, 50, 0.38) !important;
+}
+
+.dpg-btn-apply:active {
+  transform: translateY(0) !important;
+}
+
+/* ===================================================
+   CARD DE GRÁFICA
+   =================================================== */
+.dpg-chart-card {
+  background: var(--dpg-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--dpg-border);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.dpg-chart-card .card-body {
+  padding: 20px 24px;
+}
+
+.chart-wrapper {
+  min-height: 400px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-wrapper canvas {
+  max-height: 520px;
+}
+
+#chartFootnote {
+  font-size: 0.78rem;
+  color: var(--dpg-text-muted);
+  padding-top: 8px;
+  border-top: 1px solid #f0ece6;
+  margin-top: 12px;
+}
+
+/* ===================================================
+   RESPONSIVE
+   =================================================== */
+
+/* Mobile: hasta 480px */
+@media (max-width: 480px) {
+  .dpg-page-topbar {
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+
+  .dpg-topbar-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .dpg-topbar-icon i { font-size: 1.15rem; }
+
+  .dpg-topbar-title { font-size: 1rem; }
+
+  .dpg-filters-card .card-body { padding: 14px 14px; }
+
+  .chart-wrapper { min-height: 280px; }
+
+  .chart-wrapper canvas { max-height: 320px; }
+
+  .dpg-chart-card .card-body { padding: 14px 14px; }
+}
+
+/* Tablet: 480px – 960px */
+@media (min-width: 480px) and (max-width: 960px) {
+  .dpg-page-topbar { padding: 16px 20px; }
+
+  .chart-wrapper { min-height: 340px; }
+}
+
+/* Widescreen: >= 1328px */
+@media (min-width: 1328px) {
+  .dpg-topbar-title { font-size: 1.35rem; }
+
+  .chart-wrapper { min-height: 480px; }
+
+  .chart-wrapper canvas { max-height: 580px; }
+}

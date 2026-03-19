@@ -1,0 +1,258 @@
+/* ===================================================
+   PARTIDAS PRESUPUESTALES — CSS
+   Tema: Claro / Vino (#691c32) / Montserrat
+   =================================================== */
+
+:root {
+  --pt-vino:       #691c32;
+  --pt-vino-dark:  #5a1629;
+  --pt-gold:       #bc955c;
+  --pt-gold-soft:  #efe2cf;
+  --pt-bg:         #f4f1ed;
+  --pt-card-bg:    #ffffff;
+  --pt-border:     #e2d5c3;
+  --pt-text-muted: #6c757d;
+}
+
+/* ===== BODY ===== */
+.partidas-page {
+  background: var(--pt-bg);
+}
+
+/* ===================================================
+   TOPBAR DE PÁGINA
+   =================================================== */
+.pt-page-topbar {
+  background: var(--pt-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--pt-border);
+  box-shadow: 0 2px 12px rgba(105, 28, 50, 0.07);
+  padding: 18px 24px;
+  margin-bottom: 20px;
+}
+
+.pt-topbar-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--pt-vino) 0%, #9b2c40 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(105, 28, 50, 0.28);
+}
+
+.pt-topbar-icon i {
+  font-size: 1.4rem;
+  color: #ffffff;
+}
+
+.pt-topbar-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--pt-vino);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.pt-topbar-subtitle {
+  font-size: 0.8rem;
+  color: var(--pt-text-muted);
+  margin: 2px 0 0;
+}
+
+.pt-topbar-meta {
+  font-size: 0.78rem;
+  color: var(--pt-text-muted);
+  margin: 4px 0 0;
+}
+
+.pt-topbar-meta strong {
+  color: var(--pt-vino);
+  font-weight: 700;
+}
+
+/* ===================================================
+   CARD DE HERRAMIENTAS (búsqueda + paginación)
+   =================================================== */
+.pt-tools-card {
+  background: var(--pt-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--pt-border);
+  border-top: 3px solid var(--pt-gold);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 0;
+}
+
+.pt-tools-card .card-body {
+  padding: 16px 20px;
+}
+
+/* Input búsqueda */
+.pt-tools-card .input-group .input-group-text {
+  background: #faf7f3;
+  border-color: var(--pt-border);
+  color: var(--pt-vino);
+  border-radius: 8px 0 0 8px;
+}
+
+.pt-tools-card .input-group .form-control {
+  border-color: var(--pt-border);
+  border-radius: 0;
+  font-size: 0.85rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pt-tools-card .input-group .form-control:focus {
+  border-color: var(--pt-vino);
+  box-shadow: 0 0 0 3px rgba(105, 28, 50, 0.1);
+  z-index: 3;
+}
+
+.pt-tools-card .form-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--pt-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.pt-tools-card .form-select {
+  font-size: 0.85rem;
+  border-color: var(--pt-border);
+  border-radius: 8px;
+}
+
+.pt-tools-card .form-select:focus {
+  border-color: var(--pt-vino);
+  box-shadow: 0 0 0 3px rgba(105, 28, 50, 0.1);
+}
+
+/* Paginación */
+#page {
+  max-width: 70px;
+  border-left: none;
+  border-right: none;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-color: var(--pt-border);
+}
+
+/* Info de conteo */
+#countInfo {
+  font-size: 0.78rem;
+  color: var(--pt-text-muted);
+  font-weight: 600;
+}
+
+/* ===================================================
+   TABLA
+   =================================================== */
+.pt-table-card {
+  background: var(--pt-card-bg);
+  border-radius: 0 0 16px 16px;
+  border: 1px solid var(--pt-border);
+  border-top: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.pt-table thead th {
+  background: var(--pt-vino);
+  color: #ffffff;
+  border-bottom: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 12px 14px;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.pt-table tbody tr {
+  border-bottom: 1px solid #f0ece6;
+  transition: background 0.12s;
+}
+
+.pt-table tbody tr:hover {
+  background: rgba(105, 28, 50, 0.04) !important;
+}
+
+.pt-table tbody td {
+  vertical-align: middle;
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  color: #2d2d2d;
+}
+
+/* Input de monto dentro de la tabla */
+.pt-table .form-control {
+  font-size: 0.85rem;
+  border-color: var(--pt-border);
+  border-radius: 8px;
+  max-width: 220px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pt-table .form-control:focus {
+  border-color: var(--pt-vino);
+  box-shadow: 0 0 0 3px rgba(105, 28, 50, 0.12);
+}
+
+/* Badge clave de partida */
+.pt-badge-clave {
+  background: rgba(105, 28, 50, 0.1);
+  color: var(--pt-vino);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+  letter-spacing: 0.4px;
+}
+
+/* ===================================================
+   RESPONSIVE
+   =================================================== */
+
+/* Mobile: hasta 480px */
+@media (max-width: 480px) {
+  .pt-page-topbar {
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+
+  .pt-topbar-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .pt-topbar-icon i { font-size: 1.15rem; }
+
+  .pt-topbar-title { font-size: 1rem; }
+
+  .pt-tools-card .card-body { padding: 12px 14px; }
+
+  .pt-table tbody td,
+  .pt-table thead th {
+    padding: 9px 10px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Tablet: 480px – 960px */
+@media (min-width: 480px) and (max-width: 960px) {
+  .pt-page-topbar { padding: 16px 20px; }
+}
+
+/* Widescreen: >= 1328px */
+@media (min-width: 1328px) {
+  .pt-topbar-title { font-size: 1.35rem; }
+}

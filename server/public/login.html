@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Iniciar sesión | Control Presupuestal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Tu CSS -->
+  <link rel="stylesheet" href="/css/login.css">
+</head>
+
+<body>
+
+  <div class="login-wrap">
+    <div class="card shadow-lg login-card">
+      <div class="card-body p-4 p-md-5">
+
+        <!-- BRAND -->
+        <div class="text-center mb-4 brand">
+          <!-- Cambia el src si tu logo es otro -->
+          <img src="/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="brand-logo">
+          <h4 class="mt-3 mb-0 fw-semibold">Control Presupuestal</h4>
+          <div class="text-muted">Acceso al sistema</div>
+        </div>
+
+        <!-- ALERT (tu login.js usa loginError) -->
+        <div id="loginError" class="alert alert-danger d-none"></div>
+
+        <!-- FORM (IDs intactos para tu login.js) -->
+        <form id="loginForm" autocomplete="off">
+
+          <div class="mb-3">
+            <label class="form-label">Usuario</label>
+            <input type="text" id="usuario" class="form-control form-control-lg" required autofocus>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label">Contraseña</label>
+            <div class="input-group input-group-lg">
+              <input type="password" id="password" class="form-control" required>
+              <button class="btn btn-outline-secondary toggle-pass" type="button" id="togglePass" aria-label="Mostrar contraseña">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="d-grid mt-4">
+            <button type="submit" class="btn btn-primary btn-lg btn-login">
+              Iniciar sesión
+            </button>
+          </div>
+        </form>
+
+        <footer class="text-center mt-4 text-muted small">
+          © 2026 H. Ayuntamiento de Ecatepec
+        </footer>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Config + tu lógica (NO se toca) -->
+  <script src="/js/config.js"></script>
+  <script src="/js/login.js"></script>
+
+  <!-- Mini script SOLO para el ojito (visual) -->
+  <script>
+    (() => {
+      const btn = document.getElementById("togglePass");
+      const pass = document.getElementById("password");
+      if (!btn || !pass) return;
+
+      btn.addEventListener("click", () => {
+        const show = pass.type === "password";
+        pass.type = show ? "text" : "password";
+        btn.innerHTML = `<i class="bi bi-eye${show ? "-slash" : ""}"></i>`;
+      });
+    })();
+  </script>
+
+</body>
+</html>

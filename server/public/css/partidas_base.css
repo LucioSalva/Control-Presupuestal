@@ -1,0 +1,315 @@
+/* ===================================================
+   PRESUPUESTO BASE DE PARTIDAS (CARGA MASIVA) — CSS
+   Tema: Claro / Vino (#691c32) / Montserrat
+   =================================================== */
+
+:root {
+  --pbp-vino:       #691c32;
+  --pbp-vino-dark:  #5a1629;
+  --pbp-gold:       #bc955c;
+  --pbp-gold-soft:  #efe2cf;
+  --pbp-bg:         #f4f1ed;
+  --pbp-card-bg:    #ffffff;
+  --pbp-border:     #e2d5c3;
+  --pbp-text-muted: #6c757d;
+}
+
+/* ===== BODY ===== */
+.partidas-base-page {
+  background:
+    radial-gradient(circle at top right, rgba(188, 149, 92, 0.18), transparent 45%),
+    radial-gradient(circle at top left,  rgba(105, 28, 50, 0.10), transparent 42%),
+    var(--pbp-bg);
+}
+
+/* ===================================================
+   TOPBAR DE PÁGINA
+   =================================================== */
+.pbp-page-topbar {
+  background: var(--pbp-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--pbp-border);
+  box-shadow: 0 2px 12px rgba(105, 28, 50, 0.07);
+  padding: 18px 24px;
+  margin-bottom: 20px;
+}
+
+.pbp-topbar-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--pbp-vino) 0%, #9b2c40 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(105, 28, 50, 0.28);
+}
+
+.pbp-topbar-icon i {
+  font-size: 1.4rem;
+  color: #ffffff;
+}
+
+.pbp-topbar-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--pbp-vino);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.pbp-topbar-subtitle {
+  font-size: 0.8rem;
+  color: var(--pbp-text-muted);
+  margin: 3px 0 0;
+  max-width: 600px;
+}
+
+/* ===================================================
+   CARD DE ACCIONES (Subir Excel / Plantilla / Limpiar)
+   =================================================== */
+.pbp-actions-card {
+  background: var(--pbp-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--pbp-border);
+  border-top: 3px solid var(--pbp-gold);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+.pbp-actions-card .card-header {
+  background: linear-gradient(90deg, var(--pbp-gold-soft), #fff8f0);
+  border-bottom: 1px solid var(--pbp-border);
+  border-radius: 13px 13px 0 0;
+  padding: 10px 20px;
+}
+
+.pbp-actions-card .card-header span {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #5f3b09;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.pbp-actions-card .card-body {
+  padding: 18px 20px;
+}
+
+.pbp-actions-card .form-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--pbp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.pbp-actions-card .form-control {
+  font-size: 0.85rem;
+  border-color: var(--pbp-border);
+  border-radius: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pbp-actions-card .form-control:focus {
+  border-color: var(--pbp-vino);
+  box-shadow: 0 0 0 3px rgba(105, 28, 50, 0.12);
+}
+
+/* Botón subir: destacado */
+.pbp-btn-upload {
+  background: linear-gradient(135deg, var(--pbp-vino) 0%, #9b2c40 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  border-radius: 10px !important;
+  padding: 9px 18px !important;
+  box-shadow: 0 4px 14px rgba(105, 28, 50, 0.3) !important;
+  transition: transform 0.15s, box-shadow 0.15s !important;
+}
+
+.pbp-btn-upload:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(105, 28, 50, 0.38) !important;
+}
+
+/* Botón limpiar: peligroso pero con estilo coherente */
+.pbp-btn-danger {
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+}
+
+/* ===================================================
+   CARD DE TABLA DE RESULTADOS
+   =================================================== */
+.pbp-results-card {
+  background: var(--pbp-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--pbp-border);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.pbp-table-wrap {
+  max-height: 62vh;
+  overflow: auto;
+}
+
+/* Scrollbar elegante */
+.pbp-table-wrap::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.pbp-table-wrap::-webkit-scrollbar-track {
+  background: #f4f1ed;
+}
+
+.pbp-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--pbp-border);
+  border-radius: 4px;
+}
+
+.pbp-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--pbp-gold);
+}
+
+.pbp-table {
+  font-size: 0.79rem;
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+
+.pbp-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--pbp-vino);
+  color: #fff;
+  border-color: #5f1a2d;
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 11px 12px;
+}
+
+.pbp-table tbody tr {
+  border-bottom: 1px solid #f0ece6;
+  transition: background 0.12s;
+}
+
+.pbp-table tbody tr:hover {
+  background: rgba(105, 28, 50, 0.04) !important;
+}
+
+.pbp-table tbody td {
+  vertical-align: middle;
+  padding: 9px 12px;
+  color: #2d2d2d;
+}
+
+/* Total footer */
+#txtTotal {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--pbp-text-muted);
+  padding: 0 4px;
+  margin-bottom: 16px;
+}
+
+/* ===================================================
+   CARD DE ERRORES
+   =================================================== */
+.pbp-errors-card {
+  background: var(--pbp-card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--pbp-border);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.pbp-errors-head {
+  background: linear-gradient(90deg, var(--pbp-gold-soft), #fffaf1);
+  color: #5f3b09;
+  border-bottom: 1px solid var(--pbp-border);
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.pbp-errors-card .card-body {
+  padding: 16px 20px;
+}
+
+#errorList .list-group-item {
+  border-left: 4px solid #b02a37;
+  border-radius: 6px;
+  font-size: 0.83rem;
+  margin-bottom: 4px;
+  padding: 8px 14px;
+}
+
+/* ===================================================
+   RESPONSIVE
+   =================================================== */
+
+/* Mobile: hasta 480px */
+@media (max-width: 480px) {
+  .pbp-page-topbar {
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+
+  .pbp-topbar-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .pbp-topbar-icon i { font-size: 1.15rem; }
+
+  .pbp-topbar-title { font-size: 1rem; }
+
+  .pbp-actions-card .card-body { padding: 14px 14px; }
+
+  .pbp-table {
+    font-size: 0.73rem;
+  }
+
+  .pbp-table-wrap {
+    max-height: 50vh;
+  }
+}
+
+/* Tablet: 480px – 960px */
+@media (min-width: 480px) and (max-width: 960px) {
+  .pbp-page-topbar { padding: 16px 20px; }
+
+  .pbp-table {
+    font-size: 0.75rem;
+  }
+}
+
+/* Desktop: 960px – 1328px */
+@media (min-width: 960px) and (max-width: 1328px) {
+  .pbp-table {
+    font-size: 0.78rem;
+  }
+}
+
+/* Widescreen: >= 1328px */
+@media (min-width: 1328px) {
+  .pbp-topbar-title { font-size: 1.35rem; }
+
+  .pbp-table { font-size: 0.82rem; }
+
+  .pbp-table-wrap { max-height: 65vh; }
+}

@@ -1,0 +1,609 @@
+/* =============================================================
+   comprometido.css — Estilos módulo Comprometido
+   Control Presupuestal Municipal de Ecatepec
+   Color principal: --cp-vino (#691c32)
+   Breakpoints del proyecto:
+     Mobile:     max-width 480px
+     Tablet:     480px – 960px
+     Desktop:    960px – 1328px
+     Widescreen: min-width 1328px
+   ============================================================= */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { font-size: 12px; }
+
+body {
+  margin: 0;
+  font-size: 12px;
+  background-color: var(--cp-bg, #f5f5f5);
+}
+
+/* =============================================================
+   VARIABLES LOCALES (complementan styles.css)
+   ============================================================= */
+:root {
+  --comp-radius: 12px;
+  --comp-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+  --comp-shadow-hover: 0 6px 24px rgba(105, 28, 50, 0.18);
+  --comp-border: #dee2e6;
+  --comp-thead-bg: #4a1323;
+  --comp-thead-bg-alt: #691c32;
+  --comp-total-bg: #f3e8eb;
+  --comp-total-border: #691c32;
+  --comp-leyenda-bg: #f0e6e9;
+  --comp-leyenda-border: #c4949f;
+  --comp-transition: 0.18s ease;
+}
+
+/* =============================================================
+   CONTENEDOR DEL FORMULARIO
+   ============================================================= */
+.form-container {
+  width: min(1000px, calc(100% - 24px));
+  margin: 16px auto;
+  background: #fff;
+  padding: 16px;
+  border-radius: var(--comp-radius);
+  box-shadow: var(--comp-shadow);
+}
+
+.form-container.doc-header {
+  width: min(1000px, calc(100% - 24px));
+  margin: 16px auto;
+  background: #fff;
+  padding: 18px 20px !important;
+  border-radius: var(--comp-radius) !important;
+  box-shadow: var(--comp-shadow) !important;
+  border-top: 4px solid var(--cp-vino, #691c32);
+}
+
+/* =============================================================
+   TIPOGRAFÍA DEL DOCUMENTO
+   ============================================================= */
+.form-title {
+  text-align: center;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  color: var(--cp-vino, #691c32);
+}
+
+.sub-title {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #495057;
+}
+
+/* =============================================================
+   TABLAS DEL DOCUMENTO
+   ============================================================= */
+.table-bordered td,
+.table-bordered th {
+  border: 1px solid #000 !important;
+}
+
+.table-header {
+  background-color: #e9ecef;
+  font-weight: 700;
+  text-align: center;
+  font-size: 11px;
+}
+
+/* Label de campo (th izquierdo) */
+.cp-th-label {
+  background-color: #f1f3f5 !important;
+  font-size: 10.5px;
+  font-weight: 700;
+  vertical-align: middle;
+  color: #343a40;
+}
+
+/* Celda de folio superior derecha */
+.cp-th-folio {
+  background-color: rgb(180, 180, 180) !important;
+  font-size: 11px;
+}
+
+/* Tabla del folio */
+.cp-folio-table { margin-bottom: 0; }
+
+/* Thead de tabla de detalle */
+.cp-thead-cell {
+  background-color: var(--comp-thead-bg, #4a1323) !important;
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-align: center;
+  vertical-align: middle;
+  border-color: #3a0e1b !important;
+}
+
+/* Tabla de detalle */
+.cp-table-detail-wrap { border-radius: 6px; overflow: hidden; }
+.cp-table-detail tbody tr:hover { background-color: rgba(105, 28, 50, 0.04); }
+
+/* Totales */
+.cp-th-total {
+  background-color: #f1f3f5 !important;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  width: 38%;
+}
+
+.cp-th-total--highlight {
+  background-color: var(--comp-total-bg, #f3e8eb) !important;
+  color: var(--cp-vino, #691c32) !important;
+  border-top: 2px solid var(--comp-total-border) !important;
+}
+
+.cp-td-total {
+  background-color: var(--comp-total-bg, #f3e8eb) !important;
+  border-top: 2px solid var(--comp-total-border) !important;
+}
+
+/* =============================================================
+   CAMPOS DE SOLO LECTURA (as-text / ro)
+   ============================================================= */
+.form-container .as-text,
+.form-container .as-text:read-only,
+.form-container .ro,
+.form-container .ro:read-only {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: #000 !important;
+  opacity: 1 !important;
+  cursor: default !important;
+}
+
+.form-container .as-text:focus,
+.form-container .ro:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.td-text {
+  font-weight: 800 !important;
+  letter-spacing: 0.25px;
+  line-height: 1.15 !important;
+}
+
+td .as-text,
+td .ro {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100%;
+  height: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+td .text-end.as-text,
+td .text-end.ro { justify-content: flex-end !important; }
+
+.ro-folio {
+  font-size: 14px;
+  font-weight: 900 !important;
+  letter-spacing: 1px;
+}
+
+.input-no-click {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* =============================================================
+   INPUT FOCUS (vino)
+   ============================================================= */
+.form-container .form-control:focus,
+.form-container .form-select:focus {
+  border-color: var(--cp-vino, #691c32) !important;
+  box-shadow: 0 0 0 0.2rem rgba(105, 28, 50, 0.18) !important;
+}
+
+/* =============================================================
+   BARRA DE ACCIONES
+   ============================================================= */
+.cp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #fff;
+  border-radius: var(--comp-radius);
+  box-shadow: var(--comp-shadow);
+  border-left: 4px solid var(--cp-vino, #691c32);
+}
+
+.cp-actions__left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cp-actions__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 290px;
+}
+
+/* Fila superior del lado derecho: Nuevo + badge */
+.cp-actions__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+/* Separador vertical entre grupos de botones */
+.cp-actions-divider {
+  width: 1px;
+  height: 28px;
+  background-color: #dee2e6;
+  flex-shrink: 0;
+}
+
+/* Badge de status del documento */
+.cp-badge-status {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+/* =============================================================
+   BOTONES CON TEMA VINO
+   ============================================================= */
+.btn-cp-primary {
+  background-color: var(--cp-vino, #691c32) !important;
+  border-color: var(--cp-vino, #691c32) !important;
+  color: #fff !important;
+  font-weight: 700;
+  transition: background-color var(--comp-transition),
+              border-color var(--comp-transition),
+              transform var(--comp-transition),
+              box-shadow var(--comp-transition);
+}
+
+.btn-cp-primary:hover,
+.btn-cp-primary:focus {
+  background-color: var(--cp-vino-dark, #5a1629) !important;
+  border-color: var(--cp-vino-dark, #5a1629) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--comp-shadow-hover);
+}
+
+.btn-cp-outline {
+  border-color: var(--cp-vino, #691c32) !important;
+  color: var(--cp-vino, #691c32) !important;
+  background: transparent;
+  font-weight: 600;
+  transition: background-color var(--comp-transition),
+              color var(--comp-transition),
+              transform var(--comp-transition),
+              box-shadow var(--comp-transition);
+}
+
+.btn-cp-outline:hover,
+.btn-cp-outline:focus {
+  background-color: var(--cp-vino, #691c32) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: var(--comp-shadow-hover);
+}
+
+/* Transición general para btn en la barra de acciones */
+.cp-actions .btn {
+  min-height: 36px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: transform var(--comp-transition), box-shadow var(--comp-transition);
+}
+
+.cp-actions .btn:hover { transform: translateY(-1px); }
+.cp-actions .btn:active { transform: translateY(0); }
+
+/* =============================================================
+   BUSCADOR
+   ============================================================= */
+.cp-search-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cp-search {
+  width: min(520px, 100%);
+}
+
+.cp-search .form-control { min-width: 200px; }
+
+.cp-search-icon {
+  background: #fff;
+  border-right: none;
+  color: #6c757d;
+}
+
+.cp-search-hint {
+  font-size: 10.5px;
+  color: #6c757d;
+}
+
+/* =============================================================
+   SECCIÓN HEADER (barra de sección interna)
+   ============================================================= */
+.cp-section-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #f8f9fa;
+  border-left: 3px solid var(--cp-vino, #691c32);
+  border-radius: 0 6px 6px 0;
+  font-size: 11px;
+}
+
+.cp-section-title {
+  font-weight: 700;
+  color: var(--cp-vino, #691c32);
+}
+
+/* =============================================================
+   META + TOTALES — GRID DE 2 COLUMNAS
+   ============================================================= */
+.cp-meta-totales-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0;
+  border: 1px solid #000;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.cp-meta-col {
+  border-right: 1px solid #000;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+}
+
+.cp-meta-inner {
+  width: 100%;
+}
+
+.cp-meta-label {
+  font-weight: 800;
+  font-size: 11px;
+  text-align: center;
+  background-color: rgb(180, 180, 180);
+  padding: 6px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.cp-totales-col { width: 240px; flex-shrink: 0; }
+
+.cp-totales-table { margin-bottom: 0; }
+.cp-totales-table td,
+.cp-totales-table th { border: 1px solid #000 !important; }
+
+/* =============================================================
+   CONTROLES DE IMPUESTOS
+   ============================================================= */
+.cp-impuestos-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+}
+
+.cp-impuestos-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.cp-impuestos-opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.cp-tasa-input { width: 110px; flex: 0 0 110px; }
+
+/* =============================================================
+   LEYENDA LEGAL
+   ============================================================= */
+.cp-leyenda {
+  font-size: 11px;
+  text-align: justify;
+  background-color: var(--comp-leyenda-bg, #f0e6e9);
+  border: 1px solid var(--comp-leyenda-border, #c4949f);
+  border-left: 4px solid var(--cp-vino, #691c32);
+  border-radius: 6px;
+  padding: 12px 14px;
+  color: #343a40;
+  line-height: 1.5;
+}
+
+/* =============================================================
+   IMPRESIÓN
+   ============================================================= */
+@media print {
+  body { background-color: #fff; padding-top: 0; }
+  .no-print { display: none !important; }
+  .form-container {
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    border-top: none;
+  }
+  .cp-actions { display: none !important; }
+  .cp-leyenda {
+    background-color: rgb(180, 180, 180);
+    border: 1px solid #000;
+    border-left: 1px solid #000;
+  }
+  .cp-thead-cell {
+    background-color: rgb(180, 180, 180) !important;
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+}
+
+/* =============================================================
+   MOBILE  (max-width: 480px)
+   ============================================================= */
+@media (max-width: 480px) {
+  html { font-size: 11px; }
+
+  .form-container,
+  .form-container.doc-header {
+    width: calc(100% - 12px);
+    padding: 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .form-title { font-size: 13px; }
+  .sub-title { font-size: 11px; }
+
+  /* Header del documento: apilar columnas */
+  .form-container.doc-header .row { row-gap: 10px; }
+  .form-container.doc-header .col-3,
+  .form-container.doc-header .col-6 {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+    text-align: center !important;
+  }
+  .form-container.doc-header .col-3.text-center img { max-height: 44px !important; }
+
+  /* Barra de acciones: apilar todo en columna */
+  .cp-actions {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border-left-width: 3px;
+  }
+
+  .cp-actions__left,
+  .cp-actions__right {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .cp-actions__right { min-width: unset; }
+  .cp-actions__nav { justify-content: flex-start; }
+  .cp-actions-divider { display: none; }
+
+  .cp-actions .btn,
+  .cp-actions .btn-group { width: 100%; }
+  .cp-actions .btn-group .btn { flex: 1; }
+
+  .cp-search { width: 100%; }
+  .cp-search .form-control { min-width: unset; }
+
+  /* Grid meta-totales: apilar */
+  .cp-meta-totales-grid {
+    grid-template-columns: 1fr;
+  }
+  .cp-meta-col { border-right: none; border-bottom: 1px solid #000; }
+  .cp-totales-col { width: 100%; }
+
+  /* Impuestos: columna */
+  .cp-impuestos-bar { flex-direction: column; align-items: flex-start; }
+  .cp-impuestos-opts { flex-direction: column; align-items: flex-start; }
+
+  /* Tabla detalle: scroll horizontal */
+  .cp-table-detail-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cp-table-detail { min-width: 600px; }
+}
+
+/* =============================================================
+   TABLET  (480px – 960px)
+   ============================================================= */
+@media (min-width: 480px) and (max-width: 960px) {
+  html { font-size: 12px; }
+
+  .form-container,
+  .form-container.doc-header {
+    width: calc(100% - 24px);
+    padding: 16px !important;
+  }
+
+  .cp-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .cp-actions__right {
+    min-width: 100%;
+    align-items: stretch;
+  }
+
+  .cp-actions__nav { justify-content: flex-start; }
+  .cp-search { width: 100%; }
+
+  .cp-meta-totales-grid { grid-template-columns: 1fr auto; }
+  .cp-totales-col { width: 210px; }
+
+  .cp-table-detail-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cp-table-detail { min-width: 580px; }
+}
+
+/* =============================================================
+   DESKTOP  (960px – 1328px)
+   ============================================================= */
+@media (min-width: 960px) and (max-width: 1328px) {
+  html { font-size: 12.5px; }
+
+  .form-container,
+  .form-container.doc-header {
+    width: min(1000px, calc(100% - 48px));
+    padding: 18px 22px !important;
+  }
+
+  .cp-actions__right { min-width: 320px; }
+}
+
+/* =============================================================
+   WIDESCREEN  (min-width: 1328px)
+   ============================================================= */
+@media (min-width: 1328px) {
+  html { font-size: 13px; }
+
+  .form-container,
+  .form-container.doc-header {
+    width: min(1100px, calc(100% - 64px));
+    padding: 20px 30px !important;
+  }
+
+  .form-title { font-size: 15px; }
+  .cp-actions__right { min-width: 360px; }
+}
