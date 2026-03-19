@@ -568,6 +568,16 @@ async function loadCatalogs() {
   }
 }
 
+/**
+ * BUG-010: Sanitiza valor para prevenir CSV Injection (fórmulas maliciosas en Excel/Sheets).
+ * Prefija con apóstrofe si el valor empieza con =, +, -, @, TAB o CR.
+ */
+function sanitizeCsvValue(val) {
+  const s = String(val ?? "");
+  if (/^[=+\-@\t\r]/.test(s)) return "'" + s;
+  return s;
+}
+
 function exportCSV() {
   if (!STATE.filtered.length) {
     banner("No hay proyectos para exportar con los filtros actuales.", "warning");
@@ -586,7 +596,7 @@ function exportCSV() {
   ];
 
   const csvEscape = (value) => {
-    const str = String(value ?? "");
+    const str = sanitizeCsvValue(String(value ?? ""));
     if (str.includes('"') || str.includes(",") || str.includes("\n")) {
       return `"${str.replace(/"/g, '""')}"`;
     }

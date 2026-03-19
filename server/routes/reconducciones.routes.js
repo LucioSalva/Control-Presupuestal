@@ -21,7 +21,13 @@
 import express from "express";
 import crypto from "crypto";
 import { query, getClient } from "../db.js";
-import { computeSaldo, getActorId, logAuditEvent } from "../utils/helpers.js";
+import {
+  computeSaldo,
+  getActorId,
+  logAuditEvent,
+  checkIsUserL00117,
+  checkIsUserE00,
+} from "../utils/helpers.js";
 
 const router = express.Router();
 
@@ -32,18 +38,6 @@ function getRole(req) {
   return "AREA";
 }
 
-async function isUserL00117(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  const daId = Number(req.user?.id_dauxiliar);
-  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
-  const [rDg, rDa] = await Promise.all([
-    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
-    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
-  ]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "L00" && daClave === "117";
-}
 
 function canSeeAllAreas(role, isL00117) {
   return role !== "AREA" || isL00117;
@@ -186,7 +180,7 @@ async function generateReconClaveForArea(actorId, dgClave, daClave) {
 }
 
 async function requireL00117(req, res, next) {
-  const ok = await isUserL00117(req);
+  const ok = await checkIsUserL00117(req);
   if (!ok) {
     return res.status(403).json({ error: "Solo L00 117 puede acceder." });
   }
@@ -194,7 +188,7 @@ async function requireL00117(req, res, next) {
 }
 
 async function requireReconSession(req, res, next) {
-  const isL00117 = await isUserL00117(req);
+  const isL00117 = await checkIsUserL00117(req);
   if (isL00117) {
     return next();
   }
@@ -447,7 +441,7 @@ router.get("/next-oficio", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const role = getRole(req);
-    const isL00117 = await isUserL00117(req);
+    const isL00117 = await checkIsUserL00117(req);
     const allowAll = canSeeAllAreas(role, isL00117);
     const areaIds = getAreaIds(req);
 
@@ -491,7 +485,7 @@ router.get("/", async (req, res) => {
 router.get("/saldos", async (req, res) => {
   try {
     const role = getRole(req);
-    const isL00117 = await isUserL00117(req);
+    const isL00117 = await checkIsUserL00117(req);
     const allowAll = canSeeAllAreas(role, isL00117);
     const areaIds = getAreaIds(req);
 
@@ -551,7 +545,7 @@ router.get("/:id", async (req, res) => {
     }
 
     const role = getRole(req);
-    const isL00117 = await isUserL00117(req);
+    const isL00117 = await checkIsUserL00117(req);
     const allowAll = canSeeAllAreas(role, isL00117);
     const areaIds = getAreaIds(req);
 
@@ -634,7 +628,7 @@ router.post("/", async (req, res) => {
     const b = req.body || {};
     const actorId = getActorId(req) || req.user?.id || null;
     const role = getRole(req);
-    const isL00117 = await isUserL00117(req);
+    const isL00117 = await checkIsUserL00117(req);
     const allowAll = canSeeAllAreas(role, isL00117);
     const areaIds = getAreaIds(req);
 
@@ -662,7 +656,6 @@ router.post("/", async (req, res) => {
       const { year, month } = normalizeYearMonth(ym.year, ym.month);
       const prefix = `ECA-${year}-${month}-RCP-`;
       const like = `${prefix}%`;
-      await client.query("LOCK TABLE public.reconducciones IN EXCLUSIVE MODE");
       const r = await client.query(
         `
         SELECT COALESCE(MAX(
@@ -673,6 +666,7 @@ router.post("/", async (req, res) => {
         ), 0) AS max_num
         FROM public.reconducciones
         WHERE oficio LIKE $1
+        FOR UPDATE
         `,
         [like]
       );
@@ -784,7 +778,7 @@ router.post("/", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("POST /api/reconducciones", err);
-    return res.status(500).json({ error: err.message || "Error creando reconducción" });
+    return res.status(500).json({ error: "Error interno del servidor" });
   } finally {
     client.release();
   }
@@ -801,7 +795,7 @@ router.put("/:id", async (req, res) => {
     const b = req.body || {};
     const actorId = getActorId(req) || req.user?.id || null;
     const role = getRole(req);
-    const isL00117 = await isUserL00117(req);
+    const isL00117 = await checkIsUserL00117(req);
     const allowAll = canSeeAllAreas(role, isL00117);
     const areaIds = getAreaIds(req);
 
@@ -965,7 +959,7 @@ router.put("/:id", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("PUT /api/reconducciones/:id", err);
-    return res.status(500).json({ error: err.message || "Error actualizando reconducción" });
+    return res.status(500).json({ error: "Error interno del servidor" });
   } finally {
     client.release();
   }
@@ -1318,7 +1312,7 @@ router.post("/:id/aplicar", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("POST /api/reconducciones/:id/aplicar", err);
-    return res.status(500).json({ error: err.message || "Error aplicando reconducción" });
+    return res.status(500).json({ error: "Error interno del servidor" });
   } finally {
     client.release();
   }

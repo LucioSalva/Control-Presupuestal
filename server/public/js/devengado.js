@@ -21,6 +21,16 @@
 (() => {
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
 
+  // Escapa caracteres HTML para prevenir XSS al inyectar datos de la BD en HTML
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   // ---------------------------
   // DOM
   // ---------------------------
@@ -147,12 +157,12 @@
         const disabled = est === "CANCELADO" ? "disabled" : "";
         return `
         <tr>
-          <td class="text-nowrap">${String(r.no_devengado || "").trim()}</td>
-          <td>${formatFecha(r.fecha)}</td>
-          <td class="text-end">${formatMoney(r.total)}</td>
-          <td>${est}</td>
+          <td class="text-nowrap">${escapeHtml(String(r.no_devengado || "").trim())}</td>
+          <td>${escapeHtml(formatFecha(r.fecha))}</td>
+          <td class="text-end">${escapeHtml(formatMoney(r.total))}</td>
+          <td>${escapeHtml(est)}</td>
           <td>
-            <button class="btn btn-outline-danger btn-sm btn-cancelar-dev" data-id="${r.id}" ${disabled}>
+            <button class="btn btn-outline-danger btn-sm btn-cancelar-dev" data-id="${Number(r.id) || 0}" ${disabled}>
               <i class="bi bi-x-circle me-1"></i>Cancelar
             </button>
           </td>
@@ -428,16 +438,16 @@
             <input class="form-control form-control-sm as-text td-text input-no-click text-center" readonly value="${i}">
           </td>
           <td style="width: 12%;">
-            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${String(r?.clave ?? "").trim()}">
+            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${escapeHtml(String(r?.clave ?? "").trim())}">
           </td>
           <td style="width: 20%;">
-            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${String(r?.concepto_partida ?? "").trim()}">
+            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${escapeHtml(String(r?.concepto_partida ?? "").trim())}">
           </td>
           <td style="width: 20%;">
-            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${String(r?.justificacion ?? "").trim()}">
+            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${escapeHtml(String(r?.justificacion ?? "").trim())}">
           </td>
           <td style="width: 33%;">
-            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${String(r?.descripcion ?? "").trim()}">
+            <input class="form-control form-control-sm as-text td-text input-no-click" readonly value="${escapeHtml(String(r?.descripcion ?? "").trim())}">
           </td>
           <td style="width: 10%;">
             <input type="number" step="0.01" min="0" max="${importeOriginal}"
@@ -1493,9 +1503,9 @@
 
     btnBuscarComprometido?.addEventListener("click", async (e) => {
       e.preventDefault();
+      if (btnBuscarComprometido.disabled) return; // evitar doble-click
+      btnBuscarComprometido.disabled = true;
       try {
-        btnBuscarComprometido.disabled = true;
-
         const folio = String(txtNoComprometido.value || "").trim().toUpperCase();
         if (!/^ECA-\d{4}-\d{2}-(CP|DV)-\d{4}$/.test(folio)) {
           await uiWarn("Escribe un folio completo: ECA-YYYY-MM-CP-#### o ECA-YYYY-MM-DV-####");

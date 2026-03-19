@@ -26,7 +26,12 @@ const { Pool } = pkg;
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : false
+  max: Number(process.env.PG_POOL_MAX) || 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  ssl: process.env.PGSSL === "true"
+    ? { rejectUnauthorized: process.env.NODE_ENV === "production" }
+    : false,
 });
 
 export const query = (text, params) => pool.query(text, params);

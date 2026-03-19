@@ -8,7 +8,9 @@
       "Bash(cd *)",
       "Bash(node seed_expedientes_entrega.js)",
       "Bash(awk 'NR>=50 && NR<=100')",
-      "Bash(grep -rn \"v_suficiencias_estado\\\\|fuente_clave\" C:/Users/lucio/Desktop/creacionSoftware/Control-Presupuestal/server/ --include=*.sql)"
+      "Bash(grep -rn \"v_suficiencias_estado\\\\|fuente_clave\" C:/Users/lucio/Desktop/creacionSoftware/Control-Presupuestal/server/ --include=*.sql)",
+      "Bash(node:*)",
+      "Bash(ls:*)"
     ]
   }
 }

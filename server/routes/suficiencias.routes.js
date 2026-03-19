@@ -24,6 +24,10 @@ import {
   isPartidaMilKey,
   logAuditEvent,
   logUnauthorizedPartidasAccess,
+  computeTotal,
+  validateMesPago,
+  checkIsUserL00117,
+  checkIsUserE00,
 } from "../utils/helpers.js";
 import {
   canViewIepsPensionesByClaves,
@@ -47,29 +51,6 @@ function pad6(v) {
   if (!s) return "";
   if (/^\d+$/.test(s)) return s.padStart(6, "0");
   return s;
-}
-
-async function isUserL00117(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  const daId = Number(req.user?.id_dauxiliar);
-  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
-
-  const [rDg, rDa] = await Promise.all([
-    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
-    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
-  ]);
-
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "L00" && daClave === "117";
-}
-
-async function isUserE00(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  if (!Number.isFinite(dgId)) return false;
-  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "E00";
 }
 
 async function getUserDgDaClaves(req) {
@@ -223,7 +204,6 @@ router.post("/lote", async (req, res) => {
     const allowIEPSPensiones = await canViewIepsPensiones(req);
 
     await client.query("BEGIN");
-    await client.query("LOCK TABLE suficiencias IN EXCLUSIVE MODE");
 
     const creadas = [];
 
@@ -236,25 +216,18 @@ router.post("/lote", async (req, res) => {
       const tipo = "SP";
       const prefijo = `ECA-${anio}-${mes}-${tipo}-`;
 
-      const rConsec = await client.query(
-        `
-        SELECT COALESCE(MAX(
-          CASE WHEN no_suficiencia ~ '^ECA-\\d{4}-\\d{2}-SP-\\d+$'
-               THEN RIGHT(no_suficiencia, 4)::int
-               ELSE 0
-          END
-        ), 0) + 1 AS consecutivo
-        FROM suficiencias
-        WHERE no_suficiencia LIKE $1
-          AND DATE_PART('year', fecha) = DATE_PART('year', $2::date)
-        `,
-        [`${prefijo}%`, fechaBase]
-      );
-
-      const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
-      const noSuficiencia = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
+      // Generación atómica de consecutivo via sequence (evita race condition)
+      const rConsec = await client.query("SELECT fn_next_folio_suficiencia() AS next_num");
+      const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
+      const noSuficiencia = `${prefijo}${nextNum}`;
 
       const departamento = suf.departamento ?? suf.dependencia_aux ?? null;
+
+      // Validación de mes_pago — usa helper centralizado (validateMesPago)
+      if (suf.mes_pago && !validateMesPago(suf.mes_pago)) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "mes_pago inválido" });
+      }
 
       // ================================
       // VALIDACIÓN DE SALDO POR PARTIDA (lote)
@@ -283,21 +256,26 @@ router.post("/lote", async (req, res) => {
         }
       }
 
+      // BUG-001: cálculo de total centralizado via computeTotal
       let isr_tasa = suf.isr_tasa;
       let ieps_tasa = suf.ieps_tasa;
       let subtotal = normalizeNumber(suf.subtotal);
-      let iva = normalizeNumber(suf.iva);
       let isr = normalizeNumber(suf.isr);
       let ieps = normalizeNumber(suf.ieps);
-      let total = normalizeNumber(suf.total);
 
       if (!allowIEPSPensiones) {
         ieps_tasa = null;
         ieps = 0;
-        const pension_total = normalizeNumber(suf.pension_total, 0);
-        const correctedTotal = subtotal + iva + isr;
-        total = Number.isFinite(correctedTotal) ? correctedTotal : total + ieps + pension_total;
       }
+
+      // BUG-003: partidas mil no aplican IVA — se fuerza a 0
+      const esPartidaMilLote = isPartidaMilKey(String(suf.clave_programatica || "").trim());
+      const iva = esPartidaMilLote ? 0 : normalizeNumber(suf.iva);
+
+      const total = computeTotal(
+        { subtotal, iva, isr, ieps, pension_total: normalizeNumber(suf.pension_total) },
+        allowIEPSPensiones
+      );
 
       const sqlHead = `
         INSERT INTO suficiencias (
@@ -400,7 +378,7 @@ router.post("/lote", async (req, res) => {
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch {}
     console.error("[POST suficiencias/lote] error:", err);
-    return res.status(500).json({ error: "Error al guardar lote de suficiencias", db: err.message });
+    return res.status(500).json({ error: "Error al guardar lote de suficiencias" });
   } finally {
     client.release();
   }
@@ -442,6 +420,11 @@ router.post("/", async (req, res) => {
 
     const departamento = b.departamento ?? b.dependencia_aux ?? null;
 
+    // Validación de mes_pago — usa helper centralizado (validateMesPago)
+    if (b.mes_pago && !validateMesPago(b.mes_pago)) {
+      return res.status(400).json({ error: "mes_pago inválido" });
+    }
+
     // ================================
     // VALIDACIÓN DE SALDO POR PARTIDA
     // ================================
@@ -480,20 +463,11 @@ router.post("/", async (req, res) => {
     }
 
     await client.query("BEGIN");
-    await client.query("LOCK TABLE suficiencias IN EXCLUSIVE MODE");
 
-    const rConsec = await client.query(
-      `
-        SELECT COALESCE(MAX(RIGHT(no_suficiencia, 4)::int), 0) + 1 AS consecutivo
-        FROM suficiencias
-        WHERE no_suficiencia LIKE $1
-          AND DATE_PART('year', fecha) = DATE_PART('year', $2::date)
-      `,
-      [`${prefijo}%`, fechaBase],
-    );
-
-    const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
-    const noSuficiencia = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
+    // Generación atómica de consecutivo via sequence (evita race condition)
+    const rConsec = await client.query("SELECT fn_next_folio_suficiencia() AS next_num");
+    const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
+    const noSuficiencia = `${prefijo}${nextNum}`;
 
     // ================================
     // INSERT CABECERA
@@ -539,22 +513,26 @@ router.post("/", async (req, res) => {
 `;
 
     // Permisos IEPS/Pensiones: si no está permitido, se fuerzan valores seguros
+    // BUG-001: cálculo de total centralizado via computeTotal
     let isr_tasa = b.isr_tasa;
     let ieps_tasa = b.ieps_tasa;
     let subtotal = normalizeNumber(b.subtotal);
-    let iva = normalizeNumber(b.iva);
     let isr = normalizeNumber(b.isr);
     let ieps = normalizeNumber(b.ieps);
-    let total = normalizeNumber(b.total);
 
     if (!allowIEPSPensiones) {
       ieps_tasa = null;
       ieps = 0;
-      const pension_total = normalizeNumber(b.pension_total, 0);
-      const correctedTotal = subtotal + iva + isr + 0 - 0;
-      // En caso de manipulación cliente, recalculamos un total sin pensiones/IEPS
-      total = Number.isFinite(correctedTotal) ? correctedTotal : total + ieps + pension_total;
     }
+
+    // BUG-003: partidas mil no aplican IVA — se fuerza a 0
+    const esPartidaMil = isPartidaMilKey(String(b.clave_programatica || "").trim());
+    const iva = esPartidaMil ? 0 : normalizeNumber(b.iva);
+
+    const total = computeTotal(
+      { subtotal, iva, isr, ieps, pension_total: normalizeNumber(b.pension_total) },
+      allowIEPSPensiones
+    );
 
     const headParams = [
       req.user.id,
@@ -675,11 +653,10 @@ router.post("/", async (req, res) => {
       horas_restantes: full?.horas_restantes ?? null,
     });
   } catch (err) {
-    await client.query("ROLLBACK");
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("[POST suficiencias] error:", err);
     return res.status(500).json({
       error: "Error al guardar suficiencia",
-      db: err.message,
     });
   } finally {
     client.release();
@@ -730,7 +707,7 @@ router.get("/buscar", async (req, res) => {
       params.push(`%${numeroRaw}%`);
     }
 
-    const userIsL00117 = await isUserL00117(req);
+    const userIsL00117 = await checkIsUserL00117(req);
     if (role === "AREA" && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
@@ -768,7 +745,6 @@ router.get("/buscar", async (req, res) => {
     console.error("[GET buscar] error:", err);
     return res.status(500).json({
       error: "Error al buscar suficiencia",
-      db: err.message,
     });
   }
 });
@@ -786,7 +762,7 @@ router.post("/:id/cancelar", async (req, res) => {
     const params = [id];
     let i = 2;
 
-    const userIsL00117 = await isUserL00117(req);
+    const userIsL00117 = await checkIsUserL00117(req);
     if (role === "AREA" && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
@@ -885,7 +861,6 @@ router.post("/:id/cancelar", async (req, res) => {
     console.error("[POST /api/suficiencias/:id/cancelar] error:", err);
     return res.status(500).json({
       error: "Error al cancelar suficiencia",
-      db: err.message,
     });
   } finally {
     client.release();
@@ -895,7 +870,7 @@ router.post("/:id/cancelar", async (req, res) => {
 router.get("/historial", async (req, res) => {
   try {
     const role = getRole(req);
-    const allowed = role === "GOD" || role === "ADMIN" || (await isUserL00117(req));
+    const allowed = role === "GOD" || role === "ADMIN" || (await checkIsUserL00117(req));
     if (!allowed) {
       return res.status(403).json({ error: "No autorizado" });
     }
@@ -922,7 +897,6 @@ router.get("/historial", async (req, res) => {
     console.error("[GET /api/suficiencias/historial] error:", err);
     return res.status(500).json({
       error: "Error al obtener historial",
-      db: err.message,
     });
   }
 });
@@ -939,7 +913,7 @@ router.get("/:id", async (req, res) => {
     const params = [id];
     let i = 2;
 
-    const userIsL00117 = await isUserL00117(req);
+    const userIsL00117 = await checkIsUserL00117(req);
     if (role === "AREA" && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         where.push(`v.id_dgeneral = $${i++}`);
@@ -1000,7 +974,7 @@ router.get("/:id", async (req, res) => {
     console.error("[GET /api/suficiencias/:id] error:", err);
     return res
       .status(500)
-      .json({ error: "Error al obtener suficiencia", db: err.message });
+      .json({ error: "Error al obtener suficiencia" });
   }
 });
 

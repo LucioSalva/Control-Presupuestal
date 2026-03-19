@@ -24,32 +24,16 @@ import {
   isPartidaMilKey,
   logAuditEvent,
   logUnauthorizedPartidasAccess,
+  computeTotal,
+  checkIsUserL00117,
+  checkIsUserE00,
 } from "../utils/helpers.js";
 
 const router = express.Router();
 
 // ---------------------------
-// Helpers 
+// Helpers locales
 // ---------------------------
-async function isUserL00117(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  const daId = Number(req.user?.id_dauxiliar);
-  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
-  const [rDg, rDa] = await Promise.all([
-    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
-    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
-  ]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "L00" && daClave === "117";
-}
-async function isUserE00(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  if (!Number.isFinite(dgId)) return false;
-  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "E00";
-}
 function toNullIfEmpty(v) {
   const s = String(v ?? "").trim();
   return s === "" ? null : v;
@@ -91,14 +75,15 @@ router.get("/por-comprometido/:id", async (req, res) => {
       FROM devengados
       WHERE id_comprometido = $1
       ORDER BY fecha ASC, id ASC
-      `,
+      LIMIT 500
+`,
       [idComp]
     );
 
     return res.json({ ok: true, rows: r.rows });
   } catch (e) {
     console.error("[GET devengados por comprometido]", e);
-    return res.status(500).json({ error: "Error consultando devengados", db: e.message });
+    return res.status(500).json({ error: "Error interno del servidor" });
   } finally {
     client.release();
   }
@@ -138,7 +123,7 @@ router.get("/buscar", async (req, res) => {
       [idDev]
     );
     const detalleRows = Array.isArray(rDet.rows) ? rDet.rows : [];
-    const allowedMil = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowedMil = (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
     const detalle = allowedMil
       ? detalleRows
       : detalleRows.filter((row) => !isPartidaMilKey(row?.clave));
@@ -155,7 +140,7 @@ router.get("/buscar", async (req, res) => {
     });
   } catch (e) {
     console.error("[GET devengado buscar]", e);
-    return res.status(500).json({ error: "Error buscando devengado", db: e.message });
+    return res.status(500).json({ error: "Error interno del servidor" });
   } finally {
     client.release();
   }
@@ -166,7 +151,7 @@ router.post("/", async (req, res) => {
 
   try {
     const b = req.body || {};
-    const allowIEPSPensiones = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowIEPSPensiones = (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
 
     const idSuf = Number(b.id_suficiencia ?? b.id ?? 0);
     if (!Number.isFinite(idSuf) || idSuf <= 0) {
@@ -199,9 +184,16 @@ router.post("/", async (req, res) => {
       toNullIfEmpty(b.fecha_devengado ?? b.fecha) ||
       new Date().toISOString().slice(0, 10);
 
-    const mes = monthCode(fechaBase);
-    const year = String(new Date(fechaBase).getFullYear());
-    const prefijo = `ECA-${year}-${mes}-DV-`;
+    const now = new Date();
+    const anio = b.anio || (
+      Number.isFinite(new Date(fechaBase).getFullYear())
+        ? new Date(fechaBase).getFullYear()
+        : now.getFullYear()
+    );
+    const mes = String(
+      b.mes || monthCode(fechaBase) || (now.getMonth() + 1)
+    ).padStart(2, "0");
+    const prefijo = `ECA-${anio}-${mes}-DV-`;
 
     const totalDev = toNumOrZero(b.total ?? b.monto_devengado);
     if (!(totalDev > 0)) {
@@ -286,30 +278,20 @@ router.post("/", async (req, res) => {
     const saldo = totalComp - devAcum;
 
     // Revertir: validar contra SALDO (totalComp - devAcum)
-    if (totalDev > saldo) {
+    if (totalDevCalc > saldo) {
       await client.query("ROLLBACK");
       return res.status(400).json({
-        error: `El monto (${totalDev}) excede el saldo del comprometido (${saldo}).`,
+        error: `El monto (${totalDevCalc}) excede el saldo del comprometido (${saldo}).`,
         saldo,
         devengado_acumulado: devAcum,
         comprometido_total: totalComp,
       });
     }
 
-    await client.query("LOCK TABLE devengados IN EXCLUSIVE MODE");
-
-    const rConsec = await client.query(
-      `
-      SELECT COALESCE(MAX(RIGHT(no_devengado, 4)::int), 0) + 1 AS consecutivo
-      FROM devengados
-      WHERE no_devengado LIKE $1
-        AND DATE_PART('year', fecha) = DATE_PART('year', $2::date)
-      `,
-      [`${prefijo}%`, fechaBase]
-    );
-
-    const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
-    const noDevengado = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
+    // Generación atómica de consecutivo via sequence (evita race condition)
+    const rConsec = await client.query("SELECT fn_next_folio_devengado() AS next_num");
+    const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
+    const noDevengado = `${prefijo}${nextNum}`;
 
     const sqlHead = `
       INSERT INTO devengados (
@@ -362,11 +344,14 @@ router.post("/", async (req, res) => {
     let iva = toNumOrZero(b.iva ?? comp.iva);
     let isr = toNumOrZero(b.isr ?? comp.isr);
     let ieps = toNumOrZero(b.ieps ?? comp.ieps);
+    let pension_total = Number(b?.pension_total || 0);
 
     if (!allowIEPSPensiones) {
       ieps_tasa = null;
       ieps = 0;
     }
+
+    const totalDevCalc = computeTotal({ subtotal, iva, isr, ieps, pension_total }, allowIEPSPensiones);
 
     const headParams = [
       idComp, // $1
@@ -397,7 +382,7 @@ router.post("/", async (req, res) => {
       isr, // $21
       ieps, // $22
 
-      totalDev, // $23
+      totalDevCalc, // $23
       toNullIfEmpty(b.cantidad_con_letra ?? comp.cantidad_con_letra), // $24
       comp.firma_enlace_label ?? null,    // $25
       comp.firma_enlace_nombre ?? null,   // $26
@@ -457,7 +442,7 @@ router.post("/", async (req, res) => {
         id_suficiencia: idSuf,
         folio_num: rHead.rows[0].folio_num,
         no_devengado: rHead.rows[0].no_devengado,
-        total: totalDev,
+        total: totalDevCalc,
         renglones: Array.isArray(detalle) ? detalle.length : 0,
       },
     });
@@ -470,8 +455,8 @@ router.post("/", async (req, res) => {
       id_comprometido: idComp,
       id_suficiencia: idSuf,
       comprometido_total: totalComp,
-      devengado_acumulado: devAcum + totalDev,
-      saldo_restante: saldo - totalDev,
+      devengado_acumulado: devAcum + totalDevCalc,
+      saldo_restante: saldo - totalDevCalc,
     });
   } catch (err) {
     try {
@@ -480,7 +465,7 @@ router.post("/", async (req, res) => {
     console.error("[POST devengado] error:", err);
     return res
       .status(500)
-      .json({ error: "Error al guardar devengado", db: err.message });
+      .json({ error: "Error al guardar devengado" });
   } finally {
     client.release();
   }
@@ -550,7 +535,7 @@ router.patch("/:id/cancelar", async (req, res) => {
       await client.query("ROLLBACK");
     } catch (_e) {}
     console.error("[PATCH devengado cancelar] error:", err);
-    return res.status(500).json({ error: "Error al cancelar devengado", db: err.message });
+    return res.status(500).json({ error: "Error al cancelar devengado" });
   } finally {
     client.release();
   }

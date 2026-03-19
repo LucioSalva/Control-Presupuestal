@@ -22,6 +22,16 @@
 (() => {
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
 
+  // Escapa caracteres HTML para prevenir XSS al inyectar datos de la BD en HTML
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   // ---------------------------
   // DOM
   // ---------------------------
@@ -551,19 +561,19 @@
           </td>
           <td style="width: 12%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
-              readonly value="${String(r?.clave ?? "").trim()}">
+              readonly value="${escapeHtml(String(r?.clave ?? "").trim())}">
           </td>
           <td style="width: 20%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
-              readonly value="${String(r?.concepto_partida ?? "").trim()}">
+              readonly value="${escapeHtml(String(r?.concepto_partida ?? "").trim())}">
           </td>
           <td style="width: 20%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
-              readonly value="${String(r?.justificacion ?? "").trim()}">
+              readonly value="${escapeHtml(String(r?.justificacion ?? "").trim())}">
           </td>
           <td style="width: 33%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
-              readonly value="${String(r?.descripcion ?? "").trim()}">
+              readonly value="${escapeHtml(String(r?.descripcion ?? "").trim())}">
           </td>
           <td style="width: 10%;">
             <input class="form-control form-control-sm as-text td-text input-no-click text-end"
@@ -854,7 +864,7 @@
     const sizeClaveProg = 9;
     const sizeClaveProgNombre = 9;
     const sizeFuenteClave = 7;
-    const sizeFuenteNombre = 7;
+    const sizeFuenteNombre = 5;
     const sizeFecha = 7;
     const sizeRolesLabel = 7;
     const sizeFirmas = 7;
@@ -1108,6 +1118,55 @@
       form.updateFieldAppearances(font);
     } catch {}
 
+    // ── Bloque dedicado: No. de Comprometido ──────────────────
+    {
+      const folioComp = String(payload.no_comprometido || "").trim();
+      let folioEscrito = false;
+
+      // Intento 1: nombre exacto
+      setTextSafe("No. de Comprometido", folioComp, sizeDG, PDFLib?.TextAlignment?.Center);
+      if (folioComp) folioEscrito = true;
+
+      // Intento 2: variantes de nombre
+      if (!folioEscrito) {
+        const variantes = [
+          "NO_COMPROMETIDO", "NumComprometido", "No. Comprometido",
+          "No Comprometido", "NUMERO COMPROMETIDO", "NUM COMP",
+        ];
+        for (const v of variantes) {
+          setTextSafe(v, folioComp, sizeDG, PDFLib?.TextAlignment?.Center);
+          try { if (form.getTextField(v)) { folioEscrito = true; break; } } catch {}
+        }
+      }
+
+      // Intento 3: patrón por palabras clave
+      if (!folioEscrito) {
+        if (setTextByPattern(["comprometido"], folioComp, sizeDG, PDFLib?.TextAlignment?.Center)) {
+          folioEscrito = true;
+        }
+      }
+
+      // Intento 4: drawText directo como fallback garantizado
+      if (!folioEscrito) {
+        try {
+          const page = pdfDoc.getPages()[0];
+          const { width, height } = page.getSize();
+          const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+          const textWidth = font.widthOfTextAtSize(folioComp, sizeDG);
+          page.drawText(folioComp, {
+            x: width - textWidth - 30,
+            y: height - 95,
+            size: sizeDG,
+            font,
+          });
+          folioEscrito = true;
+          console.log("[COMP][PDF] No. de Comprometido dibujado vía drawText:", folioComp);
+        } catch (eDraw) {
+          console.warn("[COMP][PDF] drawText folio falló:", eDraw?.message);
+        }
+      }
+    }
+
     try {
       form.flatten();
     } catch (e) {
@@ -1164,9 +1223,6 @@
             })())) ||
       "COMPROMETIDO";
     a.download = `${folio}.pdf`;
-    try {
-      setTextByPattern(["no", "comprometido"], String(payload.no_comprometido || ""), sizeFolios, PDFLib?.TextAlignment?.Center);
-    } catch {}
     document.body.appendChild(a);
     a.click();
     a.remove();

@@ -23,6 +23,7 @@ import { query } from "../db.js";
 import {
   isPartidaMilKey,
   logUnauthorizedPartidasAccess,
+  checkIsUserL00117,
 } from "../utils/helpers.js";
 
 const router = express.Router();
@@ -93,21 +94,6 @@ function canViewPartidasMil(dg, da) {
   return (dgKey === "L00" && daKey === "117") || dgKey === "E00";
 }
 
-async function isUserL00117(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  const daId = Number(req.user?.id_dauxiliar);
-  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
-
-  const [rDg, rDa] = await Promise.all([
-    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
-    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
-  ]);
-
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "L00" && daClave === "117";
-}
-
 async function getUserDGDA(req) {
   const idDg = Number(req.user?.id_dgeneral);
   const idDa = Number(req.user?.id_dauxiliar);
@@ -164,7 +150,7 @@ router.get("/partidas-permitidas", async (req, res) => {
     const allowed = canViewPartidasMil(dg, da);
 
     // GOD/ADMIN y L00/117 ven todas las partidas sin filtro de DG/DA
-    const userIsL00117 = await isUserL00117(req);
+    const userIsL00117 = await checkIsUserL00117(req);
     if (isGodOrAdmin || userIsL00117) {
       const r = await query(`
         SELECT

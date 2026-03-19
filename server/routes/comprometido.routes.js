@@ -24,29 +24,12 @@ import {
   isPartidaMilKey,
   logAuditEvent,
   logUnauthorizedPartidasAccess,
+  computeTotal,
+  checkIsUserL00117,
+  checkIsUserE00,
 } from "../utils/helpers.js";
 
 const router = express.Router();
-
-async function isUserL00117(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  const daId = Number(req.user?.id_dauxiliar);
-  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
-  const [rDg, rDa] = await Promise.all([
-    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
-    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
-  ]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "L00" && daClave === "117";
-}
-async function isUserE00(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  if (!Number.isFinite(dgId)) return false;
-  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "E00";
-}
 
 function toNullIfEmpty(v) {
   const s = String(v ?? "").trim();
@@ -79,7 +62,7 @@ router.post("/", async (req, res) => {
   const client = await getClient();
   try {
     const b = req.body || {};
-    const allowIEPSPensiones = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowIEPSPensiones = (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
 
     const idSuf = Number(b.id_suficiencia ?? b.id);
     if (!Number.isFinite(idSuf) || idSuf <= 0) {
@@ -115,20 +98,11 @@ router.post("/", async (req, res) => {
     const departamento = b.departamento ?? b.dependencia_aux ?? null;
 
     await client.query("BEGIN");
-    await client.query("LOCK TABLE comprometidos IN EXCLUSIVE MODE");
 
-    const rConsec = await client.query(
-      `
-        SELECT COALESCE(MAX(RIGHT(no_comprometido, 4)::int), 0) + 1 AS consecutivo
-        FROM comprometidos
-        WHERE no_comprometido LIKE $1
-          AND DATE_PART('year', fecha) = DATE_PART('year', $2::date)
-      `,
-      [`${prefijo}%`, fechaBase]
-    );
-
-    const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
-    const noComprometido = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
+    // Generación atómica de consecutivo via sequence (evita race condition)
+    const rConsec = await client.query("SELECT fn_next_folio_comprometido() AS next_num");
+    const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
+    const noComprometido = `${prefijo}${nextNum}`;
 
     // Obtener firmas de la suficiencia para propagarlas al comprometido
     const rSufFirmas = await client.query(
@@ -186,13 +160,14 @@ router.post("/", async (req, res) => {
     let iva = toNumOrZero(b.iva);
     let isr = toNumOrZero(b.isr);
     let ieps = toNumOrZero(b.ieps);
+    let pension_total = Number(b?.pension_total || 0);
     let total = toNumOrZero(b.total);
 
     if (!allowIEPSPensiones) {
       ieps_tasa = null;
       ieps = 0;
-      total = subtotal + iva + isr + 0;
     }
+    total = computeTotal({ subtotal, iva, isr, ieps, pension_total }, allowIEPSPensiones);
 
     const headParams = [
       idSuf, // $1
@@ -290,7 +265,7 @@ router.post("/", async (req, res) => {
     console.error("[POST comprometido] error:", err);
     return res
       .status(500)
-      .json({ error: "Error al guardar comprometido", db: err.message });
+      .json({ error: "Error al guardar comprometido" });
   } finally {
     client.release();
   }
@@ -325,7 +300,7 @@ router.get("/buscar", async (req, res) => {
       [r.rows[0].id]
     );
     const detalleRows = Array.isArray(rDet.rows) ? rDet.rows : [];
-    const allowedMil = (await isUserL00117(req)) || (await isUserE00(req));
+    const allowedMil = (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
     const detalle = allowedMil
       ? detalleRows
       : detalleRows.filter((row) => !isPartidaMilKey(row?.clave));
@@ -342,7 +317,7 @@ router.get("/buscar", async (req, res) => {
     });
   } catch (e) {
     console.error("[GET comprometido buscar]", e);
-    return res.status(500).json({ error: "Error buscando comprometido", db: e.message });
+    return res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
@@ -449,7 +424,7 @@ router.get("/:id/resumen", async (req, res) => {
     });
   } catch (err) {
     console.error("[GET comprometido resumen] error:", err);
-    return res.status(500).json({ error: "Error consultando resumen", db: err.message });
+    return res.status(500).json({ error: "Error consultando resumen" });
   }
 });
 
@@ -556,7 +531,7 @@ router.post("/:id/cerrar", async (req, res) => {
       await client.query("ROLLBACK");
     } catch (_e) {}
     console.error("[POST comprometido cerrar] error:", err);
-    return res.status(500).json({ error: "Error al cerrar comprometido", db: err.message });
+    return res.status(500).json({ error: "Error al cerrar comprometido" });
   } finally {
     client.release();
   }

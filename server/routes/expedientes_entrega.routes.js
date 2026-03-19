@@ -280,7 +280,7 @@ router.get("/origen", async (req, res) => {
     return res.json({ ok: true, rows: r.rows });
   } catch (err) {
     console.error("[GET expedientes-entrega origen] error:", err);
-    return res.status(500).json({ error: "Error consultando origen", db: err.message });
+    return res.status(500).json({ error: "Error consultando origen" });
   }
 });
 
@@ -386,7 +386,7 @@ router.get("/", async (req, res) => {
     return res.json({ ok: true, rows: r.rows });
   } catch (err) {
     console.error("[GET expedientes-entrega] error:", err);
-    return res.status(500).json({ error: "Error consultando entregas", db: err.message });
+    return res.status(500).json({ error: "Error consultando entregas" });
   }
 });
 
@@ -440,7 +440,7 @@ router.get("/:id", async (req, res) => {
     return res.json({ ok: true, row: r.rows[0] });
   } catch (err) {
     console.error("[GET expedientes-entrega/:id] error:", err);
-    return res.status(500).json({ error: "Error consultando entrega", db: err.message });
+    return res.status(500).json({ error: "Error consultando entrega" });
   }
 });
 
@@ -574,7 +574,7 @@ router.post("/", async (req, res) => {
       return res.status(409).json({ error: "Entrega ya registrada para este folio y periodo" });
     }
     console.error("[POST expedientes-entrega] error:", err);
-    return res.status(500).json({ error: "Error guardando entrega", db: err.message });
+    return res.status(500).json({ error: "Error guardando entrega" });
   } finally {
     client.release();
   }
@@ -693,7 +693,7 @@ router.patch("/:id", async (req, res) => {
       return res.status(409).json({ error: "Entrega ya registrada para este folio y periodo" });
     }
     console.error("[PATCH expedientes-entrega] error:", err);
-    return res.status(500).json({ error: "Error actualizando entrega", db: err.message });
+    return res.status(500).json({ error: "Error actualizando entrega" });
   } finally {
     client.release();
   }

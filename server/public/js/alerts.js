@@ -28,7 +28,7 @@ const money = (v) => {
 // Función para verificar si la partida con el monto existe en otros meses
 async function checkPartidaConflict(project, partida, monto) {
   try {
-    const response = await fetch(`http://localhost:3000/api/check-partida?project=${encodeURIComponent(project)}&partida=${encodeURIComponent(partida)}&monto=${encodeURIComponent(monto)}`);
+    const response = await fetch(`${(window.API_URL || "").replace(/\/$/, "")}/api/check-partida?project=${encodeURIComponent(project)}&partida=${encodeURIComponent(partida)}&monto=${encodeURIComponent(monto)}`);
     if (!response.ok) throw new Error('Error en la verificación');
     const data = await response.json();  // Devuelve un array de { month, year }
     return data;  // Ej: [{ month: 1, year: 2023 }, { month: 10, year: 2023 }]

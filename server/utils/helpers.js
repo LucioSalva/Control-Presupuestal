@@ -40,13 +40,18 @@ export function buildHttpError(message, statusCode = 400) {
  * Front debe mandar: headers: { "x-user-id": "<id>" }
  */
 export function getActorId(req) {
-  const actorId = Number(req.headers["x-user-id"] || 0);
-  return Number.isFinite(actorId) && actorId > 0 ? actorId : null;
+  const fromHeader = Number(req.headers["x-user-id"] || 0);
+  if (Number.isFinite(fromHeader) && fromHeader > 0) return fromHeader;
+  const fromUser = Number(req.user?.id || 0);
+  return Number.isFinite(fromUser) && fromUser > 0 ? fromUser : null;
 }
 
-export function isPartidaMilKey(value) {
-  const digits = String(value ?? "").replace(/\D/g, "");
-  return digits.length >= 4 && digits.startsWith("1");
+// BUG-008: valida que la clave empiece con "1" y el segundo carácter sea también dígito
+// Ej: "1001" → true, "1abc" → false, "2001" → false
+export function isPartidaMilKey(clave) {
+  if (!clave) return false;
+  const s = String(clave).trim();
+  return s.startsWith("1") && /^\d/.test(s.charAt(1) || "0");
 }
 
 export async function logUnauthorizedPartidasAccess(req, context = {}) {
@@ -165,57 +170,66 @@ export async function ensureAuditoriaEventosSchema() {
   );
 }
 
+// RIESGO-005, REC-08: reintentos automáticos en caso de fallo transitorio de BD
 export async function logAuditEvent(req, event = {}) {
-  try {
-    await ensureAuditoriaEventosSchema();
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await ensureAuditoriaEventosSchema();
 
-    const actorId = getActorId(req) || req.user?.id || null;
-    const idDg = Number(req.user?.id_dgeneral ?? null);
-    const idDa = Number(req.user?.id_dauxiliar ?? null);
+      const actorId = getActorId(req) || req.user?.id || null;
+      const idDg = Number(req.user?.id_dgeneral ?? null);
+      const idDa = Number(req.user?.id_dauxiliar ?? null);
 
-    const tipo = String(event?.tipo || "").trim().toUpperCase();
-    if (!tipo) return;
+      const tipo = String(event?.tipo || "").trim().toUpperCase();
+      if (!tipo) return;
 
-    const entidad = event?.entidad == null ? null : String(event.entidad).trim().toUpperCase();
-    const entidadId = event?.entidad_id == null ? null : String(event.entidad_id).trim();
-    const estado = event?.estado == null ? null : String(event.estado).trim().toUpperCase();
-    const metodo = String(req.method || "").toUpperCase();
-    const ruta = String(req.originalUrl || req.path || "");
+      const entidad = event?.entidad == null ? null : String(event.entidad).trim().toUpperCase();
+      const entidadId = event?.entidad_id == null ? null : String(event.entidad_id).trim();
+      const estado = event?.estado == null ? null : String(event.estado).trim().toUpperCase();
+      const metodo = String(req.method || "").toUpperCase();
+      const ruta = String(req.originalUrl || req.path || "");
 
-    let detalles = null;
-    const traceId =
-      req.cpTraceId || req.traceId || (req.headers["x-trace-id"] ? String(req.headers["x-trace-id"]) : null);
-    const baseDetalles = event?.detalles;
-    if (baseDetalles != null) {
-      if (typeof baseDetalles === "object") detalles = JSON.stringify({ ...baseDetalles, trace_id: traceId });
-      else detalles = JSON.stringify({ value: baseDetalles, trace_id: traceId });
-    } else if (traceId) {
-      detalles = JSON.stringify({ trace_id: traceId });
+      let detalles = null;
+      const traceId =
+        req.cpTraceId || req.traceId || (req.headers["x-trace-id"] ? String(req.headers["x-trace-id"]) : null);
+      const baseDetalles = event?.detalles;
+      if (baseDetalles != null) {
+        if (typeof baseDetalles === "object") detalles = JSON.stringify({ ...baseDetalles, trace_id: traceId });
+        else detalles = JSON.stringify({ value: baseDetalles, trace_id: traceId });
+      } else if (traceId) {
+        detalles = JSON.stringify({ trace_id: traceId });
+      }
+
+      await query(
+        `
+        INSERT INTO public.auditoria_eventos
+          (tipo, entidad, entidad_id, estado, actor_id, id_dgeneral, id_dauxiliar, metodo, ruta, detalles, created_at)
+        VALUES
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb, now())
+        `,
+        [
+          tipo,
+          entidad,
+          entidadId,
+          estado,
+          actorId,
+          Number.isFinite(idDg) ? idDg : null,
+          Number.isFinite(idDa) ? idDa : null,
+          metodo,
+          ruta,
+          detalles,
+        ]
+      );
+      req._cpAuditLogged = true;
+      return; // éxito
+    } catch (e) {
+      if (attempt === MAX_RETRIES) {
+        console.error("[AUDIT][FATAL] No se pudo registrar evento después de", MAX_RETRIES, "intentos:", e.message);
+      } else {
+        await new Promise((r) => setTimeout(r, 300 * attempt));
+      }
     }
-
-    await query(
-      `
-      INSERT INTO public.auditoria_eventos
-        (tipo, entidad, entidad_id, estado, actor_id, id_dgeneral, id_dauxiliar, metodo, ruta, detalles, created_at)
-      VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb, now())
-      `,
-      [
-        tipo,
-        entidad,
-        entidadId,
-        estado,
-        actorId,
-        Number.isFinite(idDg) ? idDg : null,
-        Number.isFinite(idDa) ? idDa : null,
-        metodo,
-        ruta,
-        detalles,
-      ]
-    );
-    req._cpAuditLogged = true;
-  } catch (err) {
-    console.warn("[AUDITORIA_EVENTOS] no se pudo registrar", err?.message || err);
   }
 }
 
@@ -254,4 +268,92 @@ export async function getProjectKeys({
     id_dauxiliar: da,
     id_fuente: fu,
   };
+}
+
+// =====================================================
+//  CÁLCULO DE TOTAL PRESUPUESTAL CENTRALIZADO
+// =====================================================
+
+/**
+ * Calcula el total presupuestal de forma consistente.
+ * BUG-001, BUG-003, REC-07
+ * Si allowIEPS es false, fuerza ieps=0 y pension_total=0.
+ */
+export function computeTotal(
+  { subtotal = 0, iva = 0, isr = 0, ieps = 0, pension_total = 0 },
+  allowIEPS = true
+) {
+  const s = Number(subtotal) || 0;
+  const v = Number(iva) || 0;
+  const r = Number(isr) || 0;
+  const e = allowIEPS ? (Number(ieps) || 0) : 0;
+  const p = allowIEPS ? (Number(pension_total) || 0) : 0;
+  return Math.round((s + v + r + e + p) * 100) / 100;
+}
+
+// =====================================================
+//  VALIDACIÓN DE MES DE PAGO
+// =====================================================
+
+// REC-05: lista canónica de meses válidos
+const MESES_VALIDOS = [
+  "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+];
+
+/**
+ * Valida que el mes de pago sea un mes del año en español.
+ * Retorna true si el valor es nulo/vacío (campo opcional).
+ */
+export function validateMesPago(mes) {
+  if (!mes) return true; // campo opcional
+  return MESES_VALIDOS.includes(String(mes).trim().toUpperCase());
+}
+
+// =====================================================
+//  HELPERS DE IDENTIDAD DE USUARIO CENTRALIZADOS
+// =====================================================
+
+/**
+ * Verifica si el usuario pertenece a DG L00 con DA 117 (presupuesto central).
+ * RIESGO-008, REC-02: centralizado para evitar duplicación en routes.
+ */
+export async function checkIsUserL00117(req) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return false;
+    const r = await query(
+      `SELECT dg.clave AS dg_clave, da.clave AS da_clave
+       FROM usuarios u
+       JOIN dgeneral dg ON dg.id = u.id_dgeneral
+       JOIN dauxiliar da ON da.id = u.id_dauxiliar
+       WHERE u.id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (!r.rows.length) return false;
+    return r.rows[0].dg_clave === "L00" && r.rows[0].da_clave === "117";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verifica si el usuario pertenece a DG E00.
+ * RIESGO-008, REC-02: centralizado para evitar duplicación en routes.
+ */
+export async function checkIsUserE00(req) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return false;
+    const r = await query(
+      `SELECT dg.clave
+       FROM usuarios u
+       JOIN dgeneral dg ON dg.id = u.id_dgeneral
+       WHERE u.id = $1 LIMIT 1`,
+      [userId]
+    );
+    return r.rows.length > 0 && r.rows[0].clave === "E00";
+  } catch {
+    return false;
+  }
 }

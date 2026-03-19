@@ -31,9 +31,10 @@ import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import jwt from "jsonwebtoken";
 
-import { query } from "./db.js";
+import { query, pool } from "./db.js";
 import catalogosRoutes from "./routes/catalogos.routes.js";
 import adminUsuariosRouter from "./routes/admin-usuarios.routes.js";
 import authRouter from "./routes/auth.routes.js";
@@ -51,9 +52,25 @@ import reconduccionesOficiosRouter from "./routes/reconducciones_oficios.routes.
 import adminAuditoriaRouter from "./routes/admin-auditoria.routes.js";
 import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
 import { logAuditEvent } from "./utils/helpers.js";
+import { validateOrigin } from "./middleware/csrf.js";
 
 
 dotenv.config();
+
+// ── JWT SECRET ──────────────────────────────────────────────
+// En producción es obligatorio; en desarrollo se usa un valor
+// de respaldo exclusivo para entorno local (no apto para prod).
+const _JWT_SECRET = process.env.JWT_SECRET;
+if (!_JWT_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    console.error("[FATAL] JWT_SECRET no está configurado en .env. El servidor se detendrá.");
+    process.exit(1);
+  } else {
+    // Solo en desarrollo: continúa con valor local, nunca usar en producción
+    console.warn("[WARN] JWT_SECRET no configurado. Usando secreto de desarrollo — NO APTO PARA PRODUCCIÓN.");
+  }
+}
+const JWT_SECRET = _JWT_SECRET || "cp_dev_only_secret_no_usar_en_prod";
 
 const app = express();
 
@@ -79,7 +96,7 @@ app.use(
           useDefaults: true,
           directives: {
             "default-src": ["'self'"],
-            "script-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'", "'unsafe-eval'"],
+            "script-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
             "style-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
             "img-src": ["'self'", "data:", "https:"],
             "font-src": ["'self'", "https://cdn.jsdelivr.net", "data:"],
@@ -101,19 +118,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// 3) CORS: NO uses origin:true en producción.
-// Para local dejamos whitelist (ajusta si usas otro puerto)
+// 3) CORS: orígenes permitidos.
+// En producción, configura ALLOWED_ORIGINS en .env (comma-separated).
+// Ejemplo: ALLOWED_ORIGINS=https://presupuestal.ecatepec.gob.mx
 const API_PORT = Number(process.env.PORT) || 3000;
-const ALLOWED_ORIGINS = new Set([
-  "http://localhost:5500",
-  "http://127.0.0.1:5500",
-  "http://localhost:5502",
-  "http://127.0.0.1:5502",
-  "http://localhost:4200",
-  "http://127.0.0.1:4200",
-  `http://localhost:${API_PORT}`,
-  `http://127.0.0.1:${API_PORT}`,
-]);
+const ALLOWED_ORIGINS = new Set(
+  process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+    : [
+        `http://localhost:${API_PORT}`,
+        `http://127.0.0.1:${API_PORT}`,
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:5502",
+        "http://127.0.0.1:5502",
+      ]
+);
 
 app.use(
   cors({
@@ -149,6 +169,30 @@ const loginLimiter = rateLimit({
 });
 app.use("/api/login", loginLimiter);
 
+// RIESGO-002: Validación de origen para prevenir CSRF en endpoints
+// que aceptan token por query param (?token=) además del Bearer header.
+app.use("/api", validateOrigin);
+
+// 6) Rate limit por usuario autenticado para rutas de escritura (RIESGO-007)
+// Debe aplicarse DESPUÉS de authRequired para que req.user esté disponible
+const userWriteLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 30, // máx 30 requests de escritura por minuto por usuario
+  keyGenerator: (req) => {
+    // Si hay usuario autenticado, usar su ID como clave
+    if (req.user?.id) return `u:${req.user.id}`;
+    // Fallback: IP normalizada con el helper oficial (previene ERR_ERL_KEY_GEN_IPV6)
+    return ipKeyGenerator(req);
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes. Intenta en un momento." },
+  skip: (req) => {
+    // Solo aplica a métodos de escritura
+    return !["POST", "PUT", "PATCH", "DELETE"].includes(req.method?.toUpperCase());
+  },
+});
+
 // =====================================================
 //  STATIC (FRONTEND)
 // =====================================================
@@ -173,44 +217,70 @@ app.get("/", (_req, res) => {
 });
 
 // =====================================================
-//  AUTH (token de mentiritas) + roles reales en BD
+//  AUTH — JWT (nuevo) + formato legacy token-{id}-{ts}
 // =====================================================
-function parseFakeToken(req) {
-  // Soporte de token vía query param (solo para descarga de archivos vía window.open)
-  let rawToken = null;
+
+/**
+ * Extrae el rawToken del header Authorization o del query param ?token=
+ * (el query param solo se acepta para descargas vía window.open).
+ */
+function extractRawToken(req) {
   const h = String(req.headers.authorization || "");
   const m = h.match(/^Bearer\s+(.+)$/i);
-  if (m) {
-    rawToken = m[1].trim();
-  } else if (req.query?.token) {
-    rawToken = String(req.query.token).trim();
-  }
-  if (!rawToken) return null;
+  if (m) return m[1].trim();
+  if (req.query?.token) return String(req.query.token).trim();
+  return null;
+}
 
-  const token = rawToken; // token-<id>-<timestamp>
-  const parts = token.split("-");
+/**
+ * Intenta parsear el formato legacy: token-{userId}-{timestamp}
+ * Retorna { userId } si es válido, null si no.
+ */
+function parseLegacyToken(rawToken) {
+  const parts = rawToken.split("-");
   if (parts.length < 3) return null;
   if (parts[0] !== "token") return null;
 
   const userId = Number(parts[1]);
   if (!Number.isFinite(userId) || userId <= 0) return null;
 
-  const ts = Number(parts[2]); // timestamp del token
+  const ts = Number(parts[2]);
   if (!Number.isFinite(ts) || ts <= 0) return null;
 
-  // ✅ expira si tiene más de 10 min
+  // Expira si tiene más de 10 min
   const MAX_AGE_MS = 10 * 60 * 1000;
   if (Date.now() - ts > MAX_AGE_MS) return null;
 
-  return { token, userId, ts };
+  return { userId, ts };
+}
+
+/**
+ * Resuelve el userId desde el rawToken.
+ * Intenta JWT primero; si falla, usa el formato legacy.
+ * BUG-002, RIESGO-001, REC-01: compatibilidad hacia atrás garantizada.
+ */
+function resolveUserId(rawToken) {
+  // Intentar JWT primero
+  try {
+    const decoded = jwt.verify(rawToken, JWT_SECRET);
+    const userId = Number(decoded?.id);
+    if (Number.isFinite(userId) && userId > 0) return userId;
+  } catch {
+    // No es JWT válido — continúa con formato legacy
+  }
+
+  // Fallback: formato legacy token-{userId}-{timestamp}
+  const legacy = parseLegacyToken(rawToken);
+  return legacy ? legacy.userId : null;
 }
 
 async function authRequired(req, res, next) {
   try {
-    const parsed = parseFakeToken(req);
-    if (!parsed) return res.status(401).json({ error: "Token requerido" });
+    const rawToken = extractRawToken(req);
+    if (!rawToken) return res.status(401).json({ error: "Token requerido" });
 
-    const { userId } = parsed;
+    const userId = resolveUserId(rawToken);
+    if (!userId) return res.status(401).json({ error: "Token requerido" });
 
     const sql = `
       SELECT u.id,
@@ -319,9 +389,9 @@ app.use("/api", authRouter);
 app.use("/api/admin/usuarios", authRequired, requireGodOrAdmin, adminUsuariosRouter);
 app.use("/api/admin/auditoria", authRequired, requireGodOrAdmin, adminAuditoriaRouter);
 
-app.use("/api/suficiencias", authRequired, suficienciasRouter);
-app.use("/api/comprometido", authRequired, comprometidoRouter);
-app.use("/api/devengado", authRequired, devengadoRouter);
+app.use("/api/suficiencias", authRequired, userWriteLimiter, suficienciasRouter);
+app.use("/api/comprometido", authRequired, userWriteLimiter, comprometidoRouter);
+app.use("/api/devengado", authRequired, userWriteLimiter, devengadoRouter);
 app.use("/api/expedientes-entrega", authRequired, expedientesEntregaRouter);
 
 app.use("/api", presupuestoRouter);
@@ -331,14 +401,40 @@ app.use("/api/presupuesto-base-partidas", authRequired, requireGodOrAdmin, presu
 app.use("/api/catalogos/metas", authRequired, metasRouter);
 app.use("/api/catalogos", authRequired, catalogosRoutes);
 app.use("/api/dashboard", authRequired, dashboardPartidasRouter);
-app.use("/api/reconducciones", authRequired, reconduccionesRouter);
-app.use("/api/reconducciones", authRequired, reconduccionesOficiosRouter);
+app.use("/api/reconducciones", authRequired, userWriteLimiter, reconduccionesRouter);
+app.use("/api/reconducciones", authRequired, userWriteLimiter, reconduccionesOficiosRouter);
 
 
 // =====================================================
-//  HEALTH
+//  HEALTH CHECK — REC-008: estado de BD incluido
 // =====================================================
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/health", async (req, res) => {
+  const health = {
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+      unit: "MB",
+    },
+    database: { status: "unknown", latency_ms: null },
+  };
+
+  try {
+    const dbStart = Date.now();
+    await query("SELECT 1");
+    health.database.status = "ok";
+    health.database.latency_ms = Date.now() - dbStart;
+  } catch (e) {
+    health.status = "degraded";
+    health.database.status = "error";
+    console.error("[HEALTH] BD no disponible:", e?.message);
+  }
+
+  const statusCode = health.status === "ok" ? 200 : 503;
+  res.status(statusCode).json(health);
+});
 
 // =====================================================
 //  404 — RUTAS NO ENCONTRADAS
@@ -348,6 +444,24 @@ app.use((req, res) => {
     return res.status(404).json({ error: "Ruta de API no encontrada" });
   }
   return res.status(404).sendFile(path.join(__dirname, "public", "404.html"));
+});
+
+// =====================================================
+//  ERROR HANDLER GLOBAL
+//  BUG-005, RIESGO-006, REC-03: oculta detalles de BD en errores HTTP
+// =====================================================
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  const traceId = req.cpTraceId || "N/A";
+  if (process.env.NODE_ENV === "production") {
+    console.error(`[ERROR][${traceId}] ${err?.message || "Error desconocido"}`);
+  } else {
+    console.error(`[ERROR][${traceId}]`, err);
+  }
+  return res.status(500).json({
+    error: "Error interno del servidor",
+    trace_id: traceId,
+  });
 });
 
 // =====================================================
@@ -458,6 +572,21 @@ app.use((req, res) => {
       console.error("[MIGRATION] expedientes_entrega_fks error:", e);
     }
 
+    // Migración: sequences para generación atómica de folios
+    try {
+      const rSeq = await query(
+        "SELECT 1 FROM information_schema.sequences WHERE sequence_name = 'seq_suficiencia_folio' AND sequence_schema = 'public' LIMIT 1"
+      );
+      if (rSeq.rowCount === 0) {
+        const sqlPathSeq = path.join(__dirname, "sql", "2026_03_19_folio_sequences.sql");
+        const sqlSeq = await fs.readFile(sqlPathSeq, "utf8");
+        await query(sqlSeq);
+        console.log("[MIGRATION] folio_sequences aplicada");
+      }
+    } catch (e) {
+      console.error("[MIGRATION] folio_sequences error:", e);
+    }
+
     if (process.env.SEED === "true") {
       await seedPartidasPermitidas();
     }
@@ -466,8 +595,22 @@ app.use((req, res) => {
   }
 
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log("API escuchando en http://localhost:" + PORT);
   });
+
+  // ── Graceful shutdown ────────────────────────────────────
+  const shutdown = async (signal) => {
+    console.log(`[SHUTDOWN] ${signal} recibido — cerrando servidor...`);
+    server.close(async () => {
+      try { await pool.end(); } catch {}
+      console.log("[SHUTDOWN] Conexiones cerradas. Proceso terminado.");
+      process.exit(0);
+    });
+    // Forzar salida si tarda más de 10 s
+    setTimeout(() => { console.error("[SHUTDOWN] Timeout forzado."); process.exit(1); }, 10_000);
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT",  () => shutdown("SIGINT"));
 })();
 

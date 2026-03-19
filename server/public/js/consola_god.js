@@ -454,19 +454,29 @@
     }
   }
 
+  /**
+   * BUG-010: Sanitiza valor para prevenir CSV Injection (fórmulas maliciosas en Excel/Sheets).
+   * Prefija con apóstrofe si el valor empieza con =, +, -, @, TAB o CR.
+   */
+  function sanitizeCsvValue(val) {
+    const s = String(val ?? "");
+    if (/^[=+\-@\t\r]/.test(s)) return "'" + s;
+    return s;
+  }
+
   function toExportRows(rows) {
     return rows.map((r) => ({
       id: Number(r.id),
-      timestamp: formatTs(r.created_at),
-      tipo: String(r.tipo || ""),
-      usuario: actorText(r),
-      area: areaText(r),
-      estado: String(r.estado || ""),
-      ip: ipText(r),
-      auth_method: authMethodText(r),
-      entidad: entidadText(r),
-      ruta: `${String(r.metodo || "").toUpperCase()} ${String(r.ruta || "")}`.trim(),
-      detalles: detallesText(r),
+      timestamp: sanitizeCsvValue(formatTs(r.created_at)),
+      tipo: sanitizeCsvValue(String(r.tipo || "")),
+      usuario: sanitizeCsvValue(actorText(r)),
+      area: sanitizeCsvValue(areaText(r)),
+      estado: sanitizeCsvValue(String(r.estado || "")),
+      ip: sanitizeCsvValue(ipText(r)),
+      auth_method: sanitizeCsvValue(authMethodText(r)),
+      entidad: sanitizeCsvValue(entidadText(r)),
+      ruta: sanitizeCsvValue(`${String(r.metodo || "").toUpperCase()} ${String(r.ruta || "")}`.trim()),
+      detalles: sanitizeCsvValue(detallesText(r)),
     }));
   }
 

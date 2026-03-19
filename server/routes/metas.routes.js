@@ -169,7 +169,6 @@ router.get("/", async (req, res) => {
     console.error("[GET /catalogos/metas] error:", err);
     return res.status(500).json({
       error: "Error interno",
-      db: { message: err.message },
     });
   }
 });

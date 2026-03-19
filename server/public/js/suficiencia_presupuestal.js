@@ -79,6 +79,22 @@
 
   // Fuente del registro cargado actualmente en el formulario (para PDF)
   let _currentFuente = { id: "", clave: "", nombre: "" };
+  try {
+    const _sfStored = sessionStorage.getItem("cp_currentFuente");
+    if (_sfStored) _currentFuente = JSON.parse(_sfStored);
+  } catch {}
+
+  // ---------------------------
+  // UTILIDADES DE SEGURIDAD
+  // ---------------------------
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
 
   // ---------------------------
   // AUTH
@@ -1629,7 +1645,7 @@
       html += `
         <div class="mb-3">
           <div class="fw-semibold bg-light px-2 py-1 border rounded mb-1" style="font-size:12px;">
-            F.F. ${fk} — ${g.nombre}
+            F.F. ${escapeHtml(fk)} — ${escapeHtml(g.nombre)}
           </div>
           <table class="table table-sm table-bordered mb-0">
             <thead><tr>
@@ -1648,18 +1664,18 @@
           ? `Saldo: ${formatMXN(p.saldo_disponible ?? 0)} / Base: ${formatMXN(p.presupuesto_base ?? 0)}`
           : semClass === "verde" ? "Disponible" : semClass === "amarillo" ? "Disponibilidad limitada" : semClass === "rojo" ? "Sin disponibilidad" : "Sin datos";
         html += `
-          <tr data-partida="${p.partida_clave}" data-fuente="${fk}" data-fuente-id="${g.id}" data-fuente-nombre="${g.nombre}">
+          <tr data-partida="${escapeHtml(p.partida_clave)}" data-fuente="${escapeHtml(fk)}" data-fuente-id="${escapeHtml(String(g.id ?? ""))}" data-fuente-nombre="${escapeHtml(g.nombre)}">
             <td class="text-center align-middle">
               <input type="checkbox" class="form-check-input mp-check" ${checked}
-                data-clave="${p.partida_clave}" />
+                data-clave="${escapeHtml(p.partida_clave)}" />
             </td>
             <td class="align-middle small fw-semibold">
               <label style="display:flex;align-items:center;gap:4px;margin:0;cursor:pointer;">
-                <span class="sp-semaforo ${semClass}" title="${saldoTitle}"></span>
-                ${p.partida_clave}
+                <span class="sp-semaforo ${semClass}" title="${escapeHtml(saldoTitle)}"></span>
+                ${escapeHtml(p.partida_clave)}
               </label>
             </td>
-            <td class="align-middle small">${p.partida_descripcion}</td>
+            <td class="align-middle small">${escapeHtml(p.partida_descripcion)}</td>
             ${esUsuarioL00117 ? `
             <td class="align-middle small text-end">
               <span class="${semClass === "rojo" ? "text-danger fw-bold" : semClass === "amarillo" ? "text-warning fw-semibold" : semClass === "gris" ? "text-muted" : "text-success"} fw-semibold">
@@ -1682,7 +1698,11 @@
     const container = document.getElementById("lista-partidas-modal");
     if (!container) return;
 
-    container.querySelectorAll(".mp-check").forEach((chk) => {
+    // Limpiar listeners previos reemplazando el contenedor por su clon
+    const clone = container.cloneNode(true);
+    container.parentNode.replaceChild(clone, container);
+    const freshContainer = document.getElementById("lista-partidas-modal");
+    freshContainer.querySelectorAll(".mp-check").forEach((chk) => {
       chk.addEventListener("change", () => {
         const clave = chk.dataset.clave;
         if (!seleccionPartidasModal[clave]) seleccionPartidasModal[clave] = {};
@@ -1690,7 +1710,6 @@
         actualizarResumenModal();
       });
     });
-
   }
 
   function actualizarResumenModal() {
@@ -1761,14 +1780,14 @@
     for (const [fk, g] of Object.entries(gruposPorFuente)) {
       html += `
         <div class="border rounded p-2 mb-2 bg-light">
-          <div class="fw-semibold small mb-1">F.F. ${fk} — ${g.fuente_nombre}</div>
+          <div class="fw-semibold small mb-1">F.F. ${escapeHtml(fk)} — ${escapeHtml(g.fuente_nombre)}</div>
           <table class="table table-sm table-bordered mb-0 bg-white">
             <thead><tr><th>Partida</th><th>Nombre de Partida</th></tr></thead>
             <tbody>
               ${g.partidas.map((p) => `
                 <tr>
-                  <td class="small">${p.partida_clave}</td>
-                  <td class="small">${p.concepto_partida}</td>
+                  <td class="small">${escapeHtml(p.partida_clave)}</td>
+                  <td class="small">${escapeHtml(p.concepto_partida)}</td>
                 </tr>
               `).join("")}
             </tbody>
@@ -2431,6 +2450,7 @@
         clave: String(fInfo?.clave || data.fuente_clave || "").trim(),
         nombre: String(fInfo?.fuente || fInfo?.nombre || data.fuente_nombre || "").trim(),
       };
+      try { sessionStorage.setItem("cp_currentFuente", JSON.stringify(_currentFuente)); } catch {}
     }
 
     setVal("subtotal", moneyFormat(safeNumber(data.subtotal)));
@@ -2669,6 +2689,7 @@
         clave: String(saved.creadas[0].fuente_clave || "").trim(),
         nombre: String(saved.creadas[0].fuente_nombre || "").trim(),
       };
+      try { sessionStorage.setItem("cp_currentFuente", JSON.stringify(_currentFuente)); } catch {}
 
       if (saved.creadas.length === 1) {
         lastSavedId = Number(saved.creadas[0].id);

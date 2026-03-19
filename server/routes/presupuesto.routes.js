@@ -26,6 +26,8 @@ import {
   buildHttpError,
   isPartidaMilKey,
   logUnauthorizedPartidasAccess,
+  checkIsUserL00117,
+  checkIsUserE00,
 } from "../utils/helpers.js";
 
 const router = Router();
@@ -37,29 +39,8 @@ function getRole(req) {
   return "AREA";
 }
 
-async function isUserL00117(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  const daId = Number(req.user?.id_dauxiliar);
-  if (!Number.isFinite(dgId) || !Number.isFinite(daId)) return false;
-  const [rDg, rDa] = await Promise.all([
-    query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]),
-    query(`SELECT clave FROM dauxiliar WHERE id = $1 LIMIT 1`, [daId]),
-  ]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  const daClave = String(rDa.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "L00" && daClave === "117";
-}
-
-async function isUserE00(req) {
-  const dgId = Number(req.user?.id_dgeneral);
-  if (!Number.isFinite(dgId)) return false;
-  const rDg = await query(`SELECT clave FROM dgeneral WHERE id = $1 LIMIT 1`, [dgId]);
-  const dgClave = String(rDg.rows?.[0]?.clave || "").trim().toUpperCase();
-  return dgClave === "E00";
-}
-
 async function canViewPartidasMil(req) {
-  return (await isUserL00117(req)) || (await isUserE00(req));
+  return (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
 }
 
 /* =====================================================
@@ -70,7 +51,7 @@ router.get("/projects", async (req, res) => {
   try {
     const anio = Number(req.query.anio || 0);
     const role = getRole(req);
-    const canSeeAll = role !== "AREA" || (await isUserL00117(req));
+    const canSeeAll = role !== "AREA" || (await checkIsUserL00117(req));
 
     let idDgeneral = Number(req.query.id_dgeneral || 0);
     let idDauxiliar = Number(req.query.id_dauxiliar || 0);
@@ -740,7 +721,7 @@ router.get("/check-duplicates", async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error("GET /api/check-duplicates", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
@@ -757,7 +738,7 @@ router.get("/check-recon-duplicates", async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error("GET /api/check-recon-duplicates", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 

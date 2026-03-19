@@ -111,10 +111,6 @@ function loadCurrentUserFromLS() {
     CURRENT_DG_CLAVE = String(user.dgeneral_clave || "")
       .trim()
       .toUpperCase();
-
-    console.log("[USER] ", CURRENT_USER);
-    console.log("[USER] roles:", CURRENT_ROLES_NORM);
-    console.log("[USER] dgeneral_clave:", CURRENT_DG_CLAVE);
   } catch (e) {
     console.warn("[USER] No se pudo leer cp_usuario:", e);
   }
