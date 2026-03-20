@@ -818,6 +818,18 @@
     const templateBytes = await fetchPdfTemplateBytesComp();
     const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
     const form = pdfDoc.getForm();
+    const touchedFields = new Set();
+
+    // Diagnóstico: listar nombres exactos de campos del formulario PDF
+    try {
+      const allFields = form.getFields();
+      console.log("[CP][PDF] Campos del formulario PDF (" + allFields.length + " campos):");
+      allFields.forEach((f) => {
+        try { console.log("  →", JSON.stringify(f.getName()), "tipo:", f.constructor?.name); } catch {}
+      });
+    } catch (e) {
+      console.warn("[CP][PDF] No se pudieron listar campos:", e?.message);
+    }
 
     const setTextSafe = (fieldName, value, size, align) => {
       try {
@@ -825,6 +837,7 @@
         if (size != null) f.setFontSize(size);
         if (align != null && window.PDFLib?.TextAlignment) f.setAlignment(align);
         f.setText(String(value ?? ""));
+        touchedFields.add(String(fieldName || ""));
       } catch {}
     };
     const setTextMulti = (fieldNames, value, size, align) => {
@@ -834,45 +847,53 @@
           if (size != null) f.setFontSize(size);
           if (align != null && window.PDFLib?.TextAlignment) f.setAlignment(align);
           f.setText(String(value ?? ""));
+          touchedFields.add(String(nm || ""));
           return;
         } catch {}
       }
     };
     const setTextByPattern = (includesArray, value, size, align) => {
+      let wrote = 0;
       try {
         const fields = form.getFields();
         const lowerInc = (includesArray || []).map((s) => String(s || "").toLowerCase());
-        let wrote = 0;
         for (const f of fields) {
-          const nm = String(f.getName() || "");
-          const nmLower = nm.toLowerCase();
-          const ok = lowerInc.every((frag) => nmLower.includes(frag));
-          if (ok) {
-            if (size != null) f.setFontSize(size);
-            if (align != null && window.PDFLib?.TextAlignment) f.setAlignment(align);
-            f.setText(String(value ?? ""));
-            wrote++;
-          }
+          try {
+            const nm = String(f.getName() || "");
+            const nmLower = nm.toLowerCase();
+            const ok = lowerInc.every((frag) => nmLower.includes(frag));
+            if (ok) {
+              if (size != null && typeof f.setFontSize === "function") f.setFontSize(size);
+              if (align != null && window.PDFLib?.TextAlignment && typeof f.setAlignment === "function") {
+                f.setAlignment(align);
+              }
+              if (typeof f.setText === "function") {
+                f.setText(String(value ?? ""));
+                touchedFields.add(String(nm || ""));
+                wrote++;
+              }
+            }
+          } catch {}
         }
-        if (wrote > 0) return true;
       } catch {}
-      return false;
+      return wrote > 0;
     };
 
     const normalizeCell = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
-    const sizeDG = 20;
-    const sizeClaveProg = 9;
+    const sizeDG = 17;
+    const sizeClaveProg = 13;
     const sizeClaveProgNombre = 9;
-    const sizeFuenteClave = 7;
-    const sizeFuenteNombre = 5;
-    const sizeFecha = 7;
-    const sizeRolesLabel = 7;
-    const sizeFirmas = 7;
-    const sizeDetalle = 7;
-    const sizeTotales = 7;
-    const sizeCantidadLetra = 6;
-    const sizeMeta = 7;
-    const sizeFolios = 7;
+    const sizeFuenteClave = 12;
+    const sizeFuenteNombre = 12;
+    const sizeFecha = 10;
+    const sizeRolesLabel = 9;
+    const sizeFirmas = 10;
+    const sizeProgPago = 9;
+    const sizeDetalle = 9;
+    const sizeTotales = 9;
+    const sizeCantidadLetra = 9;
+    const sizeMeta = 18;
+    const sizeFolios = 9;
 
     // Fuente para apariencias
     try {
@@ -885,7 +906,16 @@
 
     // Dependencia general
     const depGeneralName = normalizeCell(payload.dependencia || "");
-    setTextByPattern(["dependencia", "general"], depGeneralName, sizeDG, PDFLib?.TextAlignment?.Center) ||
+    // Auto-ajuste del tamaño de fuente según la longitud del nombre de dependencia
+    const depNameAutoSize = (() => {
+      const len = (depGeneralName || "").length;
+      if (len <= 22) return 17;
+      if (len <= 32) return 13;
+      if (len <= 42) return 10;
+      if (len <= 55) return 8;
+      return 7;
+    })();
+    setTextByPattern(["dependencia", "general"], depGeneralName, depNameAutoSize, PDFLib?.TextAlignment?.Center) ||
       setTextMulti(
         [
           "NOMBRE DE LA DEPENDENCIA GENERAL:",
@@ -896,7 +926,7 @@
           "NOMBRE DE LA DEPENDENCIA GENERAL#1",
         ],
         depGeneralName,
-        sizeDG,
+        depNameAutoSize,
         PDFLib?.TextAlignment?.Center,
       );
 
@@ -909,10 +939,17 @@
     );
     const proyLabel = getProyectoLabel(payload.id_proyecto) || "";
     const claveProgDesc = proyLabel ? proyLabel.split(" - ").slice(1).join(" - ").trim() : "";
+    const claveProgDescAutoSize = (() => {
+      const len = (claveProgDesc || "").length;
+      if (len <= 30) return 9;
+      if (len <= 40) return 8;
+      if (len <= 50) return 7;
+      return 6;
+    })();
     setTextByPattern(
       ["nombre", "clave", "programática"],
       claveProgDesc,
-      sizeClaveProgNombre,
+      claveProgDescAutoSize,
       PDFLib?.TextAlignment?.Center,
     );
 
@@ -925,8 +962,15 @@
       fuenteClave = String(c || "").trim();
       fuenteDesc = rest.join(" - ").trim();
     }
-    setTextByPattern(["fuente", "financiamiento"], fuenteClave, sizeFuenteClave, PDFLib?.TextAlignment?.Center);
-    setTextByPattern(["nombre", "f.f"], fuenteDesc, sizeFuenteNombre, PDFLib?.TextAlignment?.Center);
+    const fuenteDescAutoSize = (() => {
+      const len = (fuenteDesc || "").length;
+      if (len <= 25) return 12;
+      if (len <= 35) return 10;
+      if (len <= 45) return 8;
+      return 7;
+    })();
+    setTextByPattern(["fuente", "financiamiento"], fuenteClave, sizeDG, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["nombre", "f.f"], fuenteDesc, fuenteDescAutoSize, PDFLib?.TextAlignment?.Center);
 
     // Fecha
     try {
@@ -936,6 +980,33 @@
       setTextByPattern(["fechames"], m, sizeFecha);
       setTextByPattern(["fechayear"], y, sizeFecha);
     } catch {}
+
+    // PROGRAMACIÓN DE PAGO
+    const mesSel = String(payload.mes_pago || "")
+      .trim()
+      .toUpperCase();
+    const totalTxt = safeNumber(payload.total).toFixed(2);
+    const meses = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+    ];
+    for (const mes of meses) {
+      setTextSafe(
+        `${mes}PROGRAMACIÓN DE PAGO`,
+        mes === mesSel ? totalTxt : "",
+        sizeProgPago,
+      );
+    }
 
     // Encabezados de solicitante y firmantes
     // Las firmas se heredan automáticamente desde la suficiencia en el backend
@@ -1029,7 +1100,34 @@
     setTextSafe("PENSION", safeNumber(payload.pension_total).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
     setTextSafe("total", safeNumber(payload.total).toFixed(2), sizeTotales, PDFLib?.TextAlignment?.Right);
     setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "", sizeCantidadLetra);
-    setTextSafe("Meta", payload.meta || "", sizeMeta);
+    try {
+      const metaField = form.getTextField("Meta");
+      metaField.setFontSize(sizeMeta);
+      metaField.setAlignment(PDFLib?.TextAlignment?.Center);
+      metaField.enableMultiline();
+      // Simular centrado vertical con salto de línea inicial
+      const metaText = payload.meta || "";
+      metaField.setText(metaText ? "\n" + metaText : "");
+      touchedFields.add("Meta");
+    } catch {
+      setTextSafe("Meta", payload.meta || "", sizeMeta, PDFLib?.TextAlignment?.Center);
+    }
+
+    try {
+      const UNIFORM_SIZE = 9;
+      const fields = form.getFields();
+      for (const f of fields) {
+        try {
+          if (typeof f.setFontSize === "function") {
+            const name =
+              typeof f.getName === "function" ? String(f.getName() || "") : "";
+            if (!touchedFields.has(name)) {
+              f.setFontSize(UNIFORM_SIZE);
+            }
+          }
+        } catch {}
+      }
+    } catch {}
 
     try {
       const fields = form.getFields();
@@ -1056,12 +1154,13 @@
       };
       setSizeByPattern(["dependencia", "general"], sizeDG);
       setSizeByPattern(["clave", "programática"], sizeClaveProg);
-      setSizeByPattern(["nombre", "clave", "programática"], sizeClaveProgNombre);
-      setSizeByPattern(["fuente", "financiamiento"], sizeFuenteClave);
-      setSizeByPattern(["nombre", "f.f"], sizeFuenteNombre);
+      setSizeByPattern(["nombre", "clave", "programática"], claveProgDescAutoSize);
+      setSizeByPattern(["fuente", "financiamiento"], sizeDG);
+      setSizeByPattern(["nombre", "f.f"], fuenteDescAutoSize);
       setSizeByPattern(["fechadia"], sizeFecha);
       setSizeByPattern(["fechames"], sizeFecha);
       setSizeByPattern(["fechayear"], sizeFecha);
+      setSizeByPattern(["programación", "pago"], sizeProgPago);
       setSizeByPattern(["firma1"], sizeFirmas);
       setSizeByPattern(["firma2"], sizeFirmas);
       setSizeByPattern(["firma3"], sizeFirmas);
@@ -1088,8 +1187,8 @@
         ],
         sizeClaveProgNombre,
       );
-      setSizeByNames(["FUENTE DE FINANCIAMIENTO"], sizeFuenteClave);
-      setSizeByNames(["NOMBRE F.F"], sizeFuenteNombre);
+      setSizeByNames(["FUENTE DE FINANCIAMIENTO"], sizeDG);
+      setSizeByNames(["NOMBRE F.F"], sizeDG);
       setSizeByNames(["fechadia", "fechames", "fechayear"], sizeFecha);
       setSizeByNames(
         [
@@ -1121,40 +1220,50 @@
     // ── Bloque dedicado: No. de Comprometido ──────────────────
     {
       const folioComp = String(payload.no_comprometido || "").trim();
+      const touchedComp = new Set();
+      const setTextSafeComp = (nm, val, sz, al) => {
+        try {
+          const f = form.getTextField(nm);
+          if (sz != null) f.setFontSize(sz);
+          if (al != null && window.PDFLib?.TextAlignment) f.setAlignment(al);
+          f.setText(String(val ?? ""));
+          touchedComp.add(nm);
+        } catch {}
+      };
       let folioEscrito = false;
 
       // Intento 1: nombre exacto
-      setTextSafe("No. de Comprometido", folioComp, sizeDG, PDFLib?.TextAlignment?.Center);
-      if (folioComp) folioEscrito = true;
+      setTextSafeComp("No. de Comprometido", folioComp, sizeFolios, PDFLib?.TextAlignment?.Center);
+      if (touchedComp.has("No. de Comprometido")) folioEscrito = true;
 
-      // Intento 2: variantes de nombre
+      // Intento 2: variantes
       if (!folioEscrito) {
         const variantes = [
           "NO_COMPROMETIDO", "NumComprometido", "No. Comprometido",
           "No Comprometido", "NUMERO COMPROMETIDO", "NUM COMP",
         ];
         for (const v of variantes) {
-          setTextSafe(v, folioComp, sizeDG, PDFLib?.TextAlignment?.Center);
-          try { if (form.getTextField(v)) { folioEscrito = true; break; } } catch {}
+          setTextSafeComp(v, folioComp, sizeFolios, PDFLib?.TextAlignment?.Center);
+          if (touchedComp.has(v)) { folioEscrito = true; break; }
         }
       }
 
-      // Intento 3: patrón por palabras clave
+      // Intento 3: patrón
       if (!folioEscrito) {
-        if (setTextByPattern(["comprometido"], folioComp, sizeDG, PDFLib?.TextAlignment?.Center)) {
+        if (setTextByPattern(["comprometido"], folioComp, sizeFolios, PDFLib?.TextAlignment?.Center)) {
           folioEscrito = true;
         }
       }
 
-      // Intento 4: drawText directo como fallback garantizado
+      // Intento 4: drawText fallback garantizado (mismas coordenadas que suficiencia)
       if (!folioEscrito) {
         try {
           const page = pdfDoc.getPages()[0];
           const { width, height } = page.getSize();
           const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-          const textWidth = font.widthOfTextAtSize(folioComp, sizeDG);
+          const textWidth = font.widthOfTextAtSize(folioComp, sizeFolios);
           page.drawText(folioComp, {
-            x: width - textWidth - 30,
+            x: width - textWidth - 220,
             y: height - 95,
             size: sizeDG,
             font,
@@ -1166,6 +1275,60 @@
         }
       }
     }
+
+    // Eliminar fondos (AP y MK) de todos los campos — igual que suficiencia
+    try {
+      const PDFName = PDFLib.PDFName;
+      for (const f of form.getFields()) {
+        try {
+          const widgets = f.acroField.getWidgets();
+          for (const w of widgets) {
+            try {
+              w.dict.delete(PDFName.of("AP"));
+              w.dict.delete(PDFName.of("MK"));
+            } catch {}
+          }
+        } catch {}
+      }
+    } catch {}
+
+    // Capturar posición del campo QR del formulario antes de aplanar
+    let qrFieldRect = null;
+    try {
+      for (const f of form.getFields()) {
+        const nm = String(f.getName() || "").toLowerCase();
+        if (nm.includes("qr") || nm.includes("codigo_qr") || nm.includes("código_qr")) {
+          const widgets = f.acroField.getWidgets();
+          if (widgets.length > 0) {
+            const r = widgets[0].getRectangle();
+            qrFieldRect = { x: r.x, y: r.y, width: r.width, height: r.height };
+          }
+          break;
+        }
+      }
+    } catch {}
+
+    // Limpiar widgets huérfanos antes de flatten para evitar "Could not find page for PDFRef"
+    try {
+      const { PDFName, PDFArray } = PDFLib;
+      if (PDFName && PDFArray) {
+        const pages = pdfDoc.getPages();
+        const validPageRefs = new Set(pages.map((p) => p.ref.toString()));
+        for (const f of form.getFields()) {
+          try {
+            const widgets = f.acroField.getWidgets();
+            for (const w of widgets) {
+              try {
+                const pageRef = w.P();
+                if (pageRef && !validPageRefs.has(pageRef.toString())) {
+                  w.dict.delete(PDFName.of("P"));
+                }
+              } catch {}
+            }
+          } catch {}
+        }
+      }
+    } catch {}
 
     try {
       form.flatten();
@@ -1183,10 +1346,19 @@
         const bytes = await fetch(dataUrl).then((r) => r.arrayBuffer());
         const img = await pdfDoc.embedPng(bytes);
         const page = pdfDoc.getPages()[0];
-        const size = 110;
-        const x = page.getWidth() - size - 135;
-        const y = page.getHeight() - size - 240;
-        page.drawImage(img, { x, y, width: size, height: size });
+        if (qrFieldRect) {
+          page.drawImage(img, {
+            x: qrFieldRect.x,
+            y: qrFieldRect.y,
+            width: qrFieldRect.width,
+            height: qrFieldRect.height,
+          });
+        } else {
+          const size = 110;
+          const x = page.getWidth() - size - 135;
+          const y = page.getHeight() - size - 240;
+          page.drawImage(img, { x, y, width: size, height: size });
+        }
       }
     } catch {}
 
