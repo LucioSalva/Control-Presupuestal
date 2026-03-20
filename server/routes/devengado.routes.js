@@ -277,7 +277,23 @@ router.post("/", async (req, res) => {
     const devAcum = Number(rSum.rows[0]?.dev_acum || 0);
     const saldo = totalComp - devAcum;
 
-    // Revertir: validar contra SALDO (totalComp - devAcum)
+    // Normalizar y aplicar permisos (necesario antes de validar el total)
+    let isr_tasa = toNumOrNull(b.isr_tasa ?? comp.isr_tasa);
+    let ieps_tasa = toNumOrNull(b.ieps_tasa ?? comp.ieps_tasa);
+    let subtotal = toNumOrZero(b.subtotal ?? comp.subtotal);
+    let iva = toNumOrZero(b.iva ?? comp.iva);
+    let isr = toNumOrZero(b.isr ?? comp.isr);
+    let ieps = toNumOrZero(b.ieps ?? comp.ieps);
+    let pension_total = Number(b?.pension_total || 0);
+
+    if (!allowIEPSPensiones) {
+      ieps_tasa = null;
+      ieps = 0;
+    }
+
+    const totalDevCalc = computeTotal({ subtotal, iva, isr, ieps, pension_total }, allowIEPSPensiones);
+
+    // Validar contra SALDO (totalComp - devAcum)
     if (totalDevCalc > saldo) {
       await client.query("ROLLBACK");
       return res.status(400).json({
@@ -336,22 +352,6 @@ router.post("/", async (req, res) => {
       )
       RETURNING id, folio_num, no_devengado;
     `;
-
-    // Normalizar y aplicar permisos
-    let isr_tasa = toNumOrNull(b.isr_tasa ?? comp.isr_tasa);
-    let ieps_tasa = toNumOrNull(b.ieps_tasa ?? comp.ieps_tasa);
-    let subtotal = toNumOrZero(b.subtotal ?? comp.subtotal);
-    let iva = toNumOrZero(b.iva ?? comp.iva);
-    let isr = toNumOrZero(b.isr ?? comp.isr);
-    let ieps = toNumOrZero(b.ieps ?? comp.ieps);
-    let pension_total = Number(b?.pension_total || 0);
-
-    if (!allowIEPSPensiones) {
-      ieps_tasa = null;
-      ieps = 0;
-    }
-
-    const totalDevCalc = computeTotal({ subtotal, iva, isr, ieps, pension_total }, allowIEPSPensiones);
 
     const headParams = [
       idComp, // $1

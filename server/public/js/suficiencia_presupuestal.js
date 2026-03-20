@@ -3716,19 +3716,13 @@
       setSizeByNames(["Meta"], sizeMeta);
     } catch {}
 
-    // ── Bloque dedicado: llenar los tres campos críticos ──────────────────────
-    // Se ejecuta fuera del bloque de tamaños para que un error en otro campo
-    // no impida que estos tres se llenen.
+    let folioDrawnPreFlatten = false;
     {
-      // No. de Suficiencia: intentar campo de formulario primero,
-      // si no existe dibujarlo como texto en la página
       let folioEscrito = false;
-      // Intentar por nombre exacto (si el usuario renombró el campo sin punto)
       setTextSafe("No. de Suficiencia", folio, sizeFolios, PDFLib?.TextAlignment?.Center);
       if (touchedFields.has("No. de Suficiencia")) {
         folioEscrito = true;
       }
-      // Intentar variantes sin punto
       if (!folioEscrito) {
         const variantesNoSuf = ["NoSuficiencia", "NO_SUFICIENCIA", "NumSuficiencia", "NUMERO SUFICIENCIA", "NUM SUF", "No. Suficiencia", "No Suficiencia"];
         for (const v of variantesNoSuf) {
@@ -3751,9 +3745,10 @@
           page.drawText(folio, {
             x: width - textWidth - 220,
             y: height - 95,
-            size: sizeDG,
+            size: sizeFolios,
             font,
           });
+          folioDrawnPreFlatten = true;
           console.log("[SP][PDF] No. de Suficiencia dibujado como texto plano en x:", width - textWidth - 220, "y:", height - 95);
           folioEscrito = true;
         } catch (eDraw) {
@@ -3773,9 +3768,6 @@
       console.log("[SP][PDF] NOMBRE F.F →", JSON.stringify(fuenteDesc), "| en touchedFields:", touchedFields.has("NOMBRE F.F"));
     }
 
-    // Quitar fondo (sombreado) de todos los campos del formulario
-    // Eliminamos MK completo (contiene BG = color de fondo) y AP existente
-    // para que updateFieldAppearances regenere sin fondo.
     try {
       const PDFName = PDFLib.PDFName;
       const ctx = pdfDoc.context;
@@ -3842,10 +3834,129 @@
         }
       }
     } catch {}
+    // Vaciar todos los campos y regenerar apariencias vacías para que
+    // form.flatten() no produzca texto visible — drawText es el único renderer.
+    try {
+      for (const f of form.getFields()) {
+        try { f.setText(""); } catch {}
+      }
+      let _clearFont;
+      try { _clearFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica); } catch {}
+      form.updateFieldAppearances(_clearFont);
+    } catch {}
     try {
       form.flatten();
     } catch (e) {
       console.warn("[SP][PDF] flatten falló (PDF guardado con campos interactivos):", e?.message || e);
+    }
+
+    // ── DRAW TEXT DIRECTO (suficiencia) ───────────────────────────────────────
+    try {
+      const drawPage = pdfDoc.getPages()[0];
+      const drawFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+      const BLACK = PDFLib.rgb(0, 0, 0);
+
+      const ctr = (text, rx, rw, y, size = 9) => {
+        let s = String(text ?? "").trim();
+        if (!s) return;
+        try {
+          while (s.length > 1 && drawFont.widthOfTextAtSize(s, size) > rw) s = s.slice(0, -1);
+          const tw = drawFont.widthOfTextAtSize(s, size);
+          drawPage.drawText(s, { x: rx + (rw - tw) / 2, y, size, font: drawFont, color: BLACK });
+        } catch {}
+      };
+      const lft = (text, rx, rw, y, size = 9, margin = 2) => {
+        let s = String(text ?? "").trim();
+        if (!s) return;
+        try {
+          while (s.length > 1 && drawFont.widthOfTextAtSize(s, size) > rw - margin * 2) s = s.slice(0, -1);
+          drawPage.drawText(s, { x: rx + margin, y, size, font: drawFont, color: BLACK });
+        } catch {}
+      };
+      const rgt = (text, rx, rw, y, size = 9, margin = 2) => {
+        const s = String(text ?? "").trim();
+        if (!s) return;
+        try {
+          const tw = drawFont.widthOfTextAtSize(s, size);
+          drawPage.drawText(s, { x: Math.max(rx + margin, rx + rw - tw - margin), y, size, font: drawFont, color: BLACK });
+        } catch {}
+      };
+
+      // --- Fecha ---
+      const { d: fD, m: fM, y: fY } = splitFechaParts(payload.fecha);
+      ctr(fD, 1079, 75,  966, 9);
+      ctr(fM, 1154, 107, 966, 9);
+      ctr(fY, 1263, 124, 966, 9);
+
+      // --- Folio (No. de Suficiencia) — solo si no fue dibujado pre-flatten ---
+      if (!folioDrawnPreFlatten && folio) {
+        try {
+          const pgW = drawPage.getWidth();
+          const pgH = drawPage.getHeight();
+          const fw = drawFont.widthOfTextAtSize(folio, sizeFolios);
+          drawPage.drawText(folio, { x: pgW - fw - 220, y: pgH - 95, size: sizeFolios, font: drawFont, color: BLACK });
+        } catch {}
+      }
+
+      // --- Dependencia general ---
+      ctr(depGeneralName, 539, 374, 966, 9);
+
+      // --- Clave programática y descripción ---
+      ctr(payload.clave_programatica, 539, 374, 912, 9);
+      lft(claveProgDesc,              539, 374, 890, 8);
+
+      // --- Fuente de financiamiento ---
+      ctr(fuenteClave, 539, 374, 862, 9);
+      lft(fuenteDesc,  539, 374, 834, 8);
+
+      // --- Programación de pago ---
+      const MES_COL_SUF = {
+        ENERO:      { rx: 227, rw: 223 }, FEBRERO:    { rx: 451, rw: 87  },
+        MARZO:      { rx: 540, rw: 72  }, ABRIL:      { rx: 614, rw: 70  },
+        MAYO:       { rx: 686, rw: 70  }, JUNIO:      { rx: 758, rw: 76  },
+        JULIO:      { rx: 836, rw: 76  }, AGOSTO:     { rx: 914, rw: 87  },
+        SEPTIEMBRE: { rx: 1003, rw: 75 }, OCTUBRE:    { rx: 1080, rw: 73 },
+        NOVIEMBRE:  { rx: 1155, rw: 106}, DICIEMBRE:  { rx: 1263, rw: 123},
+      };
+      const mesCol = MES_COL_SUF[String(payload.mes_pago || "").trim().toUpperCase()];
+      if (mesCol) ctr(safeN(payload.total).toFixed(2), mesCol.rx, mesCol.rw, 784, 8);
+
+      // --- Detalle de partidas ---
+      const detalleRows = Array.isArray(payload.detalle) ? payload.detalle : [];
+      const DET_START_Y = 730;
+      const DET_ROW_H = 12;
+      detalleRows.forEach((r, i) => {
+        const rowY = DET_START_Y - i * DET_ROW_H;
+        if (rowY < 510) return;
+        ctr(String(r?.renglon ?? i + 1), 100,  61,  rowY, 8);
+        ctr(r?.clave,                    164,  60,  rowY, 7);
+        lft(r?.concepto_partida,         228,  221, rowY, 7);
+        lft(r?.justificacion,            452,  303, rowY, 7);
+        lft(r?.descripcion,              759,  502, rowY, 7);
+        rgt(safeN(r?.importe).toFixed(2), 1264, 122, rowY, 8);
+      });
+
+      // --- Totales ---
+      rgt(safeN(payload.subtotal).toFixed(2), 1263, 124, 493, 9);
+      rgt(safeN(payload.iva).toFixed(2),      1263, 124, 478, 9);
+      rgt(safeN(payload.isr).toFixed(2),      1263, 124, 463, 9);
+      rgt(safeN(payload.total).toFixed(2),    1263, 124, 449, 9);
+
+      // --- Meta y cantidad con letra ---
+      lft(payload.meta,               164, 989,  469, 8);
+      lft(payload.cantidad_con_letra, 226, 1161, 427, 8);
+
+      // --- Firmas: etiquetas de área/cargo (ARRIBA) ---
+      ctr(roles.enlace_label,  97,  441, 241, 8);
+      ctr(roles.area_label,    540, 374, 241, 8);
+      ctr(depGeneralName,      912, 474, 241, 8);
+
+      // --- Firmas: nombres de la persona (ABAJO) ---
+      ctr(roles.enlace_firma,    97,  441, 142, 9);
+      ctr(roles.area_firma,      540, 374, 142, 9);
+      ctr(roles.direccion_firma, 912, 474, 142, 9);
+    } catch (eDrawAll) {
+      console.warn("[SP][PDF] drawText directo falló:", eDrawAll?.message || eDrawAll);
     }
 
     try {

@@ -633,6 +633,7 @@
       iva: safeNumber(payload.iva),
       isr: safeNumber(payload.isr),
       ieps: safeNumber(payload.ieps),
+      pension_total: safeNumber(payload.pension_total),
       total: safeNumber(payload.total),
       cantidad_pago: safeNumber(payload.cantidad_pago ?? payload.total),
 
@@ -645,6 +646,13 @@
 
       // para link a devengado
       id_comprometido: payload.id_comprometido ?? null,
+
+      // firmas
+      firma_enlace_label:     payload.firma_enlace_label     ?? "",
+      firma_enlace_nombre:    payload.firma_enlace_nombre    ?? "",
+      firma_area_label:       payload.firma_area_label       ?? "",
+      firma_area_nombre:      payload.firma_area_nombre      ?? "",
+      firma_direccion_nombre: payload.firma_direccion_nombre ?? "",
     };
   }
 
@@ -808,6 +816,13 @@
     return await r.arrayBuffer();
   }
 
+  async function debugListPdfFields() {
+    const bytes = await fetchPdfTemplateBytesComp();
+    const pdfDoc = await PDFLib.PDFDocument.load(bytes);
+    const form = pdfDoc.getForm();
+    console.log("[CP][PDF] Campos:", form.getFields().map((f) => f.getName()));
+  }
+
   async function generarPDF(rawPayload) {
     if (!window.PDFLib?.PDFDocument) {
       throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
@@ -816,7 +831,7 @@
     const payload = normalizePayload(rawPayload || {});
 
     const templateBytes = await fetchPdfTemplateBytesComp();
-    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
+    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes, { throwOnInvalidObject: false, ignoreEncryptionErrors: true });
     const form = pdfDoc.getForm();
     const touchedFields = new Set();
 
@@ -882,9 +897,7 @@
     const normalizeCell = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
     const sizeDG = 17;
     const sizeClaveProg = 13;
-    const sizeClaveProgNombre = 9;
     const sizeFuenteClave = 12;
-    const sizeFuenteNombre = 12;
     const sizeFecha = 10;
     const sizeRolesLabel = 9;
     const sizeFirmas = 10;
@@ -969,9 +982,17 @@
       if (len <= 45) return 8;
       return 7;
     })();
-    setTextByPattern(["fuente", "financiamiento"], fuenteClave, sizeDG, PDFLib?.TextAlignment?.Center);
-    setTextByPattern(["nombre", "f.f"], fuenteDesc, fuenteDescAutoSize, PDFLib?.TextAlignment?.Center);
+    
+    // FUENTE DE FINANCIAMIENTO
+    setTextSafe("FUENTE DE FINANCIAMIENTO", fuenteClave || "", sizeDG, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["fuente", "financiamiento"], fuenteClave || "", sizeDG, PDFLib?.TextAlignment?.Center);
+    console.log("[CP][PDF] FUENTE DE FINANCIAMIENTO →", JSON.stringify(fuenteClave), "| en touchedFields:", touchedFields.has("FUENTE DE FINANCIAMIENTO"));
 
+    // NOMBRE F.F
+    setTextSafe("NOMBRE F.F", fuenteDesc || "", fuenteDescAutoSize, PDFLib?.TextAlignment?.Center);
+    setTextByPattern(["nombre", "f.f"], fuenteDesc || "", fuenteDescAutoSize, PDFLib?.TextAlignment?.Center);
+    console.log("[CP][PDF] NOMBRE F.F →", JSON.stringify(fuenteDesc), "len:", (fuenteDesc || "").length, "→ size:", fuenteDescAutoSize, "| en touchedFields:", touchedFields.has("NOMBRE F.F"));
+    
     // Fecha
     try {
       const iso = payload.fecha;
@@ -982,39 +1003,39 @@
     } catch {}
 
     // PROGRAMACIÓN DE PAGO
-    const mesSel = String(payload.mes_pago || "")
-      .trim()
-      .toUpperCase();
+    const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
     const totalTxt = safeNumber(payload.total).toFixed(2);
     const meses = [
-      "ENERO",
-      "FEBRERO",
-      "MARZO",
-      "ABRIL",
-      "MAYO",
-      "JUNIO",
-      "JULIO",
-      "AGOSTO",
-      "SEPTIEMBRE",
-      "OCTUBRE",
-      "NOVIEMBRE",
-      "DICIEMBRE",
+      "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+      "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
     ];
     for (const mes of meses) {
-      setTextSafe(
-        `${mes}PROGRAMACIÓN DE PAGO`,
-        mes === mesSel ? totalTxt : "",
-        sizeProgPago,
-      );
+      setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "", sizeProgPago);
     }
 
     // Encabezados de solicitante y firmantes
-    // Las firmas se heredan automáticamente desde la suficiencia en el backend
+    // Las firmas vienen del payload (heredadas de suficiencia en el backend).
+    // Fallback a cp_suf_roles (misma clave que usa suficiencia) para registros sin firmas guardadas.
     const roles = (() => {
+      const fromPayload = {
+        enlace_label:    String(payload.firma_enlace_label    || "").trim(),
+        enlace_firma:    String(payload.firma_enlace_nombre   || "").trim(),
+        area_label:      String(payload.firma_area_label      || "").trim(),
+        area_firma:      String(payload.firma_area_nombre     || "").trim(),
+        direccion_firma: String(payload.firma_direccion_nombre || "").trim(),
+      };
+      if (Object.values(fromPayload).some((v) => v)) return fromPayload;
       try {
-        const raw = localStorage.getItem("cp_comp_roles") || "{}";
-        return JSON.parse(raw);
-      } catch { return {}; }
+        const raw = localStorage.getItem("cp_suf_roles") || "{}";
+        const obj = JSON.parse(raw);
+        return {
+          enlace_label:    String(obj.enlace_label    || "").trim(),
+          enlace_firma:    String(obj.enlace_firma    || "").trim(),
+          area_label:      String(obj.area_label      || "").trim(),
+          area_firma:      String(obj.area_firma      || "").trim(),
+          direccion_firma: String(obj.direccion_firma || "").trim(),
+        };
+      } catch { return fromPayload; }
     })();
 
     const collectCategoryFields = () => {
@@ -1041,6 +1062,7 @@
       if (roles.enlace_label) cats.enlace.forEach((nm) => setTextSafe(nm, roles.enlace_label, sizeRolesLabel, PDFLib?.TextAlignment?.Center));
       if (roles.area_label) cats.area.forEach((nm) => setTextSafe(nm, roles.area_label, sizeRolesLabel, PDFLib?.TextAlignment?.Center));
       cats.direccion.forEach((nm) => setTextSafe(nm, depGeneralName, sizeRolesLabel, PDFLib?.TextAlignment?.Center));
+      setTextByPattern(["dirección", "solicitante"], depGeneralName, sizeRolesLabel, PDFLib?.TextAlignment?.Center);
     } catch {}
 
     const findFirmasByName = () => {
@@ -1060,9 +1082,15 @@
 
     try {
       const m = findFirmasByName();
-      m.firma1.forEach((nm) => roles.enlace_firma && setTextSafe(nm, roles.enlace_firma, sizeFirmas, PDFLib?.TextAlignment?.Center));
-      m.firma2.forEach((nm) => roles.area_firma && setTextSafe(nm, roles.area_firma, sizeFirmas, PDFLib?.TextAlignment?.Center));
-      m.firma3.forEach((nm) => roles.direccion_firma && setTextSafe(nm, roles.direccion_firma, sizeFirmas, PDFLib?.TextAlignment?.Center));
+      for (const nm of m.firma1) {
+        if (roles.enlace_firma) setTextSafe(nm, roles.enlace_firma, sizeFirmas, PDFLib?.TextAlignment?.Center);
+      }
+      for (const nm of m.firma2) {
+        if (roles.area_firma) setTextSafe(nm, roles.area_firma, sizeFirmas, PDFLib?.TextAlignment?.Center);
+      }
+      for (const nm of m.firma3) {
+        if (roles.direccion_firma) setTextSafe(nm, roles.direccion_firma, sizeFirmas, PDFLib?.TextAlignment?.Center);
+      }
     } catch {}
 
     // Detalle de partidas (tabla)
@@ -1105,7 +1133,6 @@
       metaField.setFontSize(sizeMeta);
       metaField.setAlignment(PDFLib?.TextAlignment?.Center);
       metaField.enableMultiline();
-      // Simular centrado vertical con salto de línea inicial
       const metaText = payload.meta || "";
       metaField.setText(metaText ? "\n" + metaText : "");
       touchedFields.add("Meta");
@@ -1113,22 +1140,21 @@
       setTextSafe("Meta", payload.meta || "", sizeMeta, PDFLib?.TextAlignment?.Center);
     }
 
+    // UNIFORM_SIZE: campos no tocados → tamaño 9
     try {
       const UNIFORM_SIZE = 9;
       const fields = form.getFields();
       for (const f of fields) {
         try {
           if (typeof f.setFontSize === "function") {
-            const name =
-              typeof f.getName === "function" ? String(f.getName() || "") : "";
-            if (!touchedFields.has(name)) {
-              f.setFontSize(UNIFORM_SIZE);
-            }
+            const name = typeof f.getName === "function" ? String(f.getName() || "") : "";
+            if (!touchedFields.has(name)) f.setFontSize(UNIFORM_SIZE);
           }
         } catch {}
       }
     } catch {}
 
+    // Ajuste fino de tamaños por patrón y por nombre exacto
     try {
       const fields = form.getFields();
       const setSizeByName = (name, size) => {
@@ -1152,10 +1178,10 @@
           } catch {}
         }
       };
-      setSizeByPattern(["dependencia", "general"], sizeDG);
+      setSizeByPattern(["dependencia", "general"], depNameAutoSize);
       setSizeByPattern(["clave", "programática"], sizeClaveProg);
       setSizeByPattern(["nombre", "clave", "programática"], claveProgDescAutoSize);
-      setSizeByPattern(["fuente", "financiamiento"], sizeDG);
+      setSizeByPattern(["fuente", "financiamiento"], sizeFuenteClave);
       setSizeByPattern(["nombre", "f.f"], fuenteDescAutoSize);
       setSizeByPattern(["fechadia"], sizeFecha);
       setSizeByPattern(["fechames"], sizeFecha);
@@ -1174,67 +1200,39 @@
       setSizeByPattern(["meta"], sizeMeta);
       setSizeByPattern(["no", "comprometido"], sizeFolios);
       setSizeByNames(
-        [
-          "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
-          "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
-        ],
-        sizeClaveProg,
+        ["CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA"],
+        sizeDG,
       );
       setSizeByNames(
-        [
-          "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
-          "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA",
-        ],
-        sizeClaveProgNombre,
+        ["NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA"],
+        claveProgDescAutoSize,
       );
       setSizeByNames(["FUENTE DE FINANCIAMIENTO"], sizeDG);
-      setSizeByNames(["NOMBRE F.F"], sizeDG);
+      setSizeByNames(["NOMBRE F.F"], fuenteDescAutoSize);
       setSizeByNames(["fechadia", "fechames", "fechayear"], sizeFecha);
-      setSizeByNames(
-        [
-          "No",
-          "CLAVE",
-          "CONCEPTO DE PARTIDA",
-          "JUSTIFICACIÓN",
-          "DESCRIPCIÓN",
-          "IMPORTE",
-        ],
-        sizeDetalle,
-      );
-      setSizeByNames(
-        ["subtotal", "IVA", "ISR", "IEPS", "PENSION", "total"],
-        sizeTotales,
-      );
+      setSizeByNames(["No", "CLAVE", "CONCEPTO DE PARTIDA", "JUSTIFICACIÓN", "DESCRIPCIÓN", "IMPORTE"], sizeDetalle);
+      setSizeByNames(["subtotal", "IVA", "ISR", "IEPS", "PENSION", "total"], sizeTotales);
       setSizeByNames(["CANTIDAD CON LETRA:", "Meta"], sizeCantidadLetra);
       setSizeByNames(["Meta"], sizeMeta);
     } catch {}
 
+    // Segunda pasada de apariencias
     try {
       const font =
-        (PDFLib?.StandardFonts &&
-          (await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica))) ||
+        (PDFLib?.StandardFonts && (await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica))) ||
         undefined;
       form.updateFieldAppearances(font);
     } catch {}
 
     // ── Bloque dedicado: No. de Comprometido ──────────────────
+    const folioComp = String(payload.no_comprometido || "").trim();
+    let folioDrawnPreFlatten = false;
     {
-      const folioComp = String(payload.no_comprometido || "").trim();
-      const touchedComp = new Set();
-      const setTextSafeComp = (nm, val, sz, al) => {
-        try {
-          const f = form.getTextField(nm);
-          if (sz != null) f.setFontSize(sz);
-          if (al != null && window.PDFLib?.TextAlignment) f.setAlignment(al);
-          f.setText(String(val ?? ""));
-          touchedComp.add(nm);
-        } catch {}
-      };
       let folioEscrito = false;
 
       // Intento 1: nombre exacto
-      setTextSafeComp("No. de Comprometido", folioComp, sizeFolios, PDFLib?.TextAlignment?.Center);
-      if (touchedComp.has("No. de Comprometido")) folioEscrito = true;
+      setTextSafe("No. de Comprometido", folioComp, sizeFolios, PDFLib?.TextAlignment?.Center);
+      if (touchedFields.has("No. de Comprometido")) folioEscrito = true;
 
       // Intento 2: variantes
       if (!folioEscrito) {
@@ -1243,8 +1241,8 @@
           "No Comprometido", "NUMERO COMPROMETIDO", "NUM COMP",
         ];
         for (const v of variantes) {
-          setTextSafeComp(v, folioComp, sizeFolios, PDFLib?.TextAlignment?.Center);
-          if (touchedComp.has(v)) { folioEscrito = true; break; }
+          setTextSafe(v, folioComp, sizeFolios, PDFLib?.TextAlignment?.Center);
+          if (touchedFields.has(v)) { folioEscrito = true; break; }
         }
       }
 
@@ -1255,7 +1253,7 @@
         }
       }
 
-      // Intento 4: drawText fallback garantizado (mismas coordenadas que suficiencia)
+      // Fallback: drawText directo en la página
       if (!folioEscrito) {
         try {
           const page = pdfDoc.getPages()[0];
@@ -1265,18 +1263,20 @@
           page.drawText(folioComp, {
             x: width - textWidth - 220,
             y: height - 95,
-            size: sizeDG,
+            size: sizeFolios,
             font,
           });
+          folioDrawnPreFlatten = true;
           folioEscrito = true;
           console.log("[COMP][PDF] No. de Comprometido dibujado vía drawText:", folioComp);
         } catch (eDraw) {
           console.warn("[COMP][PDF] drawText folio falló:", eDraw?.message);
         }
       }
+      console.log("[COMP][PDF] No. de Comprometido →", JSON.stringify(folioComp), "| escrito:", folioEscrito);
     }
 
-    // Eliminar fondos (AP y MK) de todos los campos — igual que suficiencia
+    // Eliminar fondos (AP y MK) de todos los campos
     try {
       const PDFName = PDFLib.PDFName;
       for (const f of form.getFields()) {
@@ -1292,7 +1292,7 @@
       }
     } catch {}
 
-    // Capturar posición del campo QR del formulario antes de aplanar
+    // Capturar posición del campo QR antes de aplanar
     let qrFieldRect = null;
     try {
       for (const f of form.getFields()) {
@@ -1308,16 +1308,17 @@
       }
     } catch {}
 
-    // Limpiar widgets huérfanos antes de flatten para evitar "Could not find page for PDFRef"
+    // Limpiar widgets huérfanos antes de flatten (limpieza agresiva)
     try {
       const { PDFName, PDFArray } = PDFLib;
-      if (PDFName && PDFArray) {
+      if (PDFName) {
         const pages = pdfDoc.getPages();
         const validPageRefs = new Set(pages.map((p) => p.ref.toString()));
+
+        // 1. Borrar /P inválido de cada widget
         for (const f of form.getFields()) {
           try {
-            const widgets = f.acroField.getWidgets();
-            for (const w of widgets) {
+            for (const w of f.acroField.getWidgets()) {
               try {
                 const pageRef = w.P();
                 if (pageRef && !validPageRefs.has(pageRef.toString())) {
@@ -1327,22 +1328,188 @@
             }
           } catch {}
         }
+
+        // 2. Limpiar /Annots de cada página: quitar refs que ya no apuntan a objetos válidos
+        for (const page of pages) {
+          try {
+            const annotsRaw = page.node.get(PDFName.of("Annots"));
+            if (!annotsRaw) continue;
+            const annots = pdfDoc.context.lookupMaybe
+              ? pdfDoc.context.lookupMaybe(annotsRaw, PDFArray)
+              : (annotsRaw instanceof PDFArray ? annotsRaw : null);
+            if (!annots) continue;
+            const keep = [];
+            for (let i = 0; i < annots.size(); i++) {
+              try {
+                const ref = annots.get(i);
+                const obj = pdfDoc.context.lookupMaybe
+                  ? pdfDoc.context.lookupMaybe(ref)
+                  : null;
+                // Si no pudo resolverse, omitir
+                if (ref && pdfDoc.context.lookup && !pdfDoc.context.lookup(ref)) continue;
+                keep.push(ref);
+              } catch {
+                // ref inválida → omitir
+              }
+            }
+            if (keep.length !== annots.size()) {
+              page.node.set(PDFName.of("Annots"), pdfDoc.context.obj(keep));
+            }
+          } catch {}
+        }
       }
     } catch {}
 
+    // Vaciar todos los campos y regenerar apariencias vacías para que
+    // form.flatten() no produzca texto visible — drawText es el único renderer.
+    try {
+      for (const f of form.getFields()) {
+        try { f.setText(""); } catch {}
+      }
+      let _clearFont;
+      try { _clearFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica); } catch {}
+      form.updateFieldAppearances(_clearFont);
+    } catch {}
     try {
       form.flatten();
     } catch (e) {
-      console.warn("[COMP][PDF] flatten falló:", e?.message || e);
+      console.warn("[COMP][PDF] flatten falló (PDF guardado con campos interactivos):", e?.message || e);
+    }
+
+    // ── DRAW TEXT DIRECTO ─────────────────────────────────────────────────────
+    // El template solo tiene 5 form fields. Todos los demás datos se pintan
+    // con drawText para garantizar visibilidad independientemente del form rendering.
+    try {
+      const drawPage = pdfDoc.getPages()[0];
+      const drawFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+      const BLACK = PDFLib.rgb(0, 0, 0);
+
+      // Centra texto dentro del rect [rx, rx+rw]; trunca si no cabe
+      const ctr = (text, rx, rw, y, size = 9) => {
+        let s = String(text ?? "").trim();
+        if (!s) return;
+        try {
+          while (s.length > 1 && drawFont.widthOfTextAtSize(s, size) > rw) s = s.slice(0, -1);
+          const tw = drawFont.widthOfTextAtSize(s, size);
+          drawPage.drawText(s, { x: rx + (rw - tw) / 2, y, size, font: drawFont, color: BLACK });
+        } catch {}
+      };
+
+      // Alinea a la izquierda dentro del rect; trunca si no cabe
+      const lft = (text, rx, rw, y, size = 9, margin = 2) => {
+        let s = String(text ?? "").trim();
+        if (!s) return;
+        try {
+          while (s.length > 1 && drawFont.widthOfTextAtSize(s, size) > rw - margin * 2) s = s.slice(0, -1);
+          drawPage.drawText(s, { x: rx + margin, y, size, font: drawFont, color: BLACK });
+        } catch {}
+      };
+
+      // Alinea a la derecha dentro del rect
+      const rgt = (text, rx, rw, y, size = 9, margin = 2) => {
+        const s = String(text ?? "").trim();
+        if (!s) return;
+        try {
+          const tw = drawFont.widthOfTextAtSize(s, size);
+          drawPage.drawText(s, { x: Math.max(rx + margin, rx + rw - tw - margin), y, size, font: drawFont, color: BLACK });
+        } catch {}
+      };
+
+      // --- Fecha (día / mes / año) ---
+      // Rects medidos del template: día(rx=1079,w=75), mes(rx=1154,w=107), año(rx=1263,w=124)
+      const [fY, fM, fD] = /^\d{4}-\d{2}-\d{2}$/.test(payload.fecha)
+        ? payload.fecha.split("-") : ["", "", ""];
+      ctr(fD, 1079, 75,  966, 9);
+      ctr(fM, 1154, 107, 966, 9);
+      ctr(fY, 1263, 124, 966, 9);
+
+      // --- Folio (No. de Comprometido) — solo si no fue dibujado pre-flatten ---
+      if (!folioDrawnPreFlatten && folioComp) {
+        try {
+          const pgW = drawPage.getWidth();
+          const pgH = drawPage.getHeight();
+          const fw = drawFont.widthOfTextAtSize(folioComp, sizeFolios);
+          drawPage.drawText(folioComp, { x: pgW - fw - 220, y: pgH - 95, size: sizeFolios, font: drawFont, color: BLACK });
+        } catch {}
+      }
+
+      // --- Dependencia general ---
+      // Rect del form field NOMBRE DE LA DEPENDENCIA GENERAL (rx=539, w=374)
+      ctr(payload.dependencia, 539, 374, 966, 9);
+
+      // --- Clave programática (código) ---
+      ctr(payload.clave_programatica, 539, 374, 922, 9);
+
+      // --- Descripción de clave programática ---
+      lft(claveProgDesc, 539, 374, 893, 8);
+
+      // --- Fuente de financiamiento (clave) ---
+      ctr(fuenteClave, 539, 374, 869, 9);
+
+      // --- Nombre fuente (descripción) ---
+      lft(fuenteDesc, 539, 374, 841, 8);
+
+      // --- Programación de pago (monto centrado en la columna del mes seleccionado) ---
+      // Columnas de meses distribuidas uniformemente: x=226..1387, ancho≈97 c/u
+      const MES_COL = {
+        ENERO: 226, FEBRERO: 323, MARZO: 420, ABRIL: 517, MAYO: 614,
+        JUNIO: 711, JULIO: 808, AGOSTO: 905, SEPTIEMBRE: 1002,
+        OCTUBRE: 1099, NOVIEMBRE: 1196, DICIEMBRE: 1293,
+      };
+      const MES_COL_W = 97;
+      const mesSelUpper = String(payload.mes_pago || "").trim().toUpperCase();
+      if (mesSelUpper && MES_COL[mesSelUpper] !== undefined) {
+        ctr(safeNumber(payload.total).toFixed(2), MES_COL[mesSelUpper], MES_COL_W, 785, 8);
+      }
+
+      // --- Detalle de partidas ---
+      // Rects: No(100,61), Clave(164,60), Concepto(228,221), Justif(452,303), Desc(759,502), Importe(1264,122)
+      const DET_START_Y = 730;
+      const DET_ROW_H = 12;
+      detalleRows.forEach((r, i) => {
+        const rowY = DET_START_Y - i * DET_ROW_H;
+        if (rowY < 510) return;
+        ctr(String(r?.renglon ?? i + 1), 100,  61,  rowY, 8);
+        ctr(r?.clave,                    164,  60,  rowY, 7);
+        lft(r?.concepto_partida,         228,  221, rowY, 7);
+        lft(r?.justificacion,            452,  303, rowY, 7);
+        lft(r?.descripcion,              759,  502, rowY, 7);
+        rgt(safeNumber(r?.importe).toFixed(2), 1264, 122, rowY, 8);
+      });
+
+      // --- Totales (alineados a la derecha) ---
+      // Rect: rx=1263, w=124
+      rgt(safeNumber(payload.subtotal).toFixed(2), 1263, 124, 492, 9);
+      rgt(safeNumber(payload.iva).toFixed(2),      1263, 124, 477, 9);
+      rgt(safeNumber(payload.isr).toFixed(2),      1263, 124, 462, 9);
+      rgt(safeNumber(payload.total).toFixed(2),    1263, 124, 448, 9);
+
+      // --- Meta ---
+      // Rect: rx=164, w=989
+      lft(payload.meta, 164, 989, 471, 8);
+
+      // --- Cantidad con letra ---
+      // Rect: rx=226, w=1161
+      lft(payload.cantidad_con_letra, 226, 1161, 427, 8);
+
+      // --- Firmas: etiquetas de área/cargo (ARRIBA, y≈241) ---
+      // Rects: enlace(97,441), area(539,374), dirección/depGeneral(912,474)
+      ctr(roles.enlace_label,  97,  441, 241, 8);
+      ctr(roles.area_label,    539, 374, 241, 8);
+      ctr(depGeneralName,      912, 474, 241, 8);
+
+      // --- Firmas: nombres de la persona (ABAJO, y≈142) ---
+      ctr(roles.enlace_firma,    97,  441, 142, 9);
+      ctr(roles.area_firma,      539, 374, 142, 9);
+      ctr(roles.direccion_firma, 912, 474, 142, 9);
+    } catch (eDrawAll) {
+      console.warn("[COMP][PDF] drawText directo falló:", eDrawAll?.message || eDrawAll);
     }
 
     try {
       const qrText = buildQrPayloadComp(payload);
       if (qrText && window.QRCode?.toDataURL) {
-        const dataUrl = await window.QRCode.toDataURL(qrText, {
-          width: 330,
-          margin: 1,
-        });
+        const dataUrl = await window.QRCode.toDataURL(qrText, { width: 330, margin: 1 });
         const bytes = await fetch(dataUrl).then((r) => r.arrayBuffer());
         const img = await pdfDoc.embedPng(bytes);
         const page = pdfDoc.getPages()[0];
@@ -1374,22 +1541,13 @@
           ? folioRaw
           : (() => {
               const m = folioRaw.match(/^ECA-(\d{4})-(\d{2})-CP-(\d{1,6})$/i);
-              if (m) {
-                return `ECA-${m[1]}-${m[2]}-CP-${String(m[3]).padStart(4, "0")}`;
-              }
+              if (m) return `ECA-${m[1]}-${m[2]}-CP-${String(m[3]).padStart(4, "0")}`;
               const onlyDigits = folioRaw.replace(/\D/g, "");
               if (onlyDigits) {
                 const f = String(payload.fecha || "");
-                const year =
-                  f && /^\d{4}-\d{2}-\d{2}$/.test(f)
-                    ? f.slice(0, 4)
-                    : String(new Date().getFullYear());
-                const month =
-                  f && /^\d{4}-\d{2}-\d{2}$/.test(f)
-                    ? f.slice(5, 7)
-                    : String(new Date().getMonth() + 1).padStart(2, "0");
-                const num = onlyDigits.padStart(4, "0");
-                return `ECA-${year}-${month}-CP-${num}`;
+                const year = f && /^\d{4}-\d{2}-\d{2}$/.test(f) ? f.slice(0, 4) : String(new Date().getFullYear());
+                const month = f && /^\d{4}-\d{2}-\d{2}$/.test(f) ? f.slice(5, 7) : String(new Date().getMonth() + 1).padStart(2, "0");
+                return `ECA-${year}-${month}-CP-${onlyDigits.padStart(4, "0")}`;
               }
               return "COMPROMETIDO";
             })())) ||

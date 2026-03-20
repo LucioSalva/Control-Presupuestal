@@ -281,8 +281,10 @@ router.get("/buscar", async (req, res) => {
     const sql = `
       SELECT
         c.*,
+        s.no_suficiencia,
         COALESCE(c.estatus,'ABIERTO') AS estatus
       FROM comprometidos c
+      LEFT JOIN suficiencias s ON s.id = c.id_suficiencia
       WHERE c.no_comprometido = $1
       LIMIT 1
     `;
@@ -327,32 +329,37 @@ router.get("/por-suficiencia/:id", async (req, res) => {
   const sql = `
     SELECT
       c.id,
+      c.id AS id_comprometido,
       c.id_suficiencia,
+      s.no_suficiencia,
+      c.no_comprometido,
       c.clave_programatica,
-
       c.id_proyecto,
-      p.clave        AS proyecto_clave,
-      p.descripcion  AS proyecto_text,
-
-      dg.dependencia AS dependencia_general,
-      da.dependencia AS dependencia_auxiliar,
-
       c.id_fuente,
-      f.fuente       AS fuente_text,
-
+      c.id_dgeneral,
+      c.id_dauxiliar,
+      c.dependencia,
+      c.departamento,
       c.fecha,
       c.mes_pago,
+      c.meta,
       c.subtotal,
       c.iva,
       c.isr,
+      c.ieps,
       c.total,
+      c.cantidad_con_letra,
+      c.impuesto_tipo,
+      c.isr_tasa,
+      c.ieps_tasa,
+      c.firma_enlace_label,
+      c.firma_enlace_nombre,
+      c.firma_area_label,
+      c.firma_area_nombre,
+      c.firma_direccion_nombre,
       COALESCE(c.estatus,'ABIERTO') AS estatus
-
     FROM comprometidos c
-    LEFT JOIN proyectos p   ON p.id = c.id_proyecto
-    LEFT JOIN dgeneral dg   ON dg.id = c.id_dgeneral
-    LEFT JOIN dauxiliar da  ON da.id = c.id_dauxiliar
-    LEFT JOIN fuentes f     ON f.id = c.id_fuente
+    LEFT JOIN suficiencias s ON s.id = c.id_suficiencia
     WHERE c.id_suficiencia = $1
     LIMIT 1
   `;
@@ -362,10 +369,37 @@ router.get("/por-suficiencia/:id", async (req, res) => {
     if (!rows.length) {
       return res.status(404).json({ message: "Comprometido no encontrado" });
     }
-    res.json(rows[0]);
+
+    const comp = rows[0];
+    const idComprometido = Number(comp.id_comprometido);
+
+    const rDet = await query(
+      `
+      SELECT renglon, clave, concepto_partida, justificacion, descripcion, importe
+      FROM comprometido_detalle
+      WHERE id_comprometido = $1
+      ORDER BY renglon ASC
+      `,
+      [idComprometido]
+    );
+    const detalleRows = Array.isArray(rDet.rows) ? rDet.rows : [];
+
+    const allowedMil = (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
+    const detalle = allowedMil
+      ? detalleRows
+      : detalleRows.filter((row) => !isPartidaMilKey(row?.clave));
+
+    if (!allowedMil && detalle.length !== detalleRows.length) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "PARTIDAS_MIL_COMPROMETIDO",
+        data: { id_comprometido: idComprometido, no: comp.no_comprometido },
+      });
+    }
+
+    return res.json({ ...comp, detalle });
   } catch (err) {
-    console.error("Comprometido por suficiencia:", err);
-    res.status(500).json({ message: "Error al consultar comprometido" });
+    console.error("[GET comprometido por-suficiencia] Error:", err);
+    return res.status(500).json({ error: "Error al consultar comprometido" });
   }
 });
 
