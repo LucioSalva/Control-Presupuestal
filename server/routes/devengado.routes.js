@@ -27,6 +27,7 @@ import {
   computeTotal,
   checkIsUserL00117,
   checkIsUserE00,
+  canViewIepsPensionesByRole,
 } from "../utils/helpers.js";
 
 const router = express.Router();
@@ -123,7 +124,8 @@ router.get("/buscar", async (req, res) => {
       [idDev]
     );
     const detalleRows = Array.isArray(rDet.rows) ? rDet.rows : [];
-    const allowedMil = (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
+    // Migración 2026-03-24: usar roles en lugar de DG/DA hardcodeado
+    const allowedMil = canViewIepsPensionesByRole(req.user);
     const detalle = allowedMil
       ? detalleRows
       : detalleRows.filter((row) => !isPartidaMilKey(row?.clave));
@@ -151,7 +153,8 @@ router.post("/", async (req, res) => {
 
   try {
     const b = req.body || {};
-    const allowIEPSPensiones = (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
+    // Migración 2026-03-24: usar roles en lugar de DG/DA hardcodeado
+    const allowIEPSPensiones = canViewIepsPensionesByRole(req.user);
 
     const idSuf = Number(b.id_suficiencia ?? b.id ?? 0);
     if (!Number.isFinite(idSuf) || idSuf <= 0) {

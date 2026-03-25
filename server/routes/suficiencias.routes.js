@@ -28,6 +28,10 @@ import {
   validateMesPago,
   checkIsUserL00117,
   checkIsUserE00,
+  canUseManualTaxes,
+  canUsePreviousMonths,
+  canViewIepsPensionesByRole,
+  canSeeAllAreas,
 } from "../utils/helpers.js";
 import {
   canViewIepsPensionesByClaves,
@@ -69,8 +73,8 @@ async function getUserDgDaClaves(req) {
 }
 
 async function canViewIepsPensiones(req) {
-  const { dg, da } = await getUserDgDaClaves(req);
-  return canViewIepsPensionesByClaves(dg, da);
+  // Migración 2026-03-24: usar roles en lugar de DG/DA hardcodeado
+  return canViewIepsPensionesByRole(req.user);
 }
 
 function normalizeNumber(n, def = 0) {
@@ -203,6 +207,18 @@ router.post("/lote", async (req, res) => {
 
     const allowIEPSPensiones = await canViewIepsPensiones(req);
 
+    // ================================
+    // PERMISOS POR ROL: validación única antes del loop
+    // ADMIN y GOD pueden usar impuestos por cantidad directa y meses anteriores
+    // Migración 2026-03-24: reemplaza checkIsUserL00117
+    // ================================
+    const isL00117ForLote = canUseManualTaxes(req.user);
+    const MESES_LOTE = [
+      "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+      "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+    ];
+    const mesActualIdxLote = new Date().getMonth(); // 0-based
+
     await client.query("BEGIN");
 
     const creadas = [];
@@ -227,6 +243,49 @@ router.post("/lote", async (req, res) => {
       if (suf.mes_pago && !validateMesPago(suf.mes_pago)) {
         await client.query("ROLLBACK");
         return res.status(400).json({ error: "mes_pago inválido" });
+      }
+
+      // Bloqueo de IEPS por cantidad para usuarios sin permiso (lote)
+      const iepsEnviadoLote = Number(suf.ieps || 0);
+      const iepsTasaEnviadaLote = suf.ieps_tasa != null && String(suf.ieps_tasa).trim() !== "";
+      if (!isL00117ForLote && (iepsEnviadoLote > 0 || iepsTasaEnviadaLote)) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          error: "Sin permisos para capturar IEPS (impuestos por cantidad directa). Se requiere rol ADMIN o GOD.",
+        });
+      }
+
+      // Bloqueo de ISR por cantidad directa para usuarios sin permiso (lote)
+      const isrEnviadoLote = Number(suf.isr || 0);
+      const isrTasaEnviadaLote = suf.isr_tasa != null && String(suf.isr_tasa).trim() !== "";
+      if (!isL00117ForLote && isrEnviadoLote > 0 && !isrTasaEnviadaLote) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          error: "Sin permisos para capturar ISR como monto directo. Se requiere rol ADMIN o GOD.",
+        });
+      }
+
+      // Bloqueo de Pensión por cantidad directa para usuarios sin permiso (lote)
+      const pensionTotalEnviadoLote = Number(suf.pension_total || 0);
+      const hayTasasPensionLote = [suf.pension1_tasa, suf.pension2_tasa, suf.pension3_tasa, suf.pension4_tasa, suf.pension5_tasa]
+        .some((t) => t != null && String(t).trim() !== "");
+      if (!isL00117ForLote && pensionTotalEnviadoLote > 0 && !hayTasasPensionLote) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          error: "Sin permisos para capturar Pensión como monto directo. Se requiere rol ADMIN o GOD.",
+        });
+      }
+
+      // Bloqueo de meses anteriores para usuarios sin permiso (lote)
+      // canUsePreviousMonths === canUseManualTaxes (mismo guard de rol) — se evalúa por separado para mensajes claros
+      if (!canUsePreviousMonths(req.user) && suf.mes_pago) {
+        const mesSolicitadoIdxLote = MESES_LOTE.indexOf(String(suf.mes_pago).trim().toUpperCase());
+        if (mesSolicitadoIdxLote >= 0 && mesSolicitadoIdxLote < mesActualIdxLote) {
+          await client.query("ROLLBACK");
+          return res.status(403).json({
+            error: "Sin permisos para capturar suficiencias con mes de pago de meses anteriores. Se requiere rol ADMIN o GOD.",
+          });
+        }
       }
 
       // ================================
@@ -272,8 +331,21 @@ router.post("/lote", async (req, res) => {
       const esPartidaMilLote = isPartidaMilKey(String(suf.clave_programatica || "").trim());
       const iva = esPartidaMilLote ? 0 : normalizeNumber(suf.iva);
 
+      // Pensiones del lote: normalizar tasas e importes individuales
+      const pension_total_lote = allowIEPSPensiones ? normalizeNumber(suf.pension_total) : 0;
+      const pension1_tasa_lote = allowIEPSPensiones ? (suf.pension1_tasa ?? null) : null;
+      const pension1_lote      = allowIEPSPensiones ? normalizeNumber(suf.pension1) : 0;
+      const pension2_tasa_lote = allowIEPSPensiones ? (suf.pension2_tasa ?? null) : null;
+      const pension2_lote      = allowIEPSPensiones ? normalizeNumber(suf.pension2) : 0;
+      const pension3_tasa_lote = allowIEPSPensiones ? (suf.pension3_tasa ?? null) : null;
+      const pension3_lote      = allowIEPSPensiones ? normalizeNumber(suf.pension3) : 0;
+      const pension4_tasa_lote = allowIEPSPensiones ? (suf.pension4_tasa ?? null) : null;
+      const pension4_lote      = allowIEPSPensiones ? normalizeNumber(suf.pension4) : 0;
+      const pension5_tasa_lote = allowIEPSPensiones ? (suf.pension5_tasa ?? null) : null;
+      const pension5_lote      = allowIEPSPensiones ? normalizeNumber(suf.pension5) : 0;
+
       const total = computeTotal(
-        { subtotal, iva, isr, ieps, pension_total: normalizeNumber(suf.pension_total) },
+        { subtotal, iva, isr, ieps, pension_total: pension_total_lote },
         allowIEPSPensiones
       );
 
@@ -282,7 +354,11 @@ router.post("/lote", async (req, res) => {
           id_usuario, id_dgeneral, id_dauxiliar, id_proyecto, id_fuente,
           fecha, dependencia, departamento, fuente, mes_pago, clave_programatica,
           meta, impuesto_tipo, isr_tasa, ieps_tasa,
-          subtotal, iva, isr, ieps, total, cantidad_con_letra,
+          subtotal, iva, isr, ieps,
+          pension_total,
+          pension1_tasa, pension1, pension2_tasa, pension2, pension3_tasa, pension3,
+          pension4_tasa, pension4, pension5_tasa, pension5,
+          total, cantidad_con_letra,
           firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre,
           created_at
         )
@@ -290,8 +366,11 @@ router.post("/lote", async (req, res) => {
           $1, $2, $3, $4, $5,
           $6, $7, $8, $9, $10, $11,
           $12, $13, $14, $15,
-          $16, $17, $18, $19, $20, $21,
-          $22, $23, $24, $25, $26,
+          $16, $17, $18, $19,
+          $20,
+          $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+          $31, $32,
+          $33, $34, $35, $36, $37,
           NOW()
         )
         RETURNING id, folio_num, no_suficiencia;
@@ -317,13 +396,19 @@ router.post("/lote", async (req, res) => {
         iva,
         isr,
         ieps,
-        total,
-        suf.cantidad_con_letra,
-        suf.firma_enlace_label ?? null,   // $22
-        suf.firma_enlace_nombre ?? null,  // $23
-        suf.firma_area_label ?? null,     // $24
-        suf.firma_area_nombre ?? null,    // $25
-        suf.firma_direccion_nombre ?? null, // $26
+        pension_total_lote,                           // $20
+        pension1_tasa_lote, pension1_lote,            // $21, $22
+        pension2_tasa_lote, pension2_lote,            // $23, $24
+        pension3_tasa_lote, pension3_lote,            // $25, $26
+        pension4_tasa_lote, pension4_lote,            // $27, $28
+        pension5_tasa_lote, pension5_lote,            // $29, $30
+        total,                                        // $31
+        suf.cantidad_con_letra,                       // $32
+        suf.firma_enlace_label ?? null,               // $33
+        suf.firma_enlace_nombre ?? null,              // $34
+        suf.firma_area_label ?? null,                 // $35
+        suf.firma_area_nombre ?? null,                // $36
+        suf.firma_direccion_nombre ?? null,           // $37
       ];
 
       const rHead = await client.query(sqlHead, headParams);
@@ -426,6 +511,58 @@ router.post("/", async (req, res) => {
     }
 
     // ================================
+    // PERMISOS POR ROL: IEPS, ISR, PENSIÓN (por cantidad) y MESES ANTERIORES
+    // ADMIN y GOD pueden usar impuestos por cantidad directa y meses anteriores
+    // Migración 2026-03-24: reemplaza checkIsUserL00117
+    // ================================
+    const tienePermisoImpuestos = canUseManualTaxes(req.user);
+
+    // Bloqueo de IEPS por cantidad para usuarios sin permiso
+    const iepsEnviado = Number(b.ieps || 0);
+    const iepsTasaEnviada = b.ieps_tasa != null && String(b.ieps_tasa).trim() !== "";
+    if (!tienePermisoImpuestos && (iepsEnviado > 0 || iepsTasaEnviada)) {
+      return res.status(403).json({
+        error: "Sin permisos para capturar IEPS (impuestos por cantidad directa). Se requiere rol ADMIN o GOD.",
+      });
+    }
+
+    // Bloqueo de ISR por cantidad directa para usuarios sin permiso
+    // (ISR por tasa de porcentaje sí está permitida para todos; solo bloqueamos
+    //  cuando isr_tasa es null/vacío pero isr > 0, lo que indica captura por monto directo)
+    const isrEnviado = Number(b.isr || 0);
+    const isrTasaEnviada = b.isr_tasa != null && String(b.isr_tasa).trim() !== "";
+    if (!tienePermisoImpuestos && isrEnviado > 0 && !isrTasaEnviada) {
+      return res.status(403).json({
+        error: "Sin permisos para capturar ISR como monto directo. Se requiere rol ADMIN o GOD.",
+      });
+    }
+
+    // Bloqueo de Pensión por cantidad directa para usuarios sin permiso
+    const pensionTotalEnviado = Number(b.pension_total || 0);
+    const hayTasasPension = [b.pension1_tasa, b.pension2_tasa, b.pension3_tasa, b.pension4_tasa, b.pension5_tasa]
+      .some((t) => t != null && String(t).trim() !== "");
+    if (!tienePermisoImpuestos && pensionTotalEnviado > 0 && !hayTasasPension) {
+      return res.status(403).json({
+        error: "Sin permisos para capturar Pensión como monto directo. Se requiere rol ADMIN o GOD.",
+      });
+    }
+
+    // Bloqueo de meses anteriores para usuarios sin permiso
+    if (!canUsePreviousMonths(req.user) && b.mes_pago) {
+      const MESES = [
+        "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+        "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+      ];
+      const mesSolicitadoIdx = MESES.indexOf(String(b.mes_pago).trim().toUpperCase());
+      const mesActualIdx = new Date().getMonth(); // 0-based
+      if (mesSolicitadoIdx >= 0 && mesSolicitadoIdx < mesActualIdx) {
+        return res.status(403).json({
+          error: "Sin permisos para capturar suficiencias con mes de pago de meses anteriores. Se requiere rol ADMIN o GOD.",
+        });
+      }
+    }
+
+    // ================================
     // VALIDACIÓN DE SALDO POR PARTIDA
     // ================================
     const detalleValidar = Array.isArray(b.detalle) ? b.detalle.filter(d => d.clave && Number(d.importe) > 0) : [];
@@ -496,6 +633,13 @@ router.post("/", async (req, res) => {
     isr,
     ieps,
 
+    pension_total,
+    pension1_tasa, pension1,
+    pension2_tasa, pension2,
+    pension3_tasa, pension3,
+    pension4_tasa, pension4,
+    pension5_tasa, pension5,
+
     total,
     cantidad_con_letra,
     firma_enlace_label, firma_enlace_nombre, firma_area_label, firma_area_nombre, firma_direccion_nombre,
@@ -505,8 +649,10 @@ router.post("/", async (req, res) => {
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9, $10, $11,
     $12, $13, $14, $15, $16, $17, $18, $19,
-    $20, $21,
-    $22, $23, $24, $25, $26,
+    $20,
+    $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+    $31, $32,
+    $33, $34, $35, $36, $37,
     NOW()
   )
   RETURNING id, folio_num, no_suficiencia;
@@ -529,8 +675,21 @@ router.post("/", async (req, res) => {
     const esPartidaMil = isPartidaMilKey(String(b.clave_programatica || "").trim());
     const iva = esPartidaMil ? 0 : normalizeNumber(b.iva);
 
+    // Pensiones: normalizar tasas e importes individuales
+    const pension_total = allowIEPSPensiones ? normalizeNumber(b.pension_total) : 0;
+    const pension1_tasa = allowIEPSPensiones ? (b.pension1_tasa ?? null) : null;
+    const pension1     = allowIEPSPensiones ? normalizeNumber(b.pension1) : 0;
+    const pension2_tasa = allowIEPSPensiones ? (b.pension2_tasa ?? null) : null;
+    const pension2     = allowIEPSPensiones ? normalizeNumber(b.pension2) : 0;
+    const pension3_tasa = allowIEPSPensiones ? (b.pension3_tasa ?? null) : null;
+    const pension3     = allowIEPSPensiones ? normalizeNumber(b.pension3) : 0;
+    const pension4_tasa = allowIEPSPensiones ? (b.pension4_tasa ?? null) : null;
+    const pension4     = allowIEPSPensiones ? normalizeNumber(b.pension4) : 0;
+    const pension5_tasa = allowIEPSPensiones ? (b.pension5_tasa ?? null) : null;
+    const pension5     = allowIEPSPensiones ? normalizeNumber(b.pension5) : 0;
+
     const total = computeTotal(
-      { subtotal, iva, isr, ieps, pension_total: normalizeNumber(b.pension_total) },
+      { subtotal, iva, isr, ieps, pension_total },
       allowIEPSPensiones
     );
 
@@ -557,13 +716,20 @@ router.post("/", async (req, res) => {
       isr,
       ieps,
 
-      total,
-      b.cantidad_con_letra,
-      b.firma_enlace_label ?? null,   // $22
-      b.firma_enlace_nombre ?? null,  // $23
-      b.firma_area_label ?? null,     // $24
-      b.firma_area_nombre ?? null,    // $25
-      b.firma_direccion_nombre ?? null, // $26
+      pension_total,                            // $20
+      pension1_tasa, pension1,                  // $21, $22
+      pension2_tasa, pension2,                  // $23, $24
+      pension3_tasa, pension3,                  // $25, $26
+      pension4_tasa, pension4,                  // $27, $28
+      pension5_tasa, pension5,                  // $29, $30
+
+      total,                                    // $31
+      b.cantidad_con_letra,                     // $32
+      b.firma_enlace_label ?? null,             // $33
+      b.firma_enlace_nombre ?? null,            // $34
+      b.firma_area_label ?? null,               // $35
+      b.firma_area_nombre ?? null,              // $36
+      b.firma_direccion_nombre ?? null,         // $37
     ];
 
     const rHead = await client.query(sqlHead, headParams);
@@ -707,8 +873,8 @@ router.get("/buscar", async (req, res) => {
       params.push(`%${numeroRaw}%`);
     }
 
-    const userIsL00117 = await checkIsUserL00117(req);
-    if (role === "AREA" && !userIsL00117) {
+    // Migración 2026-03-24: ADMIN y GOD pueden ver todas las áreas
+    if (role === "AREA" && !canSeeAllAreas(req.user)) {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
         params.push(req.user.id_dgeneral);
@@ -762,8 +928,8 @@ router.post("/:id/cancelar", async (req, res) => {
     const params = [id];
     let i = 2;
 
-    const userIsL00117 = await checkIsUserL00117(req);
-    if (role === "AREA" && !userIsL00117) {
+    // Migración 2026-03-24: ADMIN y GOD pueden cancelar suficiencias de cualquier área
+    if (role === "AREA" && !canSeeAllAreas(req.user)) {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
         params.push(req.user.id_dgeneral);
@@ -869,10 +1035,10 @@ router.post("/:id/cancelar", async (req, res) => {
 
 router.get("/historial", async (req, res) => {
   try {
-    const role = getRole(req);
-    const allowed = role === "GOD" || role === "ADMIN" || (await checkIsUserL00117(req));
+    // Migración 2026-03-24: ADMIN y GOD pueden acceder al historial completo
+    const allowed = canSeeAllAreas(req.user);
     if (!allowed) {
-      return res.status(403).json({ error: "No autorizado" });
+      return res.status(403).json({ error: "No autorizado. Se requiere rol ADMIN o GOD para acceder al historial." });
     }
 
     const sql = `
@@ -913,8 +1079,8 @@ router.get("/:id", async (req, res) => {
     const params = [id];
     let i = 2;
 
-    const userIsL00117 = await checkIsUserL00117(req);
-    if (role === "AREA" && !userIsL00117) {
+    // Migración 2026-03-24: ADMIN y GOD pueden ver suficiencias de cualquier área
+    if (role === "AREA" && !canSeeAllAreas(req.user)) {
       if (req.user?.id_dgeneral != null) {
         where.push(`v.id_dgeneral = $${i++}`);
         params.push(req.user.id_dgeneral);

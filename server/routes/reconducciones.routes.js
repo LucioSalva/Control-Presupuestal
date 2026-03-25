@@ -27,6 +27,8 @@ import {
   logAuditEvent,
   checkIsUserL00117,
   checkIsUserE00,
+  canBypassOperationalLocks,
+  canSeeAllAreas,
 } from "../utils/helpers.js";
 
 const router = express.Router();
@@ -39,7 +41,9 @@ function getRole(req) {
 }
 
 
-function canSeeAllAreas(role, isL00117) {
+// Migración 2026-03-24: canSeeAllAreas local reemplazado por helper centralizado de helpers.js
+// La función local se mantiene por si hay llamadas internas con firma antigua
+function canSeeAllAreasLocal(role, isL00117) {
   return role !== "AREA" || isL00117;
 }
 
@@ -180,16 +184,17 @@ async function generateReconClaveForArea(actorId, dgClave, daClave) {
 }
 
 async function requireL00117(req, res, next) {
-  const ok = await checkIsUserL00117(req);
+  // Migración 2026-03-24: ADMIN y GOD reemplazan la excepción L00/117
+  const ok = canBypassOperationalLocks(req.user);
   if (!ok) {
-    return res.status(403).json({ error: "Solo L00 117 puede acceder." });
+    return res.status(403).json({ error: "Se requiere rol ADMIN o GOD para esta operación." });
   }
   next();
 }
 
 async function requireReconSession(req, res, next) {
-  const isL00117 = await checkIsUserL00117(req);
-  if (isL00117) {
+  // Migración 2026-03-24: ADMIN y GOD no requieren sesión de reconducción
+  if (canBypassOperationalLocks(req.user)) {
     return next();
   }
   const provided = String(req.headers["x-recon-session"] || "").trim();
@@ -441,8 +446,8 @@ router.get("/next-oficio", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const role = getRole(req);
-    const isL00117 = await checkIsUserL00117(req);
-    const allowAll = canSeeAllAreas(role, isL00117);
+    // Migración 2026-03-24: ADMIN y GOD pueden ver todas las áreas
+    const allowAll = canSeeAllAreas(req.user);
     const areaIds = getAreaIds(req);
 
     const params = [];
@@ -485,8 +490,8 @@ router.get("/", async (req, res) => {
 router.get("/saldos", async (req, res) => {
   try {
     const role = getRole(req);
-    const isL00117 = await checkIsUserL00117(req);
-    const allowAll = canSeeAllAreas(role, isL00117);
+    // Migración 2026-03-24: ADMIN y GOD pueden ver todas las áreas
+    const allowAll = canSeeAllAreas(req.user);
     const areaIds = getAreaIds(req);
 
     const params = [];
@@ -545,8 +550,8 @@ router.get("/:id", async (req, res) => {
     }
 
     const role = getRole(req);
-    const isL00117 = await checkIsUserL00117(req);
-    const allowAll = canSeeAllAreas(role, isL00117);
+    // Migración 2026-03-24: ADMIN y GOD pueden ver todas las áreas
+    const allowAll = canSeeAllAreas(req.user);
     const areaIds = getAreaIds(req);
 
     const cabParams = [id];
@@ -628,8 +633,8 @@ router.post("/", async (req, res) => {
     const b = req.body || {};
     const actorId = getActorId(req) || req.user?.id || null;
     const role = getRole(req);
-    const isL00117 = await checkIsUserL00117(req);
-    const allowAll = canSeeAllAreas(role, isL00117);
+    // Migración 2026-03-24: ADMIN y GOD pueden ver todas las áreas
+    const allowAll = canSeeAllAreas(req.user);
     const areaIds = getAreaIds(req);
 
     let oficio = toTextOrNull(b.oficio);
@@ -795,8 +800,8 @@ router.put("/:id", async (req, res) => {
     const b = req.body || {};
     const actorId = getActorId(req) || req.user?.id || null;
     const role = getRole(req);
-    const isL00117 = await checkIsUserL00117(req);
-    const allowAll = canSeeAllAreas(role, isL00117);
+    // Migración 2026-03-24: ADMIN y GOD pueden ver todas las áreas
+    const allowAll = canSeeAllAreas(req.user);
     const areaIds = getAreaIds(req);
 
     await client.query("BEGIN");

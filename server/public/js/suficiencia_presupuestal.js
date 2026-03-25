@@ -106,6 +106,7 @@
     sessionStorage.getItem("token") ||
     localStorage.getItem("authToken") ||
     sessionStorage.getItem("authToken") ||
+
     "";
 
   const authHeaders = () => {
@@ -121,7 +122,36 @@
     }
   }
 
+  // ==========================================
+  // PERMISOS POR ROL — migración 2026-03-24
+  // ==========================================
+
+  /**
+   * Retorna true si el usuario tiene rol ADMIN o GOD.
+   * Reemplaza la verificación hardcodeada DG=L00 / DA=117 para impuestos por cantidad.
+   */
+  function getUserRoles() {
+    const user = getLoggedUser();
+    const roles = user?.roles;
+    if (Array.isArray(roles)) return roles.map((r) => String(r).toUpperCase());
+    return [];
+  }
+
+  function canUseManualTaxes() {
+    const r = getUserRoles();
+    return r.includes("ADMIN") || r.includes("GOD");
+  }
+
+  function canUsePreviousMonths() {
+    const r = getUserRoles();
+    return r.includes("ADMIN") || r.includes("GOD");
+  }
+
   function canViewCancelarSuf() {
+    // ADMIN y GOD pueden cancelar suficiencias de cualquier área
+    const r = getUserRoles();
+    if (r.includes("ADMIN") || r.includes("GOD")) return true;
+    // Fallback legacy: L00/117 también puede
     const user = getLoggedUser();
     const dg = _norm(dgeneralInfo?.clave || user?.dgeneral_clave);
     const da = _normNum(dauxiliarInfo?.clave || user?.dauxiliar_clave);
@@ -1024,12 +1054,31 @@
     let ieps = 0;
 
     if (useIVA()) iva = subtotalIva * 0.16;
-    if (useISR()) isr = subtotal * getIsrRate();
-    if (useIEPS()) ieps = subtotal * getIepsRate();
+
+    // Migración 2026-03-24: ADMIN/GOD leen montos directos; AREA usa porcentaje
+    if (canUseManualTaxes()) {
+      if (useISR()) {
+        const isrCantidadEl = document.getElementById("isr_cantidad");
+        isr = parseFloat(isrCantidadEl?.value || 0) || 0;
+      }
+      if (useIEPS()) {
+        const iepsCantidadEl = document.getElementById("ieps_cantidad");
+        ieps = parseFloat(iepsCantidadEl?.value || 0) || 0;
+      }
+    } else {
+      if (useISR()) isr = subtotal * getIsrRate();
+      if (useIEPS()) ieps = subtotal * getIepsRate();
+    }
 
     let pension_total = 0;
-    const pensiones = usePension() ? getPensionPercents() : [];
-    for (const p of pensiones) pension_total += subtotal * (p.rate || 0);
+    if (canUseManualTaxes() && usePension()) {
+      // ADMIN/GOD: sumar todos los montos directos del panel dinámico
+      const montoInputs = document.querySelectorAll("#pensionList .pension-monto-input");
+      montoInputs.forEach(inp => { pension_total += parseFloat(inp.value || 0) || 0; });
+    } else {
+      const pensiones = usePension() ? getPensionPercents() : [];
+      for (const p of pensiones) pension_total += subtotal * (p.rate || 0);
+    }
 
     const total = subtotal + iva + isr + ieps - pension_total;
 
@@ -1116,6 +1165,10 @@
     const now = new Date();
     const curIdx = now.getMonth(); // 0 = enero
     const currentVal = String(sel.value || "").trim().toUpperCase();
+
+    // Migración 2026-03-24: ADMIN y GOD pueden usar meses anteriores
+    if (canUsePreviousMonths()) return;
+
     const opts = Array.from(sel.options);
     opts.forEach((opt) => {
       const val = String(opt.value || "").trim().toUpperCase();
@@ -1261,13 +1314,14 @@
     const semaforoEl = tr.querySelector(".sp-row-semaforo");
     if (semaforoEl) {
       semaforoEl.className = `sp-semaforo sp-row-semaforo ${getSemaforoClass(saldo, base)}`;
-      semaforoEl.title = esUsuarioL00117
+      // Migración 2026-03-24: ADMIN/GOD ven el detalle de saldo
+      semaforoEl.title = canUseManualTaxes()
         ? `Saldo: ${formatMXN(saldo)} / Base: ${formatMXN(base)}`
         : getSemaforoClass(saldo, base) === "verde" ? "Disponible" : getSemaforoClass(saldo, base) === "amarillo" ? "Disponibilidad limitada" : "Sin disponibilidad";
     }
 
-    // Badge con montos: solo para L00/117
-    if (!esUsuarioL00117) {
+    // Badge con montos: solo para ADMIN/GOD
+    if (!canUseManualTaxes()) {
       badge.className = "sp-saldo-badge d-none";
       return;
     }
@@ -1552,12 +1606,17 @@
   }
 
   // ---------------------------
-  // Detectar si es usuario L00/117 (flujo original) o nuevo flujo multi-fuente
+  // Detectar modo de flujo: L00/117 = flujo original (fuente manual);
+  // otros usuarios = flujo multi-fuente.
+  // La detección de impuestos por cantidad usa canUseManualTaxes() (rol ADMIN/GOD).
+  // Migración 2026-03-24: impuestos ahora dependen de rol, no de DG/DA.
   // ---------------------------
   function detectarModoFlujo() {
     const user = getLoggedUser();
     const dg = _norm(dgeneralInfo?.clave || user?.dgeneral_clave);
     const da = _normNum(dauxiliarInfo?.clave || user?.dauxiliar_clave);
+    // esUsuarioL00117 controla el WORKFLOW (fuente visible / panel-partidas)
+    // NO controla ya los permisos de impuestos — eso lo hace canUseManualTaxes()
     esUsuarioL00117 = (dg === "L00" && da === "117");
     aplicarModoFlujo();
   }
@@ -1582,6 +1641,39 @@
       if (tdFuente) tdFuente.style.display = "none";
       if (panelPartidas) panelPartidas.style.display = "";
       if (seccionDetalle) seccionDetalle.style.display = "none";
+    }
+
+    // ==========================================
+    // Modo impuestos: porcentaje vs cantidad directa
+    // Migración 2026-03-24: ADMIN y GOD usan inputs de cantidad (antes era solo L00/117)
+    // ==========================================
+    const isrTasaEl = document.getElementById("isr_tasa");
+    const isrCantidadEl = document.getElementById("isr_cantidad");
+    const iepsTasaEl = document.getElementById("ieps_tasa");
+    const iepsCantidadEl = document.getElementById("ieps_cantidad");
+    const pensionCantidadEl = document.getElementById("pension_cantidad");
+    const btnAddPension = document.getElementById("btnAddPension");
+    const pensionList = document.getElementById("pensionList");
+
+    if (canUseManualTaxes()) {
+      // Mostrar inputs de cantidad directa, ocultar inputs de porcentaje
+      if (isrTasaEl) { isrTasaEl.classList.add("d-none"); isrTasaEl.value = ""; }
+      if (isrCantidadEl) isrCantidadEl.classList.remove("d-none");
+      if (iepsTasaEl) { iepsTasaEl.classList.add("d-none"); iepsTasaEl.value = ""; }
+      if (iepsCantidadEl) iepsCantidadEl.classList.remove("d-none");
+      // ADMIN/GOD: ocultar pension_cantidad (input único heredado), usar panel dinámico de montos
+      if (pensionCantidadEl) { pensionCantidadEl.classList.add("d-none"); pensionCantidadEl.value = ""; }
+      // El panel dinámico de pensiones sí aplica para ADMIN/GOD (montos directos)
+      if (btnAddPension) btnAddPension.style.display = "";
+      // pensionList se mostrará cuando el checkbox se marque (gestionado por el handler del checkbox)
+    } else {
+      // Mostrar inputs de porcentaje, ocultar inputs de cantidad
+      if (isrTasaEl) isrTasaEl.classList.remove("d-none");
+      if (isrCantidadEl) { isrCantidadEl.classList.add("d-none"); isrCantidadEl.value = ""; }
+      if (iepsTasaEl) iepsTasaEl.classList.remove("d-none");
+      if (iepsCantidadEl) { iepsCantidadEl.classList.add("d-none"); iepsCantidadEl.value = ""; }
+      if (pensionCantidadEl) { pensionCantidadEl.classList.add("d-none"); pensionCantidadEl.value = ""; }
+      if (btnAddPension) btnAddPension.style.display = "";
     }
   }
 
@@ -1652,7 +1744,7 @@
               <th style="width:40px;"></th>
               <th style="width:90px;">Partida</th>
               <th>Nombre de Partida</th>
-              ${esUsuarioL00117 ? '<th style="width:130px;">Saldo Disp.</th>' : ''}
+              ${canUseManualTaxes() ? '<th style="width:130px;">Saldo Disp.</th>' : ''}
             </tr></thead>
             <tbody>
       `;
@@ -1660,7 +1752,8 @@
         const sel = seleccionPartidasModal[p.partida_clave] || {};
         const checked = sel.checked ? "checked" : "";
         const semClass = getSemaforoClass(p.saldo_disponible, p.presupuesto_base);
-        const saldoTitle = esUsuarioL00117
+        // Migración 2026-03-24: ADMIN/GOD ven el detalle de saldo
+        const saldoTitle = canUseManualTaxes()
           ? `Saldo: ${formatMXN(p.saldo_disponible ?? 0)} / Base: ${formatMXN(p.presupuesto_base ?? 0)}`
           : semClass === "verde" ? "Disponible" : semClass === "amarillo" ? "Disponibilidad limitada" : semClass === "rojo" ? "Sin disponibilidad" : "Sin datos";
         html += `
@@ -1676,7 +1769,7 @@
               </label>
             </td>
             <td class="align-middle small">${escapeHtml(p.partida_descripcion)}</td>
-            ${esUsuarioL00117 ? `
+            ${canUseManualTaxes() ? `
             <td class="align-middle small text-end">
               <span class="${semClass === "rojo" ? "text-danger fw-bold" : semClass === "amarillo" ? "text-warning fw-semibold" : semClass === "gris" ? "text-muted" : "text-success"} fw-semibold">
                 ${formatMXN(p.saldo_disponible ?? 0)}
@@ -2408,13 +2501,13 @@
     const myDg = Number(user?.id_dgeneral);
     const myDa = Number(user?.id_dauxiliar);
 
-    // L00/117 puede ver y cargar suficiencias de cualquier DG/DA
-    const dgClave = String(user?.dgeneral_clave || "").trim().toUpperCase();
-    const daClave = String(user?.dauxiliar_clave || "").trim().toUpperCase();
-    const isL00117 = dgClave === "L00" && daClave === "117";
+    // Migración 2026-03-24: ADMIN y GOD pueden ver suficiencias de cualquier DG/DA
+    const canSeeAll = canUseManualTaxes() ||
+      (String(user?.dgeneral_clave || "").trim().toUpperCase() === "L00" &&
+       String(user?.dauxiliar_clave || "").trim().toUpperCase() === "117");
 
     if (
-      !isL00117 &&
+      !canSeeAll &&
       Number.isFinite(myDg) &&
       Number.isFinite(myDa) &&
       (Number(data.id_dgeneral) !== myDg || Number(data.id_dauxiliar) !== myDa)
@@ -2520,6 +2613,72 @@
     const iepsTasaEl = document.querySelector('[name="ieps_tasa"], #ieps_tasa');
     if (iepsTasaEl && data.ieps_tasa != null) iepsTasaEl.value = data.ieps_tasa;
 
+    // Migración 2026-03-24: ADMIN/GOD poblan inputs de cantidad directa
+    if (canUseManualTaxes()) {
+      const isrCantidadEl = document.getElementById("isr_cantidad");
+      if (isrCantidadEl && data.isr != null) isrCantidadEl.value = safeNumber(data.isr);
+      const iepsCantidadEl = document.getElementById("ieps_cantidad");
+      if (iepsCantidadEl && data.ieps != null) iepsCantidadEl.value = safeNumber(data.ieps);
+
+      // Reconstruir panel dinámico de pensiones por monto
+      const chkPensionLoad = document.getElementById("imp_pension");
+      const pensionListLoad = document.getElementById("pensionList");
+      const btnAddPensionLoad = document.getElementById("btnAddPension");
+      const pensionCantidadEl = document.getElementById("pension_cantidad");
+      // Asegurar que pension_cantidad esté siempre oculto en modo ADMIN/GOD
+      if (pensionCantidadEl) { pensionCantidadEl.classList.add("d-none"); pensionCantidadEl.value = ""; }
+
+      // Recopilar montos guardados de pension1..5
+      const montosGuardados = [
+        safeNumber(data.pension1),
+        safeNumber(data.pension2),
+        safeNumber(data.pension3),
+        safeNumber(data.pension4),
+        safeNumber(data.pension5),
+      ].filter(m => m > 0);
+
+      // Retrocompatibilidad: si no hay pension1..5 pero sí pension_total, usar un solo renglón
+      const totalGuardado = safeNumber(data.pension_total);
+      const montosACargar = montosGuardados.length > 0
+        ? montosGuardados
+        : (totalGuardado > 0 ? [totalGuardado] : []);
+
+      if (pensionListLoad) pensionListLoad.replaceChildren();
+
+      if (montosACargar.length > 0) {
+        if (chkPensionLoad && !chkPensionLoad.disabled) chkPensionLoad.checked = true;
+        if (btnAddPensionLoad) btnAddPensionLoad.disabled = false;
+        if (pensionListLoad) {
+          pensionListLoad.classList.remove("d-none");
+          montosACargar.forEach((monto, idx) => {
+            const k = idx + 1;
+            const row = document.createElement("div");
+            row.className = "d-flex align-items-center gap-2 mb-2";
+            row.setAttribute("data-pension-monto", String(k));
+            row.innerHTML = `
+              <div class="text-muted" style="font-size:12px; width:110px;">Pensión ${k} ($)</div>
+              <input type="number"
+                class="form-control form-control-sm text-end pension-monto-input"
+                style="width:150px"
+                name="pension${k}"
+                id="pension${k}_monto"
+                placeholder="Monto $"
+                min="0" step="0.01"
+                value="${monto}">
+              <button type="button" class="btn btn-outline-danger btn-sm" data-remove-pension-monto="${k}" title="Quitar">
+                <i class="bi bi-trash"></i>
+              </button>`;
+            pensionListLoad.appendChild(row);
+          });
+          if (btnAddPensionLoad) btnAddPensionLoad.disabled = montosACargar.length >= 5;
+        }
+      } else {
+        if (chkPensionLoad && !chkPensionLoad.disabled) chkPensionLoad.checked = false;
+        if (btnAddPensionLoad) btnAddPensionLoad.disabled = true;
+        if (pensionListLoad) pensionListLoad.classList.add("d-none");
+      }
+    }
+
     refreshTotales();
 
     // Los valores exactos de la BD siempre tienen precedencia sobre el recálculo local
@@ -2575,17 +2734,56 @@
 
     const subtotal = moneyParse(get("subtotal"));
 
-    const p1 = clampPercent(get("pension1_tasa")) / 100;
-    const p2 = clampPercent(get("pension2_tasa")) / 100;
-    const p3 = clampPercent(get("pension3_tasa")) / 100;
-    const p4 = clampPercent(get("pension4_tasa")) / 100;
-    const p5 = clampPercent(get("pension5_tasa")) / 100;
+    let pension1, pension2, pension3, pension4, pension5;
+    let pension_total_payload;
+    let isr_payload, ieps_payload;
+    let isr_tasa_payload, ieps_tasa_payload;
+    let pension1_tasa_payload, pension2_tasa_payload, pension3_tasa_payload,
+      pension4_tasa_payload, pension5_tasa_payload;
 
-    const pension1 = usePension() ? subtotal * p1 : 0;
-    const pension2 = usePension() ? subtotal * p2 : 0;
-    const pension3 = usePension() ? subtotal * p3 : 0;
-    const pension4 = usePension() ? subtotal * p4 : 0;
-    const pension5 = usePension() ? subtotal * p5 : 0;
+    // Migración 2026-03-24: ADMIN/GOD envían impuestos por cantidad directa
+    if (canUseManualTaxes()) {
+      isr_payload = useISR() ? (parseFloat(document.getElementById("isr_cantidad")?.value || 0) || 0) : 0;
+      ieps_payload = useIEPS() ? (parseFloat(document.getElementById("ieps_cantidad")?.value || 0) || 0) : 0;
+      isr_tasa_payload = null;
+      ieps_tasa_payload = null;
+      pension1_tasa_payload = null;
+      pension2_tasa_payload = null;
+      pension3_tasa_payload = null;
+      pension4_tasa_payload = null;
+      pension5_tasa_payload = null;
+
+      // Leer montos de pensión desde el panel dinámico (hasta 5 filas)
+      const montoInputs = Array.from(document.querySelectorAll("#pensionList .pension-monto-input"));
+      const montos = montoInputs.map(inp => usePension() ? (parseFloat(inp.value || 0) || 0) : 0);
+      pension1 = montos[0] ?? 0;
+      pension2 = montos[1] ?? 0;
+      pension3 = montos[2] ?? 0;
+      pension4 = montos[3] ?? 0;
+      pension5 = montos[4] ?? 0;
+      pension_total_payload = usePension() ? (pension1 + pension2 + pension3 + pension4 + pension5) : 0;
+    } else {
+      const p1 = clampPercent(get("pension1_tasa")) / 100;
+      const p2 = clampPercent(get("pension2_tasa")) / 100;
+      const p3 = clampPercent(get("pension3_tasa")) / 100;
+      const p4 = clampPercent(get("pension4_tasa")) / 100;
+      const p5 = clampPercent(get("pension5_tasa")) / 100;
+      pension1 = usePension() ? subtotal * p1 : 0;
+      pension2 = usePension() ? subtotal * p2 : 0;
+      pension3 = usePension() ? subtotal * p3 : 0;
+      pension4 = usePension() ? subtotal * p4 : 0;
+      pension5 = usePension() ? subtotal * p5 : 0;
+      isr_payload = moneyParse(get("isr"));
+      ieps_payload = moneyParse(get("ieps"));
+      pension_total_payload = moneyParse(get("pension_total"));
+      isr_tasa_payload = get("isr_tasa") || null;
+      ieps_tasa_payload = get("ieps_tasa") || null;
+      pension1_tasa_payload = get("pension1_tasa") || null;
+      pension2_tasa_payload = get("pension2_tasa") || null;
+      pension3_tasa_payload = get("pension3_tasa") || null;
+      pension4_tasa_payload = get("pension4_tasa") || null;
+      pension5_tasa_payload = get("pension5_tasa") || null;
+    }
 
     return {
       id_usuario,
@@ -2604,24 +2802,24 @@
       meta,
 
       impuesto_tipo: getImpuestoTipo(),
-      isr_tasa: get("isr_tasa") || null,
-      ieps_tasa: get("ieps_tasa") || null,
+      isr_tasa: isr_tasa_payload,
+      ieps_tasa: ieps_tasa_payload,
 
       subtotal: moneyParse(get("subtotal")),
       iva: moneyParse(get("iva")),
-      isr: moneyParse(get("isr")),
-      ieps: moneyParse(get("ieps")),
+      isr: isr_payload,
+      ieps: ieps_payload,
       total: moneyParse(get("total")),
-      pension_total: moneyParse(get("pension_total")),
+      pension_total: pension_total_payload,
       cantidad_con_letra: get("cantidad_con_letra") || "",
 
       detalle: buildDetalle(),
 
-      pension1_tasa: get("pension1_tasa") || null,
-      pension2_tasa: get("pension2_tasa") || null,
-      pension3_tasa: get("pension3_tasa") || null,
-      pension4_tasa: get("pension4_tasa") || null,
-      pension5_tasa: get("pension5_tasa") || null,
+      pension1_tasa: pension1_tasa_payload,
+      pension2_tasa: pension2_tasa_payload,
+      pension3_tasa: pension3_tasa_payload,
+      pension4_tasa: pension4_tasa_payload,
+      pension5_tasa: pension5_tasa_payload,
 
       pension1,
       pension2,
@@ -2786,6 +2984,11 @@
     listen('[name="isr_tasa"], #isr_tasa');
     listen('[name="ieps_tasa"], #ieps_tasa');
     listen('[name^="pension"][name$="_tasa"]');
+
+    // Inputs de cantidad directa para L00/117
+    listen('[name="isr_cantidad"], #isr_cantidad');
+    listen('[name="ieps_cantidad"], #ieps_cantidad');
+    listen('[name="pension_cantidad"], #pension_cantidad');
   }
 
   // ==============================
@@ -4132,37 +4335,43 @@
       if (!t) return;
 
       if (t.matches('[name="imp_isr"], #imp_isr') && t.checked) {
-        const tasaEl = document.querySelector('[name="isr_tasa"], #isr_tasa');
-        const current = clampPercent(tasaEl?.value || 0);
-        if (!current) {
-          const pct = await askPercentSwal(
-            "¿Qué porcentaje de ISR aplicarás?",
-            10,
-          );
-          if (pct == null) {
-            t.checked = false;
-            refreshTotales();
-            return;
+        // ADMIN/GOD: no popup — usan input de cantidad directa
+        if (!canUseManualTaxes()) {
+          const tasaEl = document.querySelector('[name="isr_tasa"], #isr_tasa');
+          const current = clampPercent(tasaEl?.value || 0);
+          if (!current) {
+            const pct = await askPercentSwal(
+              "¿Qué porcentaje de ISR aplicarás?",
+              10,
+            );
+            if (pct == null) {
+              t.checked = false;
+              refreshTotales();
+              return;
+            }
+            setRateValue('[name="isr_tasa"], #isr_tasa', pct);
           }
-          setRateValue('[name="isr_tasa"], #isr_tasa', pct);
         }
         refreshTotales();
       }
 
       if (t.matches('[name="imp_ieps"], #imp_ieps') && t.checked) {
-        const tasaEl = document.querySelector('[name="ieps_tasa"], #ieps_tasa');
-        const current = clampPercent(tasaEl?.value || 0);
-        if (!current) {
-          const pct = await askPercentSwal(
-            "¿Qué porcentaje de IEPS aplicarás?",
-            8,
-          );
-          if (pct == null) {
-            t.checked = false;
-            refreshTotales();
-            return;
+        // ADMIN/GOD: no popup — usan input de cantidad directa
+        if (!canUseManualTaxes()) {
+          const tasaEl = document.querySelector('[name="ieps_tasa"], #ieps_tasa');
+          const current = clampPercent(tasaEl?.value || 0);
+          if (!current) {
+            const pct = await askPercentSwal(
+              "¿Qué porcentaje de IEPS aplicarás?",
+              8,
+            );
+            if (pct == null) {
+              t.checked = false;
+              refreshTotales();
+              return;
+            }
+            setRateValue('[name="ieps_tasa"], #ieps_tasa', pct);
           }
-          setRateValue('[name="ieps_tasa"], #ieps_tasa', pct);
         }
         refreshTotales();
       }
@@ -4273,7 +4482,71 @@
       return row;
     }
 
+    // ===============================================================
+    // Funciones exclusivas para ADMIN/GOD: pensiones por monto directo
+    // ===============================================================
+    function countPensionesMontos() {
+      if (!pensionList) return 0;
+      return pensionList.querySelectorAll("[data-pension-monto]").length;
+    }
+
+    function createPensionMontoRow(k, value = "") {
+      const row = document.createElement("div");
+      row.className = "d-flex align-items-center gap-2 mb-2";
+      row.setAttribute("data-pension-monto", String(k));
+      row.innerHTML = `
+    <div class="text-muted" style="font-size:12px; width:110px;">Pensión ${k} ($)</div>
+    <input type="number"
+      class="form-control form-control-sm text-end pension-monto-input"
+      style="width:150px"
+      name="pension${k}"
+      id="pension${k}_monto"
+      placeholder="Monto $"
+      min="0" step="0.01"
+      value="${value}">
+    <button type="button" class="btn btn-outline-danger btn-sm" data-remove-pension-monto="${k}" title="Quitar">
+      <i class="bi bi-trash"></i>
+    </button>`;
+      return row;
+    }
+
+    function uiWarnInline(msg) {
+      // Aviso inline sin popup: muestra un texto temporal junto al botón +
+      const existing = document.getElementById("pension-warn-inline");
+      if (existing) existing.remove();
+      const warn = document.createElement("small");
+      warn.id = "pension-warn-inline";
+      warn.className = "text-warning ms-1";
+      warn.textContent = msg;
+      btnAddPension?.insertAdjacentElement("afterend", warn);
+      setTimeout(() => warn.remove(), 3000);
+    }
+
     chkPension?.addEventListener("change", async () => {
+      // ADMIN/GOD: usa el panel dinámico de pensiones con montos directos (sin popup de porcentaje)
+      if (canUseManualTaxes()) {
+        if (!btnAddPension || !pensionList) { refreshTotales(); return; }
+
+        btnAddPension.disabled = !chkPension.checked;
+
+        if (!chkPension.checked) {
+          pensionList.replaceChildren();
+          pensionList.classList.add("d-none");
+          refreshTotales();
+          return;
+        }
+
+        ensurePensionListVisible();
+
+        // Si no hay ninguna fila de monto, agregar la primera automáticamente
+        if (countPensionesMontos() === 0) {
+          pensionList.appendChild(createPensionMontoRow(1));
+          refreshTotales();
+        }
+        return;
+      }
+
+      // AREA: lógica de porcentaje con panel dinámico
       if (!btnAddPension || !pensionList) return;
 
       btnAddPension.disabled = !chkPension.checked;
@@ -4304,6 +4577,21 @@
     btnAddPension?.addEventListener("click", async () => {
       if (!chkPension?.checked) return;
 
+      // ADMIN/GOD: agregar fila de monto directo sin popup
+      if (canUseManualTaxes()) {
+        const c = countPensionesMontos();
+        if (c >= 5) {
+          uiWarnInline("Máximo 5 pensiones.");
+          return;
+        }
+        ensurePensionListVisible();
+        pensionList.appendChild(createPensionMontoRow(c + 1));
+        btnAddPension.disabled = countPensionesMontos() >= 5;
+        refreshTotales();
+        return;
+      }
+
+      // AREA: lógica de porcentaje con popup
       const c = countPensiones();
       if (c >= 5) {
         uiWarn("Máximo 5 pensiones.");
@@ -4320,6 +4608,35 @@
     });
 
     pensionList?.addEventListener("click", (e) => {
+      // ADMIN/GOD: eliminar fila de monto directo
+      const btnMonto = e.target.closest("[data-remove-pension-monto]");
+      if (btnMonto) {
+        btnMonto.closest("[data-pension-monto]")?.remove();
+        // Reordenar labels e índices de filas de monto
+        const montoRows = Array.from(pensionList.querySelectorAll("[data-pension-monto]"));
+        montoRows.forEach((r, idx) => {
+          const k = idx + 1;
+          r.setAttribute("data-pension-monto", String(k));
+          r.querySelector(".text-muted").textContent = `Pensión ${k} ($)`;
+          const input = r.querySelector("input");
+          if (input) {
+            input.name = `pension${k}`;
+            input.id = `pension${k}_monto`;
+          }
+          r.querySelector("[data-remove-pension-monto]")?.setAttribute("data-remove-pension-monto", String(k));
+        });
+        if (countPensionesMontos() === 0) {
+          chkPension.checked = false;
+          btnAddPension.disabled = true;
+          pensionList.classList.add("d-none");
+        } else {
+          btnAddPension.disabled = countPensionesMontos() >= 5;
+        }
+        refreshTotales();
+        return;
+      }
+
+      // AREA: eliminar fila de porcentaje
       const btn = e.target.closest("[data-remove-pension]");
       if (!btn) return;
 
@@ -4361,51 +4678,92 @@
       e.preventDefault();
       if (!hasSwal()) return alert("Info: Usa SweetAlert2 (Swal).");
 
-      Swal.fire({
-        icon: "info",
-        title: "Pensión alimenticia",
-        html: `
-      <div style="text-align:left; font-size:13px;">
-        <p class="mb-2">
-          La <b>Pensión</b> se calcula como un porcentaje del <b>SUBTOTAL</b>.
-        </p>
-        <ul class="mb-2">
-          <li>Puedes agregar hasta <b>5 pensiones</b>.</li>
-          <li>Cada pensión es un % independiente (ej. 10%, 5%, etc.).</li>
-          <li>El sistema suma todas las pensiones y las muestra en <b>PENSIÓN</b>.</li>
-          <li>El <b>TOTAL</b> = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN</li>
-        </ul>
-        <p class="mb-0 text-muted">
-          Tip: Si no ves cambios, revisa que hayas capturado porcentajes mayores a 0.
-        </p>
-      </div>
-    `,
-        confirmButtonText: "Entendido",
-        confirmButtonColor: "#BC955C",
-      });
+      if (canUseManualTaxes()) {
+        Swal.fire({
+          icon: "info",
+          title: "Pensión alimenticia",
+          html: `
+        <div style="text-align:left; font-size:13px;">
+          <p class="mb-2">
+            Captura el <b>monto directo</b> de la pensión alimenticia.
+          </p>
+          <ul class="mb-2">
+            <li>Escribe el importe exacto en pesos.</li>
+            <li>El sistema lo resta del TOTAL automáticamente.</li>
+            <li>El <b>TOTAL</b> = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN</li>
+          </ul>
+        </div>
+      `,
+          confirmButtonText: "Entendido",
+          confirmButtonColor: "#BC955C",
+        });
+      } else {
+        Swal.fire({
+          icon: "info",
+          title: "Pensión alimenticia",
+          html: `
+        <div style="text-align:left; font-size:13px;">
+          <p class="mb-2">
+            La <b>Pensión</b> se calcula como un porcentaje del <b>SUBTOTAL</b>.
+          </p>
+          <ul class="mb-2">
+            <li>Puedes agregar hasta <b>5 pensiones</b>.</li>
+            <li>Cada pensión es un % independiente (ej. 10%, 5%, etc.).</li>
+            <li>El sistema suma todas las pensiones y las muestra en <b>PENSIÓN</b>.</li>
+            <li>El <b>TOTAL</b> = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN</li>
+          </ul>
+          <p class="mb-0 text-muted">
+            Tip: Si no ves cambios, revisa que hayas capturado porcentajes mayores a 0.
+          </p>
+        </div>
+      `,
+          confirmButtonText: "Entendido",
+          confirmButtonColor: "#BC955C",
+        });
+      }
     });
 
     btnInfoImpuestos?.addEventListener("click", (e) => {
       e.preventDefault();
       if (!hasSwal()) return alert("Info: Usa SweetAlert2 (Swal).");
 
-      Swal.fire({
-        icon: "info",
-        title: "Impuestos (IVA / ISR / IEPS)",
-        html: `
-      <div style="text-align:left; font-size:13px;">
-        <p class="mb-2"><b>IVA</b> se calcula al 16% del SUBTOTAL.</p>
-        <p class="mb-2"><b>ISR</b> y <b>IEPS</b> se calculan usando la tasa que captures (ej. 10 y 8).</p>
-        <hr class="my-2">
-        <p class="mb-1"><b>Fórmula:</b></p>
-        <p class="mb-0">
-          TOTAL = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN
-        </p>
-      </div>
-    `,
-        confirmButtonText: "Ok",
-        confirmButtonColor: "#BC955C",
-      });
+      if (canUseManualTaxes()) {
+        Swal.fire({
+          icon: "info",
+          title: "Impuestos (IVA / ISR / IEPS)",
+          html: `
+        <div style="text-align:left; font-size:13px;">
+          <p class="mb-2"><b>IVA</b> se calcula al 16% del SUBTOTAL.</p>
+          <p class="mb-2"><b>ISR</b> e <b>IEPS</b> se capturan como <b>monto directo</b> en pesos.</p>
+          <hr class="my-2">
+          <p class="mb-1"><b>Fórmula:</b></p>
+          <p class="mb-0">
+            TOTAL = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN
+          </p>
+        </div>
+      `,
+          confirmButtonText: "Ok",
+          confirmButtonColor: "#BC955C",
+        });
+      } else {
+        Swal.fire({
+          icon: "info",
+          title: "Impuestos (IVA / ISR / IEPS)",
+          html: `
+        <div style="text-align:left; font-size:13px;">
+          <p class="mb-2"><b>IVA</b> se calcula al 16% del SUBTOTAL.</p>
+          <p class="mb-2"><b>ISR</b> y <b>IEPS</b> se calculan usando la tasa que captures (ej. 10 y 8).</p>
+          <hr class="my-2">
+          <p class="mb-1"><b>Fórmula:</b></p>
+          <p class="mb-0">
+            TOTAL = SUBTOTAL + IVA + ISR + IEPS - PENSIÓN
+          </p>
+        </div>
+      `,
+          confirmButtonText: "Ok",
+          confirmButtonColor: "#BC955C",
+        });
+      }
     });
     // Sección de info de Dirección solicitante removida del UI
   }
@@ -4443,17 +4801,19 @@
       console.warn("[SP] catálogo partidas:", e.message);
     }
 
-    initRows();
-    refreshPartidaSelects();
-    attachMoneyInputs(detalleBody);
-    bindEvents();
-
+    // Cargar dependencias y detectar modo ANTES de initRows para que
+    // esUsuarioL00117 esté correctamente establecido cuando rowTemplate() corre.
     try {
       await loadDependenciasFromUser();
     } catch (e) {
       console.warn("[SP] dependencias:", e.message);
     }
     detectarModoFlujo();
+
+    initRows();
+    refreshPartidaSelects();
+    attachMoneyInputs(detalleBody);
+    bindEvents();
     applyCancelarSufVisibility(canViewCancelarSuf());
 
     await loadProyectosCatalog();

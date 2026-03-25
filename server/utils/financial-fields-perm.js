@@ -34,6 +34,18 @@ export function canViewIepsPensionesByClaves(dgClave, daClave) {
   return dg === "L00" && da === "117";
 }
 
+/**
+ * Verifica permisos de IEPS/Pensiones basándose en roles.
+ * MIGRACIÓN 2026-03-24: reemplaza canViewIepsPensionesByClaves para el modelo por roles.
+ * ADMIN y GOD tienen permiso; AREA no.
+ * @param {string[]} roles — arreglo de claves de roles del usuario (req.user.roles)
+ */
+export function canViewIepsPensionesByRoles(roles) {
+  if (!Array.isArray(roles)) return false;
+  const r = roles.map((x) => String(x).toUpperCase());
+  return r.includes("ADMIN") || r.includes("GOD");
+}
+
 export function sanitizeFinancialFieldsForLimitedView(payload) {
   const p = payload && typeof payload === "object" ? payload : {};
   const out = { ...p };

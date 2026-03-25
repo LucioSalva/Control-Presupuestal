@@ -118,12 +118,19 @@
     return CURRENT_ROLES_NORM.includes("ADMIN");
   }
 
+  // Migración 2026-03-24: isL00117User se mantiene para compatibilidad de lógica de workflow
   function isL00117User() {
     return CURRENT_DGENERAL_CLAVE === "L00" && CURRENT_DAUXILIAR_CLAVE === "117";
   }
 
+  // Migración 2026-03-24: canBypassOperationalLocks reemplaza a isL00117User en acceso de día/clave
+  function canBypassOperationalLocks() {
+    return isGodUser() || isAdminUser();
+  }
+
   function canSeeAllAreas() {
-    return isGodUser() || isAdminUser() || isL00117User();
+    // Migración 2026-03-24: ADMIN y GOD pueden ver todas las áreas (rol-based)
+    return isGodUser() || isAdminUser();
   }
 
   function isAllowedReconDay() {
@@ -132,7 +139,8 @@
   }
 
   function isReconAccessAllowed() {
-    return isL00117User() || isAllowedReconDay();
+    // Migración 2026-03-24: ADMIN y GOD pueden operar cualquier día
+    return canBypassOperationalLocks() || isAllowedReconDay();
   }
 
   const el = {
@@ -328,12 +336,13 @@
   async function ensureReconAccess() {
     if (!isReconAccessAllowed()) {
       await uiWarn(
-        "Reconducciones está habilitado de lunes a jueves. El área L00 117 es la excepción."
+        "Reconducciones está habilitado de lunes a jueves. Los roles ADMIN y GOD son la excepción."
       );
       disableReconUI();
       return false;
     }
-    if (isL00117User()) return true;
+    // Migración 2026-03-24: ADMIN y GOD no requieren clave de acceso
+    if (canBypassOperationalLocks()) return true;
     if (hasReconSession()) return true;
     let ok = false;
     for (let i = 0; i < 3; i += 1) {

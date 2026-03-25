@@ -314,7 +314,73 @@ export function validateMesPago(mes) {
 //  HELPERS DE IDENTIDAD DE USUARIO CENTRALIZADOS
 // =====================================================
 
+// =====================================================
+//  PERMISOS POR ROL — reemplaza validaciones por DG/DA
+//  Migración 2026-03-24: L00/117 → roles ADMIN/GOD
+// =====================================================
+
 /**
+ * ADMIN y GOD pueden capturar ISR, IEPS y Pensión como monto directo (sin tasa).
+ * Reemplaza la verificación hardcodeada DG=L00 AND DA=117.
+ * @param {{ roles: string[] }} user — req.user adjunto por authRequired
+ */
+export function canUseManualTaxes(user) {
+  if (!user || !Array.isArray(user.roles)) return false;
+  const r = user.roles.map((x) => String(x).toUpperCase());
+  return r.includes("ADMIN") || r.includes("GOD");
+}
+
+/**
+ * ADMIN y GOD pueden usar meses anteriores al mes en curso.
+ * Reemplaza la verificación hardcodeada DG=L00 AND DA=117.
+ * @param {{ roles: string[] }} user — req.user adjunto por authRequired
+ */
+export function canUsePreviousMonths(user) {
+  if (!user || !Array.isArray(user.roles)) return false;
+  const r = user.roles.map((x) => String(x).toUpperCase());
+  return r.includes("ADMIN") || r.includes("GOD");
+}
+
+/**
+ * ADMIN y GOD pueden operar sin candados operativos (ej. restricción día de semana).
+ * Reemplaza la verificación hardcodeada DG=L00 AND DA=117.
+ * @param {{ roles: string[] }} user — req.user adjunto por authRequired
+ */
+export function canBypassOperationalLocks(user) {
+  if (!user || !Array.isArray(user.roles)) return false;
+  const r = user.roles.map((x) => String(x).toUpperCase());
+  return r.includes("ADMIN") || r.includes("GOD");
+}
+
+/**
+ * ADMIN y GOD pueden ver todas las áreas (reconducciones, suficiencias, etc.).
+ * Equivale a la lógica anterior: role !== "AREA" || isL00117.
+ * @param {{ roles: string[] }} user — req.user adjunto por authRequired
+ */
+export function canSeeAllAreas(user) {
+  if (!user || !Array.isArray(user.roles)) return false;
+  const r = user.roles.map((x) => String(x).toUpperCase());
+  return r.includes("ADMIN") || r.includes("GOD");
+}
+
+/**
+ * ADMIN y GOD pueden ver/usar campos IEPS y Pensiones.
+ * Reemplaza canViewIepsPensionesByClaves(dg, da) para el modelo por roles.
+ * @param {{ roles: string[] }} user — req.user adjunto por authRequired
+ */
+export function canViewIepsPensionesByRole(user) {
+  if (!user || !Array.isArray(user.roles)) return false;
+  const r = user.roles.map((x) => String(x).toUpperCase());
+  return r.includes("ADMIN") || r.includes("GOD");
+}
+
+// =====================================================
+//  DEPRECADO — se mantiene por compatibilidad
+//  MIGRACIÓN 2026-03-24: usar canUseManualTaxes(req.user)
+// =====================================================
+
+/**
+ * @deprecated Usar canUseManualTaxes(req.user) en su lugar.
  * Verifica si el usuario pertenece a DG L00 con DA 117 (presupuesto central).
  * RIESGO-008, REC-02: centralizado para evitar duplicación en routes.
  */

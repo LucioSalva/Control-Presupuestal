@@ -408,8 +408,12 @@
             <input class="form-check-input" type="checkbox" name="imp_isr" id="imp_isr" />
             <label class="form-check-label fw-semibold" for="imp_isr">ISR</label>
           </div>
+          <!-- Modo porcentaje (usuarios normales) -->
           <input type="number" class="form-control form-control-sm text-end" name="isr_tasa"
             placeholder="Ej. 10 %" min="0" max="100" step="0.01" id="isr_tasa" />
+          <!-- Modo cantidad directa (solo L00/117) — oculto por defecto -->
+          <input type="number" class="form-control form-control-sm text-end d-none" name="isr_cantidad"
+            placeholder="Monto ISR $" min="0" step="0.01" id="isr_cantidad" />
         </div>
 
         <!-- IEPS -->
@@ -418,8 +422,12 @@
             <input class="form-check-input" type="checkbox" name="imp_ieps" id="imp_ieps" />
             <label class="form-check-label fw-semibold" for="imp_ieps">IEPS</label>
           </div>
+          <!-- Modo porcentaje (usuarios normales) -->
           <input type="number" class="form-control form-control-sm text-end" id="ieps_tasa" name="ieps_tasa"
             placeholder="Ej. 8 %" min="0" max="100" step="0.01" />
+          <!-- Modo cantidad directa (solo L00/117) — oculto por defecto -->
+          <input type="number" class="form-control form-control-sm text-end d-none" name="ieps_cantidad"
+            placeholder="Monto IEPS $" min="0" step="0.01" id="ieps_cantidad" />
         </div>
 
         <!-- PENSIÓN ALIMENTICIA -->
@@ -428,6 +436,9 @@
             <input class="form-check-input" type="checkbox" name="imp_pension" id="imp_pension" />
             <label class="form-check-label fw-semibold" for="imp_pension">Pensión alimenticia</label>
           </div>
+          <!-- Modo cantidad directa (solo L00/117) — oculto por defecto -->
+          <input type="number" class="form-control form-control-sm text-end d-none" name="pension_cantidad"
+            placeholder="Monto Pensión $" min="0" step="0.01" id="pension_cantidad" />
           <div class="btn-group btn-group-sm ms-1" role="group">
             <button type="button" class="btn btn-outline-secondary" id="btnAddPension" title="Agregar pensión">
               <i class="bi bi-plus-lg"></i>

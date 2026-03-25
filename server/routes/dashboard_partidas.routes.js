@@ -20,7 +20,7 @@
  */
 import { Router } from "express";
 import { query } from "../db.js";
-import { logUnauthorizedPartidasAccess } from "../utils/helpers.js";
+import { logUnauthorizedPartidasAccess, canBypassOperationalLocks } from "../utils/helpers.js";
 
 const router = Router();
 const ALLOWED_DG = "L00";
@@ -31,7 +31,17 @@ function normalizeKey(value) {
   return String(value || "").trim().toUpperCase();
 }
 
-function hasAccess(dg, da) {
+/**
+ * Migración 2026-03-24: ADMIN y GOD tienen acceso al dashboard.
+ * Se mantiene la verificación por DG/DA como fallback legacy.
+ * @param {object} req — Express request con req.user
+ * @param {string} dg — clave DG del usuario
+ * @param {string} da — clave DA del usuario
+ */
+function hasAccess(req, dg, da) {
+  // Primero: permisos por rol (ADMIN/GOD)
+  if (canBypassOperationalLocks(req.user)) return true;
+  // Fallback legacy: L00/117 o E00
   const dgKey = normalizeKey(dg);
   const daKey = normalizeKey(da);
   return (
@@ -164,13 +174,14 @@ router.get("/partidas-resumen", async (req, res) => {
     if (!userId) return res.status(401).json({ error: "No autenticado" });
 
     const { dg, da } = await getUserDGDA(req);
-    if (!hasAccess(dg, da)) {
+    // Migración 2026-03-24: ADMIN/GOD tienen acceso; legacy L00/117 y E00 también
+    if (!hasAccess(req, dg, da)) {
       await logUnauthorizedPartidasAccess(req, {
         motivo: "ACCESO_DASHBOARD_PARTIDAS",
         data: { dg, da },
       });
       return res.status(403).json({
-        error: "Acceso denegado. Solo DG L00 con DA 117 o DG E00 puede acceder.",
+        error: "Acceso denegado. Se requiere rol ADMIN o GOD para acceder al dashboard.",
       });
     }
 
@@ -374,13 +385,14 @@ router.get("/partidas-detalle", async (req, res) => {
     if (!userId) return res.status(401).json({ error: "No autenticado" });
 
     const { dg, da } = await getUserDGDA(req);
-    if (!hasAccess(dg, da)) {
+    // Migración 2026-03-24: ADMIN/GOD tienen acceso; legacy L00/117 y E00 también
+    if (!hasAccess(req, dg, da)) {
       await logUnauthorizedPartidasAccess(req, {
         motivo: "ACCESO_DASHBOARD_PARTIDAS",
         data: { dg, da },
       });
       return res.status(403).json({
-        error: "Acceso denegado. Solo DG L00 con DA 117 o DG E00 puede acceder.",
+        error: "Acceso denegado. Se requiere rol ADMIN o GOD para acceder al dashboard.",
       });
     }
 
