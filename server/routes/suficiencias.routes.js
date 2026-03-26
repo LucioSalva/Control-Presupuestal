@@ -213,6 +213,11 @@ router.post("/lote", async (req, res) => {
     // Migración 2026-03-24: reemplaza checkIsUserL00117
     // ================================
     const isL00117ForLote = canUseManualTaxes(req.user);
+
+    // PERMISO DE FECHA MANUAL: solo ADMIN/GOD pueden indicar una fecha personalizada.
+    // Para AREA la fecha siempre es la del servidor (se pasa null y el INSERT usa COALESCE con CURRENT_DATE).
+    const tienePermisoFechaLote = isL00117ForLote; // misma guardia de rol
+
     const MESES_LOTE = [
       "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
       "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
@@ -224,7 +229,9 @@ router.post("/lote", async (req, res) => {
     const creadas = [];
 
     for (const suf of suficiencias) {
-      const fechaBaseRaw = suf.fecha ? new Date(suf.fecha) : new Date();
+      // Determinar fecha efectiva respetando permisos
+      const fechaFinalLote = tienePermisoFechaLote && suf.fecha ? suf.fecha : null;
+      const fechaBaseRaw = fechaFinalLote ? new Date(fechaFinalLote) : new Date();
       const fechaBase = Number.isNaN(fechaBaseRaw.getTime()) ? new Date() : fechaBaseRaw;
 
       const anio = String(fechaBase.getFullYear());
@@ -364,7 +371,7 @@ router.post("/lote", async (req, res) => {
         )
         VALUES (
           $1, $2, $3, $4, $5,
-          $6, $7, $8, $9, $10, $11,
+          COALESCE($6::date, CURRENT_DATE), $7, $8, $9, $10, $11,
           $12, $13, $14, $15,
           $16, $17, $18, $19,
           $20,
@@ -382,7 +389,7 @@ router.post("/lote", async (req, res) => {
         suf.id_dauxiliar,
         suf.id_proyecto,
         suf.id_fuente,
-        suf.fecha,
+        fechaFinalLote,   // $6 — null para AREA (COALESCE con CURRENT_DATE), fecha manual para ADMIN/GOD
         suf.dependencia,
         departamento,
         suf.fuente,
@@ -493,10 +500,20 @@ router.post("/", async (req, res) => {
     const b = req.body || {};
     const allowIEPSPensiones = await canViewIepsPensiones(req);
 
-    const fechaBaseRaw = b.fecha ? new Date(b.fecha) : new Date();
+    // ================================
+    // PERMISO DE FECHA MANUAL (ADMIN/GOD únicamente)
+    // Si el usuario no es ADMIN ni GOD, se ignora cualquier fecha enviada
+    // y se usa la fecha actual del servidor.
+    // ================================
+    const tienePermisoFecha = canUseManualTaxes(req.user); // misma guardia de rol: ADMIN o GOD
+
+    const fechaBaseRaw = tienePermisoFecha && b.fecha ? new Date(b.fecha) : new Date();
     const fechaBase = Number.isNaN(fechaBaseRaw.getTime())
       ? new Date()
       : fechaBaseRaw;
+
+    // Sobreescribir b.fecha con el valor seguro (AREA no puede imponer fecha)
+    const fechaFinal = tienePermisoFecha && b.fecha ? b.fecha : null; // null = NOW() en el INSERT
 
     const anio = String(fechaBase.getFullYear());
     const mes = String(fechaBase.getMonth() + 1).padStart(2, "0");
@@ -647,7 +664,7 @@ router.post("/", async (req, res) => {
   )
   VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8, $9, $10, $11,
+    COALESCE($6::date, CURRENT_DATE), $7, $8, $9, $10, $11,
     $12, $13, $14, $15, $16, $17, $18, $19,
     $20,
     $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
@@ -700,7 +717,7 @@ router.post("/", async (req, res) => {
       b.id_proyecto,
       b.id_fuente,
 
-      b.fecha,
+      fechaFinal,   // $6 — null para AREA (usará CURRENT_DATE por COALESCE), fecha manual para ADMIN/GOD
       b.dependencia,
       departamento,
       b.fuente,

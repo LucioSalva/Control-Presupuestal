@@ -663,19 +663,43 @@
   }
 
   // ---------------------------
-  // Fecha automática (hoy) + readonly
+  // Fecha de elaboración: editable para ADMIN/GOD, solo lectura para AREA
   // ---------------------------
   function setFechaHoy() {
     const el = document.querySelector('[name="fecha"]');
     if (!el) return;
-    el.readOnly = true;
-    if (el.value) return;
 
-    const hoy = new Date();
-    const yyyy = hoy.getFullYear();
-    const mm = String(hoy.getMonth() + 1).padStart(2, "0");
-    const dd = String(hoy.getDate()).padStart(2, "0");
-    el.value = `${yyyy}-${mm}-${dd}`;
+    const puedeEditarFecha = canUseManualTaxes(); // ADMIN o GOD
+
+    if (puedeEditarFecha) {
+      // ADMIN/GOD: campo editable; si no hay valor, se pone hoy como valor por defecto
+      el.readOnly = false;
+      el.classList.remove("cp-readonly");
+      el.title = "Como ADMIN/GOD puedes cambiar la fecha de elaboración";
+    } else {
+      // AREA: siempre de solo lectura y forzada a hoy
+      el.readOnly = true;
+      el.classList.add("cp-readonly");
+      el.title = "";
+    }
+
+    // Si el campo está vacío se establece la fecha de hoy como valor inicial
+    if (!el.value) {
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+      const dd = String(hoy.getDate()).padStart(2, "0");
+      el.value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    // Para usuarios AREA, sobrescribir con hoy siempre (ignora cualquier valor previo)
+    if (!puedeEditarFecha) {
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+      const dd = String(hoy.getDate()).padStart(2, "0");
+      el.value = `${yyyy}-${mm}-${dd}`;
+    }
   }
 
   // ---------------------------
@@ -2517,7 +2541,17 @@
     }
 
     setVal("no_suficiencia", data.no_suficiencia || "");
-    setVal("fecha", data.fecha ? String(data.fecha).split("T")[0] : "");
+
+    // Fecha de elaboración: ADMIN/GOD ven y pueden editar la fecha guardada;
+    // AREA siempre ve la fecha de hoy (no puede ver ni modificar fechas históricas).
+    if (canUseManualTaxes()) {
+      setVal("fecha", data.fecha ? String(data.fecha).split("T")[0] : "");
+    } else {
+      // Para AREA: mostrar la fecha guardada en solo lectura (informativo, no editable)
+      const fechaGuardada = data.fecha ? String(data.fecha).split("T")[0] : "";
+      setVal("fecha", fechaGuardada);
+    }
+
     setVal("dependencia", data.dependencia || "");
     setVal("dependencia_aux", data.departamento || data.dependencia_aux || "");
     setVal("mes_pago", data.mes_pago || "");
