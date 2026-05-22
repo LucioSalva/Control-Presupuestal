@@ -21,10 +21,18 @@
 // server/routes/auth.routes.js
 import express from "express";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { query, getClient } from "../db.js";
 import { logAuditEvent } from "../utils/helpers.js";
 
 const router = express.Router();
+
+// =====================================================
+//  CONSTANTES JWT
+// =====================================================
+const JWT_ISSUER = "control-presupuestal";
+const JWT_AUDIENCE = "cp-frontend";
+const JWT_EXPIRES_IN = "10m";
 
 function isBcryptHash(str) {
   return typeof str === "string" && /^\$2[aby]?\$\d{2}\$/.test(str);
@@ -37,21 +45,33 @@ function getRequestIp(req) {
   return first || req.ip || null;
 }
 
-function parseFakeToken(req) {
+/**
+ * Verifica un JWT firmado (issuer/audience estrictos).
+ * Retorna { userId } si el token es válido y vigente, null si no.
+ * Solo se acepta el formato JWT — el formato legacy "token-{id}-{ts}"
+ * fue eliminado por hardening (C-6).
+ */
+function verifyAuthToken(req) {
   const h = String(req.headers.authorization || "");
   const m = h.match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
-  const token = m[1].trim();
-  const parts = token.split("-");
-  if (parts.length < 3) return null;
-  if (parts[0] !== "token") return null;
-  const userId = Number(parts[1]);
-  if (!Number.isFinite(userId) || userId <= 0) return null;
-  const ts = Number(parts[2]);
-  if (!Number.isFinite(ts) || ts <= 0) return null;
-  const MAX_AGE_MS = 10 * 60 * 1000;
-  if (Date.now() - ts > MAX_AGE_MS) return null;
-  return { token, userId, ts };
+  const rawToken = m[1].trim();
+  if (!rawToken) return null;
+
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
+
+  try {
+    const decoded = jwt.verify(rawToken, secret, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+    const userId = Number(decoded?.sub);
+    if (!Number.isFinite(userId) || userId <= 0) return null;
+    return { token: rawToken, userId };
+  } catch {
+    return null;
+  }
 }
 
 router.post("/login", async (req, res) => {
@@ -186,8 +206,35 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // token de mentiritas (tu mismo sistema)
-    const token = `token-${user.id}-${Date.now()}`;
+    // ── Emisión de JWT firmado (C-6) ──────────────────────────
+    // El token legacy `token-{id}-{ts}` fue eliminado por completo.
+    // El frontend sigue leyendo el campo `token` del response sin
+    // necesidad de cambios (es opaco para el cliente).
+    const rolesArray = Array.isArray(user.roles)
+      ? user.roles.map((r) => String(r).trim().toUpperCase()).filter(Boolean)
+      : [];
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      // Defensa en profundidad. validateEnv() debió haber abortado el
+      // arranque, pero si llegamos aquí en dev sin secreto, fallamos.
+      console.error("[LOGIN] JWT_SECRET no configurado — no se puede emitir token.");
+      return res.status(500).json({ error: "Error interno de autenticación" });
+    }
+
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        roles: rolesArray,
+      },
+      jwtSecret,
+      {
+        algorithm: "HS256",
+        expiresIn: JWT_EXPIRES_IN,
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE,
+      }
+    );
 
     req.user = { id: user.id, id_dgeneral: user.id_dgeneral, id_dauxiliar: user.id_dauxiliar, roles: user.roles || [] };
     await logAuditEvent(req, {
@@ -239,7 +286,7 @@ router.post("/login", async (req, res) => {
 
 router.post("/logout", async (req, res) => {
   try {
-    const parsed = parseFakeToken(req);
+    const parsed = verifyAuthToken(req);
     const ip = getRequestIp(req);
 
     if (!parsed) {
@@ -248,7 +295,7 @@ router.post("/logout", async (req, res) => {
         entidad: "USUARIO",
         entidad_id: null,
         estado: "FALLO",
-        detalles: { ip, auth_method: "TOKEN_FAKE", ok: false, motivo: "TOKEN_INVALIDO_O_EXPIRADO" },
+        detalles: { ip, auth_method: "JWT", ok: false, motivo: "TOKEN_INVALIDO_O_EXPIRADO" },
       });
       return res.json({ ok: true });
     }
@@ -269,7 +316,7 @@ router.post("/logout", async (req, res) => {
         entidad: "USUARIO",
         entidad_id: String(parsed.userId),
         estado: "FALLO",
-        detalles: { ip, auth_method: "TOKEN_FAKE", ok: false, motivo: "USUARIO_NO_EXISTE" },
+        detalles: { ip, auth_method: "JWT", ok: false, motivo: "USUARIO_NO_EXISTE" },
       });
       return res.json({ ok: true });
     }
@@ -283,7 +330,7 @@ router.post("/logout", async (req, res) => {
       estado: u.activo ? "EXITO" : "FALLO",
       detalles: {
         ip,
-        auth_method: "TOKEN_FAKE",
+        auth_method: "JWT",
         ok: !!u.activo,
         usuario: String(u.usuario || "").trim(),
         motivo: u.activo ? null : "USUARIO_INACTIVO",
@@ -299,7 +346,7 @@ router.post("/logout", async (req, res) => {
         entidad: "USUARIO",
         entidad_id: null,
         estado: "FALLO",
-        detalles: { ip: getRequestIp(req), auth_method: "TOKEN_FAKE", ok: false, motivo: "ERROR_INTERNO" },
+        detalles: { ip: getRequestIp(req), auth_method: "JWT", ok: false, motivo: "ERROR_INTERNO" },
       });
     } catch {}
     return res.json({ ok: true });

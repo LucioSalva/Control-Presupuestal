@@ -53,24 +53,48 @@ import adminAuditoriaRouter from "./routes/admin-auditoria.routes.js";
 import { seedPartidasPermitidas } from "./utils/seed_partidas_permitidas.js";
 import { logAuditEvent } from "./utils/helpers.js";
 import { validateOrigin } from "./middleware/csrf.js";
+import { validateEnv } from "./utils/env-schema.js";
 
 
 dotenv.config();
 
+// ── VALIDACIÓN DE ENV (fail-fast) ───────────────────────────
+// Debe correr ANTES de cualquier `new Pool` o `app.listen`.
+// Si falla, hace process.exit(1) con un log detallado del campo.
+validateEnv();
+
 // ── JWT SECRET ──────────────────────────────────────────────
-// En producción es obligatorio; en desarrollo se usa un valor
-// de respaldo exclusivo para entorno local (no apto para prod).
+// Después de validateEnv() sabemos que:
+//   - en producción/staging: JWT_SECRET existe con longitud >= 32.
+//   - en development/test: puede faltar (warning ya emitido).
+// El secreto de respaldo SOLO se usa en development/test explícito.
 const _JWT_SECRET = process.env.JWT_SECRET;
-if (!_JWT_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    console.error("[FATAL] JWT_SECRET no está configurado en .env. El servidor se detendrá.");
-    process.exit(1);
-  } else {
-    // Solo en desarrollo: continúa con valor local, nunca usar en producción
-    console.warn("[WARN] JWT_SECRET no configurado. Usando secreto de desarrollo — NO APTO PARA PRODUCCIÓN.");
-  }
+const _NODE_ENV = String(process.env.NODE_ENV || "").trim().toLowerCase();
+const _IS_DEV_OR_TEST = _NODE_ENV === "development" || _NODE_ENV === "test" || _NODE_ENV === "";
+
+if (!_JWT_SECRET && !_IS_DEV_OR_TEST) {
+  // Doble red de seguridad — no debería llegar aquí porque validateEnv()
+  // ya habría abortado, pero protege contra cambios futuros del schema.
+  console.error("[FATAL] JWT_SECRET no está configurado y NODE_ENV no es dev/test. Abortando.");
+  process.exit(1);
+}
+if (_JWT_SECRET && _JWT_SECRET.length < 32 && !_IS_DEV_OR_TEST) {
+  console.error("[FATAL] JWT_SECRET tiene menos de 32 caracteres en NODE_ENV=" + _NODE_ENV + ". Abortando.");
+  process.exit(1);
 }
 const JWT_SECRET = _JWT_SECRET || "cp_dev_only_secret_no_usar_en_prod";
+
+// Constantes JWT — deben coincidir con auth.routes.js
+const JWT_ISSUER = "control-presupuestal";
+const JWT_AUDIENCE = "cp-frontend";
+
+// =====================================================
+//  TRACKING DE AUDITS PENDIENTES (C-7)
+// =====================================================
+// Set global de promesas de logAuditEvent en vuelo. En graceful
+// shutdown esperamos a que se resuelvan (con timeout) para no
+// perder eventos de auditoría críticos durante un deploy.
+const pendingAuditPromises = new Set();
 
 const app = express();
 
@@ -135,19 +159,48 @@ const ALLOWED_ORIGINS = new Set(
       ]
 );
 
+// H-2: en producción exigimos Origin presente para métodos de
+// escritura, EXCEPTO cuando viene Authorization Bearer (caso típico
+// de API cliente legítima). GET/HEAD/OPTIONS siguen siendo permisivos
+// para no romper healthchecks ni navegación directa.
 app.use(
   cors({
     origin(origin, cb) {
-      // Permitir tools como Postman/curl (sin origin)
-      if (!origin) return cb(null, true);
-      if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
-      return cb(new Error("CORS bloqueado: " + origin), false);
+      // Origen presente: validar whitelist
+      if (origin) {
+        if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+        return cb(new Error("CORS bloqueado: " + origin), false);
+      }
+
+      // Sin origin: permitir SIEMPRE en este callback. La regla
+      // estricta para métodos de escritura se aplica más adelante en
+      // un middleware dedicado (writeOriginGuard) que tiene acceso a
+      // req.headers (cors() solo recibe el string origin, no el req).
+      return cb(null, true);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization", "x-user-id"],
   })
 );
+
+// H-2: bloquea writes en producción cuando NO hay Origin Y NO hay
+// Bearer token. Esto cierra el hueco de scripts cron/curl externos
+// sin autenticación contra rutas de escritura.
+const isProductionEnv = process.env.NODE_ENV === "production";
+app.use((req, res, next) => {
+  if (!isProductionEnv) return next();
+  const method = String(req.method || "").toUpperCase();
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return next();
+  const origin = String(req.headers["origin"] || "").trim();
+  if (origin) return next();
+  const auth = String(req.headers["authorization"] || "");
+  if (/^Bearer\s+/i.test(auth)) return next();
+  return res.status(403).json({
+    error: "origin_required",
+    trace_id: req.cpTraceId || null,
+  });
+});
 
 // 4) Rate limit global para /api (suave)
 const apiLimiter = rateLimit({
@@ -217,8 +270,12 @@ app.get("/", (_req, res) => {
 });
 
 // =====================================================
-//  AUTH — JWT (nuevo) + formato legacy token-{id}-{ts}
+//  AUTH — JWT firmado (issuer/audience estrictos)
 // =====================================================
+// C-6: El formato legacy `token-{userId}-{timestamp}` fue ELIMINADO.
+// Solo se aceptan JWT verificados con issuer="control-presupuestal"
+// y audience="cp-frontend". Tras el deploy, todas las sesiones
+// activas con tokens legacy serán rechazadas → relogin obligatorio.
 
 /**
  * Extrae el rawToken del header Authorization o del query param ?token=
@@ -233,45 +290,24 @@ function extractRawToken(req) {
 }
 
 /**
- * Intenta parsear el formato legacy: token-{userId}-{timestamp}
- * Retorna { userId } si es válido, null si no.
- */
-function parseLegacyToken(rawToken) {
-  const parts = rawToken.split("-");
-  if (parts.length < 3) return null;
-  if (parts[0] !== "token") return null;
-
-  const userId = Number(parts[1]);
-  if (!Number.isFinite(userId) || userId <= 0) return null;
-
-  const ts = Number(parts[2]);
-  if (!Number.isFinite(ts) || ts <= 0) return null;
-
-  // Expira si tiene más de 10 min
-  const MAX_AGE_MS = 10 * 60 * 1000;
-  if (Date.now() - ts > MAX_AGE_MS) return null;
-
-  return { userId, ts };
-}
-
-/**
- * Resuelve el userId desde el rawToken.
- * Intenta JWT primero; si falla, usa el formato legacy.
- * BUG-002, RIESGO-001, REC-01: compatibilidad hacia atrás garantizada.
+ * Verifica un JWT firmado y retorna el userId del campo `sub`.
+ * Si el token es inválido, está expirado, o no coincide
+ * issuer/audience → retorna null.
  */
 function resolveUserId(rawToken) {
-  // Intentar JWT primero
+  if (!rawToken || typeof rawToken !== "string") return null;
   try {
-    const decoded = jwt.verify(rawToken, JWT_SECRET);
-    const userId = Number(decoded?.id);
-    if (Number.isFinite(userId) && userId > 0) return userId;
+    const decoded = jwt.verify(rawToken, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+      algorithms: ["HS256"],
+    });
+    const userId = Number(decoded?.sub);
+    if (!Number.isFinite(userId) || userId <= 0) return null;
+    return userId;
   } catch {
-    // No es JWT válido — continúa con formato legacy
+    return null;
   }
-
-  // Fallback: formato legacy token-{userId}-{timestamp}
-  const legacy = parseLegacyToken(rawToken);
-  return legacy ? legacy.userId : null;
 }
 
 async function authRequired(req, res, next) {
@@ -332,13 +368,25 @@ async function authRequired(req, res, next) {
             const seg = pathNoQuery.replace(/^\/api\/?/, "").split("/")[0] || "API";
             const tipoBase = denied ? "AUTO_DENEGADO" : "AUTO";
             const tipo = `${tipoBase}_${method}_${seg}`.toUpperCase().replace(/[^A-Z0-9_]/g, "_");
-            logAuditEvent(req, {
-              tipo,
-              entidad: "HTTP",
-              entidad_id: null,
-              estado: `HTTP_${sc}`,
-              detalles: { auto: true, status: sc },
-            });
+            // C-7: trackear la promesa para esperarla en graceful shutdown.
+            // logAuditEvent() puede ser una promesa o un valor; lo normalizamos.
+            const p = Promise.resolve()
+              .then(() =>
+                logAuditEvent(req, {
+                  tipo,
+                  entidad: "HTTP",
+                  entidad_id: null,
+                  estado: `HTTP_${sc}`,
+                  detalles: { auto: true, status: sc },
+                })
+              )
+              .catch((err) => {
+                console.error("[AUDIT] fallo:", err?.message || err);
+              })
+              .finally(() => {
+                pendingAuditPromises.delete(p);
+              });
+            pendingAuditPromises.add(p);
           } catch {}
         });
       }
@@ -389,24 +437,12 @@ app.use("/api", authRouter);
 app.use("/api/admin/usuarios", authRequired, requireGodOrAdmin, adminUsuariosRouter);
 app.use("/api/admin/auditoria", authRequired, requireGodOrAdmin, adminAuditoriaRouter);
 
-app.use("/api/suficiencias", authRequired, userWriteLimiter, suficienciasRouter);
-app.use("/api/comprometido", authRequired, userWriteLimiter, comprometidoRouter);
-app.use("/api/devengado", authRequired, userWriteLimiter, devengadoRouter);
-app.use("/api/expedientes-entrega", authRequired, expedientesEntregaRouter);
-
-app.use("/api", presupuestoRouter);
-
-app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite, partidasRouter);
-app.use("/api/presupuesto-base-partidas", authRequired, requireGodOrAdmin, presupuestoBasePartidasRouter);
-app.use("/api/catalogos/metas", authRequired, metasRouter);
-app.use("/api/catalogos", authRequired, catalogosRoutes);
-app.use("/api/dashboard", authRequired, dashboardPartidasRouter);
-app.use("/api/reconducciones", authRequired, userWriteLimiter, reconduccionesRouter);
-app.use("/api/reconducciones", authRequired, userWriteLimiter, reconduccionesOficiosRouter);
-
-
 // =====================================================
 //  HEALTH CHECK — REC-008: estado de BD incluido
+//  IMPORTANTE: debe registrarse ANTES de cualquier app.use("/api", ...)
+//  que aplique authRequired a nivel router (p. ej. presupuestoRouter
+//  con su router.use(authRequired)), o el healthcheck devolverá 401
+//  y romperá load balancers / kubernetes probes.
 // =====================================================
 app.get("/api/health", async (req, res) => {
   const health = {
@@ -435,6 +471,21 @@ app.get("/api/health", async (req, res) => {
   const statusCode = health.status === "ok" ? 200 : 503;
   res.status(statusCode).json(health);
 });
+
+app.use("/api/suficiencias", authRequired, userWriteLimiter, suficienciasRouter);
+app.use("/api/comprometido", authRequired, userWriteLimiter, comprometidoRouter);
+app.use("/api/devengado", authRequired, userWriteLimiter, devengadoRouter);
+app.use("/api/expedientes-entrega", authRequired, expedientesEntregaRouter);
+
+app.use("/api", presupuestoRouter);
+
+app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite, partidasRouter);
+app.use("/api/presupuesto-base-partidas", authRequired, requireGodOrAdmin, presupuestoBasePartidasRouter);
+app.use("/api/catalogos/metas", authRequired, metasRouter);
+app.use("/api/catalogos", authRequired, catalogosRoutes);
+app.use("/api/dashboard", authRequired, dashboardPartidasRouter);
+app.use("/api/reconducciones", authRequired, userWriteLimiter, reconduccionesRouter);
+app.use("/api/reconducciones", authRequired, userWriteLimiter, reconduccionesOficiosRouter);
 
 // =====================================================
 //  404 — RUTAS NO ENCONTRADAS
@@ -465,6 +516,23 @@ app.use((err, req, res, next) => {
 });
 
 // =====================================================
+//  HELPER: fail-fast de migraciones (H-11)
+// =====================================================
+// En cualquier entorno que NO sea "development", si una migración
+// falla → abortamos el arranque con process.exit(1). En development
+// mantenemos el comportamiento permisivo para no bloquear el dev
+// loop cuando alguien está iterando schema.
+function handleMigrationFailure(nombre, error) {
+  const env = String(process.env.NODE_ENV || "").trim().toLowerCase();
+  const isDev = env === "development" || env === "";
+  console.error(`[MIGRATION] ${nombre} error:`, error?.message || error);
+  if (!isDev) {
+    console.error(`[FATAL] Migración "${nombre}" falló en NODE_ENV=${env}. Abortando arranque.`);
+    process.exit(1);
+  }
+}
+
+// =====================================================
 //  ARRANQUE
 // =====================================================
 (async () => {
@@ -479,7 +547,7 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] reconducciones aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] reconducciones error:", e);
+      handleMigrationFailure("reconducciones", e);
     }
 
     // Migración: reconduccion_oficios
@@ -493,7 +561,7 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] reconduccion_oficios aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] reconduccion_oficios error:", e);
+      handleMigrationFailure("reconduccion_oficios", e);
     }
 
     // Migración: firma fields en reconducciones
@@ -508,7 +576,7 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] reconducciones_firmas aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] reconducciones_firmas error:", e);
+      handleMigrationFailure("reconducciones_firmas", e);
     }
 
     // Migración: firma fields en suficiencias, comprometidos y devengados
@@ -523,7 +591,7 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] firmas_suf_comp_dev aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] firmas_suf_comp_dev error:", e);
+      handleMigrationFailure("firmas_suf_comp_dev", e);
     }
 
     // Migración: función fn_saldo_disponible_partida
@@ -538,7 +606,7 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] fn_saldo_disponible_partida aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] fn_saldo_disponible_partida error:", e);
+      handleMigrationFailure("fn_saldo_disponible_partida", e);
     }
 
     // Migración: normalización general de presupuesto_db
@@ -554,7 +622,7 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] normalizacion_db aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] normalizacion_db error:", e);
+      handleMigrationFailure("normalizacion_db", e);
     }
 
     // Migración: FKs y triggers en expedientes_entrega
@@ -569,7 +637,7 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] expedientes_entrega_fks aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] expedientes_entrega_fks error:", e);
+      handleMigrationFailure("expedientes_entrega_fks", e);
     }
 
     // Migración: sequences para generación atómica de folios
@@ -584,7 +652,44 @@ app.use((err, req, res, next) => {
         console.log("[MIGRATION] folio_sequences aplicada");
       }
     } catch (e) {
-      console.error("[MIGRATION] folio_sequences error:", e);
+      handleMigrationFailure("folio_sequences", e);
+    }
+
+    // Migración 2026-05-21: folios mensuales atómicos + lock saldo
+    // (idempotente: usa CREATE TABLE IF NOT EXISTS, CREATE OR REPLACE FUNCTION,
+    //  ON CONFLICT DO NOTHING para el seed, y guard sobre pg_constraint para UNIQUE)
+    try {
+      const rFoliosMes = await query(
+        "SELECT to_regclass('public.folios_contadores') AS tbl"
+      );
+      const existsFolios = Boolean(rFoliosMes.rows?.[0]?.tbl);
+      if (!existsFolios) {
+        const sqlPathFolios = path.join(
+          __dirname, "sql", "migrations", "2026_05_21_folios_mensuales.sql"
+        );
+        const sqlFolios = await fs.readFile(sqlPathFolios, "utf8");
+        await query(sqlFolios);
+        console.log("[MIGRATION] folios_mensuales aplicada");
+      }
+    } catch (e) {
+      handleMigrationFailure("folios_mensuales", e);
+    }
+
+    // Migración 2026-05-21: corrección de fn_saldo_disponible_partida
+    // Hallazgo B-4: la versión 2026-03-11 leía columnas inexistentes
+    // (pb.monto, pb.clave, s.monto, c.monto). Se reescribe usando el
+    // esquema real (columnas mensuales ene..dic + tablas *_detalle).
+    // Reaplicar siempre con CREATE OR REPLACE para corregir instalaciones
+    // que ya tenían la versión rota.
+    try {
+      const sqlPathFnSaldoFix = path.join(
+        __dirname, "sql", "migrations", "2026_05_21_fn_saldo_fix.sql"
+      );
+      const sqlFnSaldoFix = await fs.readFile(sqlPathFnSaldoFix, "utf8");
+      await query(sqlFnSaldoFix);
+      console.log("[MIGRATION] fn_saldo_fix aplicada");
+    } catch (e) {
+      handleMigrationFailure("fn_saldo_fix", e);
     }
 
     if (process.env.SEED === "true") {
@@ -600,15 +705,58 @@ app.use((err, req, res, next) => {
   });
 
   // ── Graceful shutdown ────────────────────────────────────
+  // C-7: además de cerrar el servidor HTTP, esperamos a que se
+  // resuelvan los logAuditEvent en vuelo (con timeout de 8s) antes
+  // de cerrar el pool. Esto evita perder eventos críticos durante
+  // un deploy en producción.
+  let shuttingDown = false;
   const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`[SHUTDOWN] ${signal} recibido — cerrando servidor...`);
+
+    // 1) Dejar de aceptar conexiones nuevas.
     server.close(async () => {
-      try { await pool.end(); } catch {}
+      try {
+        // 2) Esperar audits en vuelo (máx 8s).
+        const pending = [...pendingAuditPromises];
+        if (pending.length > 0) {
+          console.log(`[SHUTDOWN] esperando ${pending.length} audits…`);
+          const timeoutPromise = new Promise((resolve) =>
+            setTimeout(() => resolve("timeout"), 8000)
+          );
+          const result = await Promise.race([
+            Promise.allSettled(pending),
+            timeoutPromise,
+          ]);
+          if (result === "timeout") {
+            console.warn(
+              `[SHUTDOWN] timeout de audits — ${pendingAuditPromises.size} pendientes descartados.`
+            );
+          } else {
+            console.log("[SHUTDOWN] audits drenados correctamente.");
+          }
+        }
+      } catch (e) {
+        console.error("[SHUTDOWN] error esperando audits:", e?.message || e);
+      }
+
+      // 3) Cerrar pool de Postgres.
+      try {
+        await pool.end();
+      } catch (e) {
+        console.error("[SHUTDOWN] error cerrando pool:", e?.message || e);
+      }
+
       console.log("[SHUTDOWN] Conexiones cerradas. Proceso terminado.");
       process.exit(0);
     });
-    // Forzar salida si tarda más de 10 s
-    setTimeout(() => { console.error("[SHUTDOWN] Timeout forzado."); process.exit(1); }, 10_000);
+
+    // 4) Red de seguridad: timeout duro de 10s para todo el proceso.
+    setTimeout(() => {
+      console.error("[SHUTDOWN] Timeout forzado.");
+      process.exit(1);
+    }, 10_000).unref();
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT",  () => shutdown("SIGINT"));
