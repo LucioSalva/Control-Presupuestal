@@ -29,6 +29,7 @@ import {
   checkIsUserE00,
   canViewIepsPensionesByRole,
 } from "../utils/helpers.js";
+import { blockPartidasMilAccess } from "../middleware/permisos.js";
 
 const router = express.Router();
 
@@ -148,7 +149,7 @@ router.get("/buscar", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", blockPartidasMilAccess, async (req, res) => {
   const client = await getClient();
 
   try {
@@ -307,8 +308,17 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Generación atómica de consecutivo via sequence (evita race condition)
-    const rConsec = await client.query("SELECT fn_next_folio_devengado() AS next_num");
+    // B-3 followup: folios mensuales atómicos vía public.fn_next_folio.
+    // El prefijo string del folio sigue siendo "DV" (devengado, formato
+    // ECA-YYYY-MM-DV-NNNN); el tipo lógico para la tabla folios_contadores
+    // es "DEV". Reemplaza fn_next_folio_devengado() que era una sequence
+    // global y saltaba entre meses.
+    const anioFolioDev = Number(anio) || new Date().getFullYear();
+    const mesFolioDev = Number(mes) || (new Date().getMonth() + 1);
+    const rConsec = await client.query(
+      `SELECT public.fn_next_folio($1, $2, $3) AS next_num`,
+      ["DEV", anioFolioDev, mesFolioDev]
+    );
     const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
     const noDevengado = `${prefijo}${nextNum}`;
 

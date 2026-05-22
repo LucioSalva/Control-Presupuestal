@@ -24,12 +24,113 @@ import { query, getClient } from "../db.js";
 
 const router = Router();
 
+/**
+ * H-4 (Fase 3B): se eliminó la lectura de `x-user-id` (header spoofable).
+ * Ahora SOLO se confía en `req.user.id`, que es inyectado por `authRequired`
+ * tras validar el token contra la BD.
+ */
 function getActorId(req) {
-  const actorId = Number(req.headers["x-user-id"] || 0);
-  return Number.isFinite(actorId) && actorId > 0 ? actorId : null;
+  const id = Number(req.user?.id || 0);
+  return Number.isFinite(id) && id > 0 ? id : null;
 }
 
 const SALT_ROUNDS = 12;
+
+// =====================================================
+//  H-5 (Fase 3B): VALIDACIÓN DE INPUTS PARA USUARIOS
+// =====================================================
+
+const ALLOWED_ROLES = ["GOD", "ADMIN", "AREA"];
+
+/**
+ * Valida el cuerpo de creación/edición de usuarios.
+ * - nombre_completo: requerido, 1..120 caracteres.
+ * - usuario: requerido, 1..64 caracteres.
+ * - correo (opcional): si viene, debe ser string <=120 con formato email.
+ * - password (opcional en PUT, requerido en POST): si viene, 1..200 caracteres.
+ * - roles (opcional): array de strings dentro de ALLOWED_ROLES.
+ * - id_dgeneral / id_dauxiliar (opcionales): enteros >= 0 o null.
+ * Devuelve un array de errores (vacío si todo es válido).
+ */
+function validateUsuarioInput(body, { passwordRequired = false } = {}) {
+  const errors = [];
+  const isStr = (v, max) =>
+    typeof v === "string" && v.length > 0 && v.length <= max;
+
+  if (!isStr(body.nombre_completo, 120)) {
+    errors.push("nombre_completo inválido (string 1..120)");
+  }
+  if (!isStr(body.usuario, 64)) {
+    errors.push("usuario inválido (string 1..64)");
+  }
+
+  if (body.correo !== undefined && body.correo !== null && body.correo !== "") {
+    if (
+      typeof body.correo !== "string" ||
+      body.correo.length > 120 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.correo)
+    ) {
+      errors.push("correo inválido");
+    }
+  }
+
+  if (passwordRequired) {
+    if (!isStr(body.password, 200)) {
+      errors.push("password inválido (string 1..200)");
+    }
+  } else if (body.password !== undefined && body.password !== null && body.password !== "") {
+    if (!isStr(body.password, 200)) {
+      errors.push("password inválido (string 1..200)");
+    }
+  }
+
+  if (body.roles !== undefined && body.roles !== null) {
+    if (!Array.isArray(body.roles)) {
+      errors.push("roles debe ser array");
+    } else {
+      for (const r of body.roles) {
+        if (typeof r !== "string" || !ALLOWED_ROLES.includes(r.toUpperCase())) {
+          errors.push(`rol inválido: ${String(r)}`);
+        }
+      }
+    }
+  }
+
+  const checkOptInt = (k) => {
+    const v = body[k];
+    if (v === undefined || v === null || v === "") return;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) errors.push(`${k} inválido (entero >=0)`);
+  };
+  checkOptInt("id_dgeneral");
+  checkOptInt("id_dauxiliar");
+
+  if (body.activo !== undefined && typeof body.activo !== "boolean") {
+    // tolerante: aceptar 0/1, "true"/"false"
+    const s = String(body.activo).toLowerCase();
+    if (!["true", "false", "1", "0"].includes(s)) {
+      errors.push("activo inválido (boolean)");
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Defensa contra prototype pollution: rechaza el request si el body
+ * trae llaves __proto__, constructor o prototype al nivel raíz.
+ * Express ya parsea JSON con Object.create(null) en versiones recientes,
+ * pero esto añade defensa en profundidad. El middleware extrae solo
+ * los campos esperados antes de procesar.
+ */
+function hasUnsafeKeys(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  const bad = ["__proto__", "constructor", "prototype"];
+  for (const k of bad) {
+    if (Object.prototype.hasOwnProperty.call(obj, k)) return true;
+  }
+  return false;
+}
 
 // =======================
 // GET
@@ -89,6 +190,15 @@ router.get("/", async (_req, res) => {
 // POST (crear)
 // =======================
 router.post("/", async (req, res) => {
+  // H-5: rechazar prototype pollution antes de extraer campos
+  if (hasUnsafeKeys(req.body)) {
+    return res.status(400).json({
+      error: "Cuerpo de petición contiene claves no permitidas",
+      trace_id: req.cpTraceId,
+    });
+  }
+
+  // H-5: extraer solo los campos esperados — nunca spread del body completo
   const {
     nombre_completo,
     usuario,
@@ -98,11 +208,18 @@ router.post("/", async (req, res) => {
     id_dauxiliar,
     activo = true,
     roles = [],
-  } = req.body;
+  } = req.body || {};
 
-  if (!nombre_completo || !usuario || !password) {
+  // H-5: validación estricta (longitud, formato, allowlist)
+  const errs = validateUsuarioInput(
+    { nombre_completo, usuario, correo, password, id_dgeneral, id_dauxiliar, activo, roles },
+    { passwordRequired: true }
+  );
+  if (errs.length > 0) {
     return res.status(400).json({
-      error: "Nombre completo, usuario y contraseña son obligatorios",
+      error: "Validación fallida",
+      detalles: errs,
+      trace_id: req.cpTraceId,
     });
   }
 
@@ -194,6 +311,15 @@ router.put("/:id", async (req, res) => {
   const id = Number(req.params.id || 0);
   if (!id) return res.status(400).json({ error: "ID inválido" });
 
+  // H-5: rechazar prototype pollution antes de extraer campos
+  if (hasUnsafeKeys(req.body)) {
+    return res.status(400).json({
+      error: "Cuerpo de petición contiene claves no permitidas",
+      trace_id: req.cpTraceId,
+    });
+  }
+
+  // H-5: extraer solo los campos esperados — nunca spread del body completo
   const {
     nombre_completo,
     usuario,
@@ -203,12 +329,19 @@ router.put("/:id", async (req, res) => {
     id_dauxiliar,
     activo = true,
     roles = [],
-  } = req.body;
+  } = req.body || {};
 
-  if (!nombre_completo || !usuario) {
-    return res
-      .status(400)
-      .json({ error: "Nombre completo y usuario son obligatorios" });
+  // H-5: validación estricta. Password es opcional en PUT.
+  const errs = validateUsuarioInput(
+    { nombre_completo, usuario, correo, password, id_dgeneral, id_dauxiliar, activo, roles },
+    { passwordRequired: false }
+  );
+  if (errs.length > 0) {
+    return res.status(400).json({
+      error: "Validación fallida",
+      detalles: errs,
+      trace_id: req.cpTraceId,
+    });
   }
 
   const client = await getClient();

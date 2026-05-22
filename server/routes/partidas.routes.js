@@ -20,8 +20,22 @@
  */
 import { Router } from "express";
 import { query } from "../db.js";
+import {
+  isPartidaMilKey,
+  logUnauthorizedPartidasAccess,
+  checkIsUserL00117,
+  checkIsUserE00,
+} from "../utils/helpers.js";
 
 const router = Router();
+
+// =====================================================
+//  HELPER — Permiso de partidas mil (Hallazgo C-3)
+// =====================================================
+// Solo L00/117 y E00 pueden ver partidas 1xxx (regla de negocio).
+async function canViewPartidasMil(req) {
+  return (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
+}
 async function getUserDGDA(req) {
   const idDg = Number(req.user?.id_dgeneral);
   const idDa = Number(req.user?.id_dauxiliar);
@@ -70,7 +84,28 @@ router.get("/", async (req, res) => {
       [userId]
     );
 
-    return res.json({ dg, da, rows: r.rows });
+    // =====================================================
+    //  Hallazgo C-3: Filtrado de partidas mil
+    // =====================================================
+    // Si el usuario no es L00/117 ni E00, ocultar partidas 1xxx.
+    // Logueamos acceso no autorizado SOLO cuando el filtrado del cliente
+    // pidió específicamente una clave mil (q/clave query param), no en
+    // cada listado para evitar ruido en auditoría.
+    const rowsRaw = Array.isArray(r.rows) ? r.rows : [];
+    const allowed = await canViewPartidasMil(req);
+    const rows = allowed
+      ? rowsRaw
+      : rowsRaw.filter((row) => !isPartidaMilKey(row?.clave));
+
+    const qParam = String(req.query?.q || req.query?.clave || "").trim();
+    if (!allowed && qParam && isPartidaMilKey(qParam)) {
+      await logUnauthorizedPartidasAccess(req, {
+        motivo: "PARTIDAS_MIL_CATALOGO_GET",
+        data: { q: qParam },
+      });
+    }
+
+    return res.json({ dg, da, rows });
   } catch (e) {
     console.error("[PARTIDAS][GET] Error:", e);
     return res.status(500).json({ error: "Error al cargar partidas" });
@@ -89,6 +124,23 @@ router.post("/monto", async (req, res) => {
     if (!clave) return res.status(400).json({ error: "clave requerida" });
     if (!Number.isFinite(monto) || monto < 0) {
       return res.status(400).json({ error: "monto invalido" });
+    }
+
+    // =====================================================
+    //  Hallazgo C-3: Bloqueo de partidas mil en escritura
+    // =====================================================
+    if (isPartidaMilKey(clave)) {
+      const allowed = await canViewPartidasMil(req);
+      if (!allowed) {
+        await logUnauthorizedPartidasAccess(req, {
+          motivo: "PARTIDAS_MIL_MONTO_WRITE",
+          data: { clave },
+        });
+        return res.status(403).json({
+          error: "Sin permisos para capturar partidas mil.",
+          trace_id: req.cpTraceId || null,
+        });
+      }
     }
 
     await getUserDGDA(req);

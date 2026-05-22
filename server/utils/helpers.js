@@ -36,14 +36,29 @@ export function buildHttpError(message, statusCode = 400) {
 }
 
 /**
- * Auditoría: quién ejecuta la acción (viene del front en header)
- * Front debe mandar: headers: { "x-user-id": "<id>" }
+ * Auditoría: quién ejecuta la acción.
+ * H-4 (Fase 3B): se eliminó la lectura de `x-user-id` (header spoofable).
+ * Ahora SOLO se confía en `req.user.id`, que es inyectado por `authRequired`
+ * tras validar el token contra la BD.
  */
 export function getActorId(req) {
-  const fromHeader = Number(req.headers["x-user-id"] || 0);
-  if (Number.isFinite(fromHeader) && fromHeader > 0) return fromHeader;
   const fromUser = Number(req.user?.id || 0);
   return Number.isFinite(fromUser) && fromUser > 0 ? fromUser : null;
+}
+
+// =====================================================
+//  REGLAS OPERATIVAS — Reconducciones (C-1 Fase 3B)
+// =====================================================
+
+/**
+ * Verifica si el día actual permite operar reconducciones.
+ * Regla de negocio: solo lunes-jueves (1..4 en getDay()).
+ * GOD/ADMIN y usuarios L00/117 pueden saltar esta regla
+ * (ver canBypassOperationalLocks + checkIsUserL00117).
+ */
+export function isReconduccionAllowedToday() {
+  const dow = new Date().getDay(); // 0=domingo .. 6=sábado
+  return dow >= 1 && dow <= 4;
 }
 
 // BUG-008: valida que la clave empiece con "1" y el segundo carácter sea también dígito

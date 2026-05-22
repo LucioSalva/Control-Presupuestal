@@ -29,7 +29,9 @@ import {
   checkIsUserE00,
   canBypassOperationalLocks,
   canSeeAllAreas,
+  isReconduccionAllowedToday,
 } from "../utils/helpers.js";
+import { blockPartidasMilAccess } from "../middleware/permisos.js";
 
 const router = express.Router();
 
@@ -190,6 +192,35 @@ async function requireL00117(req, res, next) {
     return res.status(403).json({ error: "Se requiere rol ADMIN o GOD para esta operación." });
   }
   next();
+}
+
+/**
+ * C-1 (Fase 3B): valida en SERVIDOR que la operación de reconducción
+ * se realice en día permitido (lunes-jueves).
+ *
+ * Bypass: GOD/ADMIN (canBypassOperationalLocks) y usuarios L00/117
+ * pueden operar cualquier día de la semana (decisión firme de Lucio:
+ * L00/117 puede crear reconducciones CUALQUIER DÍA, 7/7).
+ *
+ * Se aplica a creación/edición/envío/aplicación, NO a GET ni a lectura.
+ */
+async function requireReconDayAllowed(req, res, next) {
+  try {
+    if (isReconduccionAllowedToday()) return next();
+    if (canBypassOperationalLocks(req.user)) return next();
+    const isL00117 = await checkIsUserL00117(req);
+    if (isL00117) return next();
+    return res.status(403).json({
+      error: "Las reconducciones solo se permiten de lunes a jueves",
+      trace_id: req.cpTraceId,
+    });
+  } catch (err) {
+    console.error("[requireReconDayAllowed] Error:", err);
+    return res.status(500).json({
+      error: "No fue posible validar la regla de día",
+      trace_id: req.cpTraceId,
+    });
+  }
 }
 
 async function requireReconSession(req, res, next) {
@@ -627,7 +658,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireReconDayAllowed, blockPartidasMilAccess, async (req, res) => {
   const client = await getClient();
   try {
     const b = req.body || {};
@@ -660,22 +691,15 @@ router.post("/", async (req, res) => {
       const ym = getYearMonthFromFecha(fecha_elaboracion);
       const { year, month } = normalizeYearMonth(ym.year, ym.month);
       const prefix = `ECA-${year}-${month}-RCP-`;
-      const like = `${prefix}%`;
-      const r = await client.query(
-        `
-        SELECT COALESCE(MAX(
-          CASE
-            WHEN oficio ~ '^ECA-\\d{4}-\\d{2}-RCP-\\d{4}$' THEN RIGHT(oficio, 4)::int
-            ELSE NULL
-          END
-        ), 0) AS max_num
-        FROM public.reconducciones
-        WHERE oficio LIKE $1
-        FOR UPDATE
-        `,
-        [like]
+      // B-3 followup: folios mensuales atómicos vía public.fn_next_folio
+      // (tipo lógico "RC"; el prefijo string del folio sigue siendo "RCP").
+      // Reemplaza el MAX(...) FOR UPDATE manual que era frágil bajo
+      // concurrencia y dependía del orden lexicográfico de oficio.
+      const rRC = await client.query(
+        `SELECT public.fn_next_folio($1, $2, $3) AS next_num`,
+        ["RC", Number(year), Number(month)]
       );
-      const nextNum = Number(r.rows?.[0]?.max_num || 0) + 1;
+      const nextNum = Number(rRC.rows?.[0]?.next_num || 0);
       oficio = `${prefix}${String(nextNum).padStart(4, "0")}`;
     }
 
@@ -789,7 +813,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireReconDayAllowed, blockPartidasMilAccess, async (req, res) => {
   const client = await getClient();
   try {
     const id = Number(req.params.id);
@@ -970,7 +994,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.post("/:id/enviar", async (req, res) => {
+router.post("/:id/enviar", requireReconDayAllowed, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) {
@@ -1009,7 +1033,7 @@ router.post("/:id/enviar", async (req, res) => {
   }
 });
 
-router.post("/:id/aplicar", async (req, res) => {
+router.post("/:id/aplicar", requireReconDayAllowed, async (req, res) => {
   const client = await getClient();
   try {
     const id = Number(req.params.id);

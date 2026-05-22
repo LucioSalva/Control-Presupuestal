@@ -239,8 +239,13 @@ router.post("/lote", async (req, res) => {
       const tipo = "SP";
       const prefijo = `ECA-${anio}-${mes}-${tipo}-`;
 
-      // Generación atómica de consecutivo via sequence (evita race condition)
-      const rConsec = await client.query("SELECT fn_next_folio_suficiencia() AS next_num");
+      // B-3 followup: folios mensuales atómicos vía fn_next_folio.
+      // Reemplaza la sequence global fn_next_folio_suficiencia(), que
+      // saltaba entre meses al mezclar todos los registros.
+      const rConsec = await client.query(
+        `SELECT public.fn_next_folio($1, $2, $3) AS next_num`,
+        ["SP", fechaBase.getFullYear(), fechaBase.getMonth() + 1]
+      );
       const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
       const noSuficiencia = `${prefijo}${nextNum}`;
 
@@ -296,11 +301,37 @@ router.post("/lote", async (req, res) => {
       }
 
       // ================================
-      // VALIDACIÓN DE SALDO POR PARTIDA (lote)
+      // C-2: VALIDACIÓN DE SALDO POR PARTIDA (lote)
       // ================================
+      // Ya estamos dentro del BEGIN del lote. Tomamos lock pesimista
+      // sobre cada partida única ANTES de leer saldo, para evitar race
+      // condition con otros writes concurrentes.
       const detalleLote = Array.isArray(suf.detalle) ? suf.detalle.filter(d => d.clave && Number(d.importe) > 0) : [];
       if (detalleLote.length > 0) {
         const ejercicioLote = new Date(suf.fecha || Date.now()).getFullYear();
+        // Deduplicar partidas para no tomar el mismo lock dos veces en esta iter.
+        const partidasLote = [];
+        const vistasLote = new Set();
+        for (const renglon of detalleLote) {
+          const k = String(renglon.clave || "").trim().toUpperCase();
+          if (!vistasLote.has(k)) {
+            vistasLote.add(k);
+            partidasLote.push(k);
+          }
+        }
+        for (const clave of partidasLote) {
+          await client.query(
+            `SELECT public.fn_lock_partida_para_saldo($1,$2,$3,$4,$5,$6)`,
+            [
+              Number(suf.id_dgeneral),
+              Number(suf.id_dauxiliar),
+              Number(suf.id_fuente),
+              Number(suf.id_proyecto),
+              clave,
+              ejercicioLote,
+            ]
+          );
+        }
         for (const renglon of detalleLote) {
           const clave = String(renglon.clave || "").trim().toUpperCase();
           const importe = Number(renglon.importe || 0);
@@ -312,7 +343,7 @@ router.post("/lote", async (req, res) => {
           );
           const saldo = Number(rSaldo.rows?.[0]?.saldo_disponible ?? 0);
           if (importe > saldo) {
-            await client.query("ROLLBACK");
+            try { await client.query("ROLLBACK"); } catch {}
             return res.status(400).json({
               error: `Saldo insuficiente — Partida ${clave}: solicitado $${importe.toFixed(2)}, disponible $${saldo.toFixed(2)}`,
               errores_saldo: [{ clave, importe_solicitado: importe, saldo_disponible: saldo,
@@ -580,16 +611,47 @@ router.post("/", async (req, res) => {
     }
 
     // ================================
-    // VALIDACIÓN DE SALDO POR PARTIDA
+    // C-2: la validación de saldo se hace DENTRO de la transacción
+    // tras adquirir el lock pesimista por partida (fn_lock_partida_para_saldo).
+    // Esto cierra la race condition donde dos requests concurrentes leían
+    // el mismo saldo antes de insertar.
     // ================================
+
+    await client.query("BEGIN");
+
     const detalleValidar = Array.isArray(b.detalle) ? b.detalle.filter(d => d.clave && Number(d.importe) > 0) : [];
     if (detalleValidar.length > 0) {
       const ejercicioVal = new Date(b.fecha || Date.now()).getFullYear();
       const erroresSaldo = [];
+      // Deduplicar partidas para no tomar el mismo lock dos veces.
+      const partidasUnicas = [];
+      const vistas = new Set();
+      for (const renglon of detalleValidar) {
+        const k = String(renglon.clave || "").trim().toUpperCase();
+        if (!vistas.has(k)) {
+          vistas.add(k);
+          partidasUnicas.push(k);
+        }
+      }
+      // 1) Lock pesimista por cada partida única ANTES de leer saldo.
+      for (const clave of partidasUnicas) {
+        await client.query(
+          `SELECT public.fn_lock_partida_para_saldo($1,$2,$3,$4,$5,$6)`,
+          [
+            Number(b.id_dgeneral),
+            Number(b.id_dauxiliar),
+            Number(b.id_fuente),
+            Number(b.id_proyecto),
+            clave,
+            ejercicioVal,
+          ]
+        );
+      }
+      // 2) Validar saldo de cada renglón dentro de la misma tx.
       for (const renglon of detalleValidar) {
         const clave = String(renglon.clave || "").trim().toUpperCase();
         const importe = Number(renglon.importe || 0);
-        const rSaldo = await query(
+        const rSaldo = await client.query(
           `SELECT saldo_disponible, presupuesto_base, reservado_suficiencias
            FROM public.fn_saldo_disponible_partida($1,$2,$3,$4,$5,$6,$7)`,
           [Number(b.id_dgeneral), Number(b.id_dauxiliar), Number(b.id_fuente), Number(b.id_proyecto),
@@ -606,20 +668,26 @@ router.post("/", async (req, res) => {
         }
       }
       if (erroresSaldo.length > 0) {
-        const detalle = erroresSaldo.map(e =>
+        try { await client.query("ROLLBACK"); } catch {}
+        const detalleErr = erroresSaldo.map(e =>
           `Partida ${e.clave}: solicitado $${e.importe_solicitado.toFixed(2)}, disponible $${e.saldo_disponible.toFixed(2)}`
         ).join("; ");
         return res.status(400).json({
-          error: `Saldo insuficiente en partida(s): ${detalle}`,
+          error: `Saldo insuficiente en partida(s): ${detalleErr}`,
           errores_saldo: erroresSaldo,
         });
       }
     }
 
-    await client.query("BEGIN");
-
-    // Generación atómica de consecutivo via sequence (evita race condition)
-    const rConsec = await client.query("SELECT fn_next_folio_suficiencia() AS next_num");
+    // B-3 followup: folios mensuales atómicos vía fn_next_folio.
+    // Sustituye fn_next_folio_suficiencia() (sequence global). El prefijo
+    // string del folio sigue siendo "SP" y el formato ECA-YYYY-MM-SP-NNNN.
+    const anioFolio = fechaBase.getFullYear();
+    const mesFolio = fechaBase.getMonth() + 1;
+    const rConsec = await client.query(
+      `SELECT public.fn_next_folio($1, $2, $3) AS next_num`,
+      ["SP", anioFolio, mesFolio]
+    );
     const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
     const noSuficiencia = `${prefijo}${nextNum}`;
 
@@ -941,12 +1009,25 @@ router.post("/:id/cancelar", async (req, res) => {
       return res.status(400).json({ error: "id inválido" });
     }
 
+    // =====================================================
+    //  Hallazgo B-2: userIsL00117 estaba undefined.
+    // =====================================================
+    // En el bloque whereUpdate (más abajo) se referenciaba a una
+    // variable que nunca se inicializaba. Calculamos aquí el flag
+    // y alineamos con el patrón del resto del handler (canSeeAllAreas
+    // como guard primario; userIsL00117 como salvaguarda para los
+    // usuarios legítimamente L00/117 que aún no estén marcados
+    // ADMIN/GOD).
+    const userIsL00117 = await checkIsUserL00117(req);
+
     const where = [`id = $1`];
     const params = [id];
     let i = 2;
 
-    // Migración 2026-03-24: ADMIN y GOD pueden cancelar suficiencias de cualquier área
-    if (role === "AREA" && !canSeeAllAreas(req.user)) {
+    // Migración 2026-03-24: ADMIN y GOD pueden cancelar suficiencias de cualquier área.
+    // Si por algún motivo el flag canSeeAllAreas dice false pero el usuario
+    // pertenece a L00/117, también se le permite (compatibilidad histórica).
+    if (role === "AREA" && !canSeeAllAreas(req.user) && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
         params.push(req.user.id_dgeneral);
@@ -1000,7 +1081,8 @@ router.post("/:id/cancelar", async (req, res) => {
     const whereUpdate = [`id = $1`];
     const paramsUpdate = [id, cancelUser, cancelReason];
     let j = 4;
-    if (role === "AREA" && !userIsL00117) {
+    // Mismo guard que la query SELECT de arriba (B-2 fix).
+    if (role === "AREA" && !canSeeAllAreas(req.user) && !userIsL00117) {
       if (req.user?.id_dgeneral != null) {
         whereUpdate.push(`id_dgeneral = $${j++}`);
         paramsUpdate.push(req.user.id_dgeneral);

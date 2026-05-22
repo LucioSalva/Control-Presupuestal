@@ -29,6 +29,7 @@ import {
   checkIsUserE00,
   canViewIepsPensionesByRole,
 } from "../utils/helpers.js";
+import { blockPartidasMilAccess } from "../middleware/permisos.js";
 
 const router = express.Router();
 
@@ -59,7 +60,7 @@ function getMonthCode(dateStr) {
   return String(now.getMonth() + 1).padStart(2, "0");
 }
 
-router.post("/", async (req, res) => {
+router.post("/", blockPartidasMilAccess, async (req, res) => {
   const client = await getClient();
   try {
     const b = req.body || {};
@@ -101,8 +102,13 @@ router.post("/", async (req, res) => {
 
     await client.query("BEGIN");
 
-    // Generación atómica de consecutivo via sequence (evita race condition)
-    const rConsec = await client.query("SELECT fn_next_folio_comprometido() AS next_num");
+    // B-3 followup: folios mensuales atómicos vía public.fn_next_folio.
+    // Reemplaza la sequence global fn_next_folio_comprometido(), que
+    // saltaba entre meses. Prefijo string en el folio = "CP".
+    const rConsec = await client.query(
+      `SELECT public.fn_next_folio($1, $2, $3) AS next_num`,
+      ["CP", fechaBase.getFullYear(), fechaBase.getMonth() + 1]
+    );
     const nextNum = String(rConsec.rows[0].next_num).padStart(4, "0");
     const noComprometido = `${prefijo}${nextNum}`;
 

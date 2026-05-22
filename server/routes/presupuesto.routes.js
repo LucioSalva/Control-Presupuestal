@@ -29,8 +29,21 @@ import {
   checkIsUserL00117,
   checkIsUserE00,
 } from "../utils/helpers.js";
+import {
+  authRequired,
+  requireGod,
+  isGodOrAdmin,
+} from "../middleware/auth.js";
 
 const router = Router();
+
+// =====================================================
+//  AUTH OBLIGATORIA A NIVEL ROUTER (Hallazgo B-1)
+// =====================================================
+// En server.js este router se montaba SIN authRequired. Aquí
+// aplicamos la guardia a TODAS las rutas del router para cerrar el
+// hueco — server.js no se modifica.
+router.use(authRequired);
 
 function getRole(req) {
   const roles = (req.user?.roles || []).map((r) => String(r).toUpperCase());
@@ -41,6 +54,20 @@ function getRole(req) {
 
 async function canViewPartidasMil(req) {
   return (await checkIsUserL00117(req)) || (await checkIsUserE00(req));
+}
+
+/**
+ * Guard de escritura: AREA solo lee. POST/DELETE/PUT/PATCH requieren
+ * GOD o ADMIN (excepto DELETE /project que se eleva a GOD-only abajo).
+ */
+function requireGodOrAdminWrite(req, res, next) {
+  if (!isGodOrAdmin(req)) {
+    return res.status(403).json({
+      error: "Solo GOD/ADMIN puede realizar esta acción.",
+      trace_id: req.cpTraceId || null,
+    });
+  }
+  next();
 }
 
 /* =====================================================
@@ -176,8 +203,8 @@ router.get("/detalles", async (req, res) => {
   }
 });
 
-// POST /api/detalles
-router.post("/detalles", async (req, res) => {
+// POST /api/detalles  — escritura: solo GOD/ADMIN
+router.post("/detalles", requireGodOrAdminWrite, async (req, res) => {
   try {
     const {
       project,
@@ -304,7 +331,7 @@ router.get("/gastos", async (req, res) => {
   }
 });
 
-router.post("/gastos", async (req, res) => {
+router.post("/gastos", requireGodOrAdminWrite, async (req, res) => {
   try {
     const project = String(req.body.project || "").trim();
     const partida = String(req.body.partida || "").trim();
@@ -452,7 +479,7 @@ router.post("/gastos", async (req, res) => {
   }
 });
 
-router.delete("/gastos/:id", async (req, res) => {
+router.delete("/gastos/:id", requireGodOrAdminWrite, async (req, res) => {
   try {
     const id = Number(req.params.id || 0);
     if (!id) return res.status(400).json({ error: "id inválido" });
@@ -533,7 +560,7 @@ router.delete("/gastos/:id", async (req, res) => {
    POST /api/reconducir
    ===================================================== */
 
-router.post("/reconducir", async (req, res) => {
+router.post("/reconducir", requireGodOrAdminWrite, async (req, res) => {
   try {
     const project = String(req.body.project || "").trim();
     const origen = String(req.body.origen || "").trim();
@@ -689,17 +716,26 @@ router.post("/reconducir", async (req, res) => {
 /* =====================================================
    Borrar todo un proyecto
    DELETE /api/project?project=...
+   GOD-only (decisión firme Lucio): ADMIN y AREA → 403.
+   La auditoría se dispara automáticamente en res.on("finish")
+   del authRequired (escritura → AUTO_DELETE_PROJECT).
    ===================================================== */
-router.delete("/project", async (req, res) => {
+router.delete("/project", requireGod, async (req, res) => {
   try {
     const project = String(req.query.project || "").trim();
     if (!project) return res.status(400).json({ error: "project es obligatorio" });
 
-    const r = await query("DELETE FROM presupuesto_detalle WHERE id_proyecto = $1", [project]);
-    res.json({ ok: true, deleted_rows: r.rowCount });
+    const r = await query(
+      "DELETE FROM presupuesto_detalle WHERE id_proyecto = $1",
+      [project]
+    );
+    return res.json({ ok: true, deleted_rows: r.rowCount });
   } catch (e) {
-    console.error("DELETE /api/project", e);
-    res.status(500).json({ error: "No se pudo borrar el proyecto" });
+    console.error("[PRESUPUESTO][DELETE /project] Error:", e);
+    return res.status(500).json({
+      error: "No se pudo borrar el proyecto",
+      trace_id: req.cpTraceId || null,
+    });
   }
 });
 
