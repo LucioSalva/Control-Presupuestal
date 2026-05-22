@@ -320,14 +320,16 @@
       thOrigenFolio.textContent =
         selectTipoOrigen.value === "SUF" ? "No. de Suficiencia" : "Folio";
     }
+    // Sanitización anti-XSS: folio, dependencia y concepto provienen de BD y
+    // suelen ser cadenas largas capturadas en formularios.
     tbodyOrigen.innerHTML = origenRows
       .map(
         (row, idx) => `
         <tr>
-          <td>${row.folio || ""}</td>
-          <td>${row.dependencia || ""}</td>
-          <td>${row.concepto || ""}</td>
-          <td class="text-end">${money(row.importe)}</td>
+          <td>${escapeHtml(row.folio || "")}</td>
+          <td>${escapeHtml(row.dependencia || "")}</td>
+          <td>${escapeHtml(row.concepto || "")}</td>
+          <td class="text-end">${escapeHtml(money(row.importe))}</td>
           <td class="text-center">
             <button class="btn btn-outline-primary btn-sm btn-select-origen" data-idx="${idx}">
               Seleccionar
@@ -359,21 +361,23 @@
         '<tr><td colspan="11" class="text-center text-muted py-3">Sin registros</td></tr>';
       return;
     }
+    // Sanitización anti-XSS: folio, dependencia, concepto, estatus y
+    // observaciones son cadenas capturadas por usuarios en formularios.
     tbodyEntregas.innerHTML = rows
       .map(
         (row, idx) => `
         <tr>
           <td>${idx + 1}</td>
-          <td>${row.folio || ""}</td>
-          <td>${row.dependencia || ""}</td>
-          <td>${row.concepto || ""}</td>
+          <td>${escapeHtml(row.folio || "")}</td>
+          <td>${escapeHtml(row.dependencia || "")}</td>
+          <td>${escapeHtml(row.concepto || "")}</td>
           <td class="text-center">${row.entrego_comprometido ? "●" : ""}</td>
           <td class="text-center">${row.entrego_devengado ? "●" : ""}</td>
-          <td class="text-end">${money(row.importe)}</td>
-          <td>${formatDate(row.fecha_entrega_tesoreria)}</td>
-          <td>${formatDate(row.fecha_recibido_presupuesto)}</td>
-          <td class="text-center">${row.estatus || ""}</td>
-          <td>${row.observaciones || ""}</td>
+          <td class="text-end">${escapeHtml(money(row.importe))}</td>
+          <td>${escapeHtml(formatDate(row.fecha_entrega_tesoreria))}</td>
+          <td>${escapeHtml(formatDate(row.fecha_recibido_presupuesto))}</td>
+          <td class="text-center">${escapeHtml(row.estatus || "")}</td>
+          <td>${escapeHtml(row.observaciones || "")}</td>
         </tr>
       `
       )

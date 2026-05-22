@@ -385,6 +385,10 @@ function renderTablaUsuarios() {
   usuariosCache.forEach((u) => {
     const tr = document.createElement("tr");
 
+    // Sanitización anti-XSS: escapamos TODOS los campos que provengan de BD
+    // antes de inyectarlos en innerHTML (un usuario malicioso podría llamarse
+    // <img src=x onerror=...> y robar el token de cualquier admin que abra
+    // esta vista). Las clases CSS y la estructura HTML permanecen literales.
     const rolesHtml = Array.isArray(u.roles)
       ? u.roles
           .map((r) => {
@@ -394,31 +398,33 @@ function renderTablaUsuarios() {
               rol === "ADMIN" ? "text-bg-primary" :
               rol === "AREA" ? "text-bg-secondary" :
               "text-bg-light";
-            return `<span class="badge ${cls} badge-role me-1">${rol}</span>`;
+            // rol ya fue normalizado con toUpperCase; aun así lo escapamos por
+            // defensa en profundidad ante valores inesperados.
+            return `<span class="badge ${cls} badge-role me-1">${escapeHtml(rol)}</span>`;
           })
           .join("")
       : "";
 
     tr.innerHTML = `
-      <td>${u.id}</td>
-      <td class="col-nombre">${u.nombre_completo || ""}</td>
-      <td>${u.usuario || ""}</td>
-      <td class="wrap">${u.dgeneral_nombre || ""}</td>
-      <td class="wrap">${u.dauxiliar_nombre || ""}</td>
+      <td>${escapeHtml(u.id)}</td>
+      <td class="col-nombre">${escapeHtml(u.nombre_completo || "")}</td>
+      <td>${escapeHtml(u.usuario || "")}</td>
+      <td class="wrap">${escapeHtml(u.dgeneral_nombre || "")}</td>
+      <td class="wrap">${escapeHtml(u.dauxiliar_nombre || "")}</td>
       <td>${rolesHtml}</td>
       <td>${
         u.activo
           ? `<span class="badge text-bg-success badge-role">ACTIVO</span>`
           : `<span class="badge text-bg-danger badge-role">INACTIVO</span>`
       }</td>
-      <td class="col-fecha">${formatFecha(u.fecha_creacion)}</td>
+      <td class="col-fecha">${escapeHtml(formatFecha(u.fecha_creacion))}</td>
       <td class="text-center">
         <button class="btn btn-sm btn-outline-primary btn-action me-1"
-                data-action="edit" data-id="${u.id}">
+                data-action="edit" data-id="${escapeHtml(u.id)}">
           ✏️ Editar
         </button>
         <button class="btn btn-sm btn-outline-danger btn-action"
-                data-action="delete" data-id="${u.id}">
+                data-action="delete" data-id="${escapeHtml(u.id)}">
           🗑️ Eliminar
         </button>
       </td>

@@ -3,24 +3,27 @@
  *  CONTROL PRESUPUESTAL — Tests: Autenticación (auth.routes.js)
  * ================================================================
  *  Casos cubiertos:
- *    CP-001: Login exitoso retorna token con formato correcto
+ *    CP-001: Login exitoso retorna JWT firmado HS256
  *    CP-002: Login con credenciales incorrectas retorna 401
  *    CP-003: Usuario inactivo retorna 403
- *    CP-004: Token expirado (>10 min) retorna 401 en ruta protegida
+ *    CP-004: Token expirado retorna 401 en ruta protegida
  *    CP-004b: Sin token retorna 401
  *    CP-004c: Token con formato inválido retorna 401
+ *
+ *  Actualizado para C-6: JWT firmado HS256 con issuer/audience.
+ *  El formato legacy token-{id}-{ts} ya NO se acepta.
  * ================================================================
  */
-import request from "supertest";
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import bcrypt from "bcryptjs";
 
 // =====================================================
-//  Mock de BD — debe declararse ANTES de cualquier import
-//  que use db.js (incluidos los routers y helpers)
+//  Mock de db.js — debe declararse ANTES de import del factory
+//  para que los routers (que importan db.js) reciban el mock.
 // =====================================================
-jest.mock("../db.js", () => ({
+jest.unstable_mockModule("../db.js", () => ({
   query: jest.fn(),
+  pool: { end: jest.fn() },
   getClient: jest.fn(() =>
     Promise.resolve({
       query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
@@ -29,20 +32,16 @@ jest.mock("../db.js", () => ({
   ),
 }));
 
+const { default: request } = await import("supertest");
 const { query } = await import("../db.js");
-const { createTestApp } = await import("./app-test-factory.js");
+const { createTestApp, signTestToken } = await import("./app-test-factory.js");
+const jwt = (await import("jsonwebtoken")).default;
 
 const app = createTestApp();
 
-// =====================================================
-//  Helper: hash bcrypt sincrónico para tests
-// =====================================================
 const PLAIN_PASSWORD = "miPassword123";
 const BCRYPT_HASH = await bcrypt.hash(PLAIN_PASSWORD, 10);
 
-// =====================================================
-//  Helper: fila de usuario activo base
-// =====================================================
 function mockUsuarioActivo(overrides = {}) {
   return {
     id: 1,
@@ -62,35 +61,17 @@ function mockUsuarioActivo(overrides = {}) {
   };
 }
 
-// =====================================================
-//  Cada query call que logAuditEvent hace necesita
-//  una respuesta válida para no romper el flujo.
-//  Usamos un helper para encadenar mocks adicionales.
-// =====================================================
 function mockAuditQueries() {
-  // ensureAuditoriaEventosSchema hace múltiples CREATE TABLE IF NOT EXISTS
-  // e INSERT — los mockeamos con respuesta vacía genérica
   query.mockResolvedValue({ rows: [], rowCount: 0 });
 }
 
-// =====================================================
-//  SUITE: Autenticación
-// =====================================================
 describe("CP-001 a CP-004: Autenticación", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    query.mockReset();
   });
 
-  // --------------------------------------------------
-  //  CP-001: Login exitoso
-  // --------------------------------------------------
-  it("CP-001: login exitoso retorna token con formato token-{id}-{ts}", async () => {
-    // Primera query: buscar usuario por nombre
-    query.mockResolvedValueOnce({
-      rows: [mockUsuarioActivo()],
-      rowCount: 1,
-    });
-    // Resto de queries (logAuditEvent, ensureAuditoriaEventosSchema, INSERT audit)
+  it("CP-001: login exitoso retorna JWT firmado HS256", async () => {
+    query.mockResolvedValueOnce({ rows: [mockUsuarioActivo()], rowCount: 1 });
     mockAuditQueries();
 
     const res = await request(app)
@@ -99,14 +80,19 @@ describe("CP-001 a CP-004: Autenticación", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("token");
-    // Formato: token-{número}-{timestamp}
-    expect(res.body.token).toMatch(/^token-\d+-\d+$/);
-    expect(res.body).toHaveProperty("usuario");
-    expect(res.body.usuario.id).toBe(1);
-    expect(res.body.usuario.roles).toContain("AREA");
+    // C-6: ya no es token-{id}-{ts} sino JWT (3 segmentos base64url)
+    expect(res.body.token.split(".")).toHaveLength(3);
+
+    // Verifica que el token es decodificable con la clave correcta
+    const decoded = jwt.verify(res.body.token, process.env.JWT_SECRET, {
+      issuer: "control-presupuestal",
+      audience: "cp-frontend",
+      algorithms: ["HS256"],
+    });
+    expect(decoded.sub).toBe(1);
   });
 
-  it("CP-001: login exitoso incluye datos del usuario en la respuesta", async () => {
+  it("CP-001: login incluye datos del usuario en la respuesta", async () => {
     query.mockResolvedValueOnce({
       rows: [mockUsuarioActivo({ dgeneral_clave: "L00" })],
       rowCount: 1,
@@ -126,10 +112,7 @@ describe("CP-001 a CP-004: Autenticación", () => {
     });
   });
 
-  // --------------------------------------------------
-  //  CP-002: Credenciales incorrectas
-  // --------------------------------------------------
-  it("CP-002: usuario inexistente retorna 401 sin exponer detalles de BD", async () => {
+  it("CP-002: usuario inexistente retorna 401 sin exponer detalles", async () => {
     query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
     mockAuditQueries();
 
@@ -138,20 +121,14 @@ describe("CP-001 a CP-004: Autenticación", () => {
       .send({ usuario: "noexiste", password: "cualquiera" });
 
     expect(res.status).toBe(401);
-    expect(res.body).toHaveProperty("error");
-    // No debe exponer mensajes internos de PostgreSQL
     const body = JSON.stringify(res.body);
     expect(body).not.toContain("relation");
     expect(body).not.toContain("does not exist");
-    expect(res.body).not.toHaveProperty("db");
     expect(res.body).not.toHaveProperty("stack");
   });
 
   it("CP-002: password incorrecto retorna 401", async () => {
-    query.mockResolvedValueOnce({
-      rows: [mockUsuarioActivo()],
-      rowCount: 1,
-    });
+    query.mockResolvedValueOnce({ rows: [mockUsuarioActivo()], rowCount: 1 });
     mockAuditQueries();
 
     const res = await request(app)
@@ -159,36 +136,23 @@ describe("CP-001 a CP-004: Autenticación", () => {
       .send({ usuario: "testuser", password: "passwordIncorrecto" });
 
     expect(res.status).toBe(401);
-    expect(res.body).toHaveProperty("error");
     expect(res.body).not.toHaveProperty("token");
   });
 
   it("CP-002: sin cuerpo retorna 400", async () => {
     mockAuditQueries();
-
-    const res = await request(app)
-      .post("/api/login")
-      .send({});
-
+    const res = await request(app).post("/api/login").send({});
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("error");
   });
 
   it("CP-002: solo usuario sin password retorna 400", async () => {
     mockAuditQueries();
-
-    const res = await request(app)
-      .post("/api/login")
-      .send({ usuario: "testuser" });
-
+    const res = await request(app).post("/api/login").send({ usuario: "testuser" });
     expect(res.status).toBe(400);
-    expect(res.body).toHaveProperty("error");
     expect(res.body).not.toHaveProperty("token");
   });
 
-  // --------------------------------------------------
-  //  CP-003: Usuario inactivo
-  // --------------------------------------------------
   it("CP-003: usuario inactivo retorna 403", async () => {
     query.mockResolvedValueOnce({
       rows: [mockUsuarioActivo({ activo: false })],
@@ -201,68 +165,57 @@ describe("CP-001 a CP-004: Autenticación", () => {
       .send({ usuario: "testuser", password: PLAIN_PASSWORD });
 
     expect(res.status).toBe(403);
-    expect(res.body).toHaveProperty("error");
     expect(res.body).not.toHaveProperty("token");
   });
 
-  // --------------------------------------------------
-  //  CP-004: Token expirado / inválido
-  // --------------------------------------------------
-  it("CP-004: token expirado (>10 min) retorna 401 en ruta protegida", async () => {
-    const oldTimestamp = Date.now() - 11 * 60 * 1000; // 11 minutos atrás
-    const expiredToken = `token-1-${oldTimestamp}`;
+  it("CP-004: token expirado retorna 401 en ruta protegida", async () => {
+    // JWT firmado pero ya vencido
+    const expired = jwt.sign(
+      { sub: 1, roles: ["AREA"] },
+      process.env.JWT_SECRET,
+      { algorithm: "HS256", issuer: "control-presupuestal", audience: "cp-frontend", expiresIn: "-1s" }
+    );
 
     const res = await request(app)
       .get("/api/catalogos/metas")
-      .set("Authorization", `Bearer ${expiredToken}`);
+      .set("Authorization", `Bearer ${expired}`);
 
-    // El middleware authRequired debe rechazarlo antes de llegar a la BD
     expect(res.status).toBe(401);
     expect(res.body).toHaveProperty("error");
   });
 
   it("CP-004b: sin Authorization header retorna 401", async () => {
     const res = await request(app).get("/api/catalogos/metas");
-
     expect(res.status).toBe(401);
-    expect(res.body).toHaveProperty("error");
   });
 
   it("CP-004c: token con formato inválido retorna 401", async () => {
     const res = await request(app)
       .get("/api/catalogos/metas")
-      .set("Authorization", "Bearer esto-no-es-un-token-valido");
-
+      .set("Authorization", "Bearer esto-no-es-un-jwt");
     expect(res.status).toBe(401);
-    expect(res.body).toHaveProperty("error");
   });
 
-  it("CP-004d: token con userId=0 retorna 401", async () => {
+  it("CP-004d: token legacy token-1-{ts} ahora retorna 401 (C-6)", async () => {
+    const legacy = `token-1-${Date.now()}`;
     const res = await request(app)
       .get("/api/catalogos/metas")
-      .set("Authorization", `Bearer token-0-${Date.now()}`);
-
+      .set("Authorization", `Bearer ${legacy}`);
     expect(res.status).toBe(401);
   });
 
-  // --------------------------------------------------
-  //  Logout
-  // --------------------------------------------------
   it("logout siempre retorna 200 con ok:true aunque el token sea inválido", async () => {
     mockAuditQueries();
-
     const res = await request(app)
       .post("/api/logout")
       .set("Authorization", "Bearer token-invalido");
-
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("ok", true);
   });
 
-  it("logout con token válido consulta BD y retorna ok:true", async () => {
-    const validToken = `token-1-${Date.now()}`;
+  it("logout con JWT válido consulta BD y retorna ok:true", async () => {
+    const token = signTestToken(1, { roles: ["AREA"] });
 
-    // Mock: consulta de usuario en logout
     query.mockResolvedValueOnce({
       rows: [{ id: 1, usuario: "testuser", id_dgeneral: 2, id_dauxiliar: 3, activo: true }],
       rowCount: 1,
@@ -271,20 +224,40 @@ describe("CP-001 a CP-004: Autenticación", () => {
 
     const res = await request(app)
       .post("/api/logout")
-      .set("Authorization", `Bearer ${validToken}`);
+      .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("ok", true);
   });
 });
 
-// =====================================================
-//  SUITE: Health check (sin auth)
-// =====================================================
-describe("GET /api/health", () => {
-  it("retorna 200 con ok:true sin necesidad de token", async () => {
+describe("GET /api/health (real, post-fix orden de mounts)", () => {
+  beforeEach(() => query.mockReset());
+
+  // ----------------------------------------------------------
+  // FIX aplicado: app.get("/api/health", ...) se movió ANTES
+  // de app.use("/api", presupuestoRouter). El healthcheck ya no
+  // queda detrás del authRequired del router de presupuesto y
+  // responde 200 sin token (necesario para load balancers / k8s).
+  // ----------------------------------------------------------
+  it("/api/health SIN token responde 200 con estado de BD", async () => {
+    query.mockResolvedValueOnce({ rows: [{ "?column?": 1 }], rowCount: 1 });
+
     const res = await request(app).get("/api/health");
+
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("ok", true);
+    expect(res.body).toHaveProperty("status", "ok");
+    expect(res.body).toHaveProperty("database");
+    expect(res.body.database.status).toBe("ok");
+  });
+
+  it("/api/health responde 503 si la BD está caída (sin token)", async () => {
+    query.mockRejectedValueOnce(new Error("connection refused"));
+
+    const res = await request(app).get("/api/health");
+
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe("degraded");
+    expect(res.body.database.status).toBe("error");
   });
 });

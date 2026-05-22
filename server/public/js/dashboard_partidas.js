@@ -152,21 +152,24 @@
       return;
     }
 
+    // Sanitización anti-XSS: cap viene como número de capítulo (1..9), pero
+    // las funciones money()/percent() devuelven strings que escapamos por
+    // defensa en profundidad. row puede contener clave si la vista es PARTIDA.
     tbodyCapitulos.innerHTML = rows
       .map((row) => {
         const cap = row.capitulo ?? 0;
         return `
           <tr>
-            <td class="fw-semibold">${cap}</td>
-            <td class="text-end">${money(row.presupuesto)}</td>
-            <td class="text-end">${money(row.suficiencia)}</td>
-            <td class="text-end">${money(row.comprometido)}</td>
-            <td class="text-end">${money(row.devengado)}</td>
-            <td class="text-end">${money(row.reconducciones)}</td>
-            <td class="text-end">${money(row.saldo_disponible)}</td>
-            <td class="text-end">${percent(row.porcentaje_ejercido)}</td>
+            <td class="fw-semibold">${escapeHtml(cap)}</td>
+            <td class="text-end">${escapeHtml(money(row.presupuesto))}</td>
+            <td class="text-end">${escapeHtml(money(row.suficiencia))}</td>
+            <td class="text-end">${escapeHtml(money(row.comprometido))}</td>
+            <td class="text-end">${escapeHtml(money(row.devengado))}</td>
+            <td class="text-end">${escapeHtml(money(row.reconducciones))}</td>
+            <td class="text-end">${escapeHtml(money(row.saldo_disponible))}</td>
+            <td class="text-end">${escapeHtml(percent(row.porcentaje_ejercido))}</td>
             <td class="text-center">
-              <button class="btn btn-sm btn-outline-primary" data-capitulo="${cap}">
+              <button class="btn btn-sm btn-outline-primary" data-capitulo="${escapeHtml(cap)}">
                 Ver detalle
               </button>
             </td>
@@ -185,19 +188,21 @@
       return;
     }
 
+    // Sanitización anti-XSS: row.clave y row.descripcion provienen del
+    // catálogo de partidas (BD) y se inyectan directamente en innerHTML.
     tbody.innerHTML = rows
       .map((row) => {
         return `
           <tr>
-            <td>${row.clave || ""}</td>
-            <td>${row.descripcion || ""}</td>
-            <td class="text-end">${money(row.presupuesto)}</td>
-            <td class="text-end">${money(row.suficiencia)}</td>
-            <td class="text-end">${money(row.comprometido)}</td>
-            <td class="text-end">${money(row.devengado)}</td>
-            <td class="text-end">${money(row.reconducciones)}</td>
-            <td class="text-end">${money(row.saldo_disponible)}</td>
-            <td class="text-end">${percent(row.porcentaje_ejercido)}</td>
+            <td>${escapeHtml(row.clave || "")}</td>
+            <td>${escapeHtml(row.descripcion || "")}</td>
+            <td class="text-end">${escapeHtml(money(row.presupuesto))}</td>
+            <td class="text-end">${escapeHtml(money(row.suficiencia))}</td>
+            <td class="text-end">${escapeHtml(money(row.comprometido))}</td>
+            <td class="text-end">${escapeHtml(money(row.devengado))}</td>
+            <td class="text-end">${escapeHtml(money(row.reconducciones))}</td>
+            <td class="text-end">${escapeHtml(money(row.saldo_disponible))}</td>
+            <td class="text-end">${escapeHtml(percent(row.porcentaje_ejercido))}</td>
           </tr>
         `;
       })

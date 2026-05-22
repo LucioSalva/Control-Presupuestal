@@ -164,6 +164,10 @@
     if (page > totalPages) page = totalPages;
     const rows = paginate(filtered);
 
+    // Sanitización anti-XSS: row.no_suficiencia y row.cancel_reason provienen
+    // de BD y pueden contener cualquier texto capturado por un usuario.
+    // statusClass() y mapEstado() devuelven constantes controladas por código,
+    // pero las escapamos también por defensa en profundidad.
     tbody.innerHTML = rows
       .map((row) => {
         const estado = mapEstado(row.estado);
@@ -173,11 +177,11 @@
         const id = Number(row.id);
         return `
           <tr>
-            <td class="fw-semibold">${row.no_suficiencia || "—"}</td>
-            <td><span class="status-pill ${statusClass(estado)}">${estado}</span></td>
-            <td>${elapsed}</td>
-            <td>${remaining}</td>
-            <td class="text-muted">${motivo}</td>
+            <td class="fw-semibold">${escapeHtml(row.no_suficiencia || "—")}</td>
+            <td><span class="status-pill ${escapeHtml(statusClass(estado))}">${escapeHtml(estado)}</span></td>
+            <td>${escapeHtml(elapsed)}</td>
+            <td>${escapeHtml(remaining)}</td>
+            <td class="text-muted">${escapeHtml(motivo)}</td>
             <td class="text-center">
               <a class="btn btn-sm btn-outline-primary" href="suficiencia_presupuestal.html?id=${id}">
                 Ver

@@ -761,19 +761,21 @@
   // ---------------------------
   function buildPartidasOptionsHtml(selectedClave = "") {
     const cur = String(selectedClave || "").trim();
+    // Escapamos tanto el atributo value como el texto visible para evitar
+    // que un cambio en el catálogo de partidas inyecte HTML/JS arbitrario.
     const opts = partidasRows
       .map((r) => {
         const c = String(r.clave || "").trim();
         const d = String(r.partida || "").trim();
         const sel = c === cur ? "selected" : "";
-        return `<option value="${c}" ${sel}>${c} - ${d}</option>`;
+        return `<option value="${escapeHtml(c)}" ${sel}>${escapeHtml(c)} - ${escapeHtml(d)}</option>`;
       })
       .join("");
 
     let html = `<option value="">-- Selecciona --</option>${opts}`;
     if (cur && !partidasRows.some((r) => String(r.clave || "").trim() === cur)) {
       const desc = partidasMap[cur] || "NO DISPONIBLE";
-      html += `<option value="${cur}" selected>${cur} - ${desc}</option>`;
+      html += `<option value="${escapeHtml(cur)}" selected>${escapeHtml(cur)} - ${escapeHtml(desc)}</option>`;
     }
     return html;
   }

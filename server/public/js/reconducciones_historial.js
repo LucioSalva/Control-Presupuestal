@@ -265,21 +265,24 @@
     if (page > totalPages) page = totalPages;
     const rows = paginate(filtered);
 
+    // Sanitización anti-XSS: oficio y tipo_movimiento son texto capturado por
+    // el usuario. r.id es un Number serializado por backend, pero por
+    // uniformidad usamos escapeHtml en todos los campos inyectados.
     el.tbody.innerHTML = rows
       .map((r) => {
         const estatus = String(r.estatus || "—").toUpperCase();
         return `
           <tr>
-            <td class="fw-semibold">${r.id || "—"}</td>
-            <td>${r.oficio || "—"}</td>
-            <td>${formatDate(r.fecha_elaboracion)}</td>
-            <td>${r.tipo_movimiento || "—"}</td>
-            <td><span class="badge bg-light text-dark">${estatus}</span></td>
-            <td class="text-end">${formatCurrency(r.origen_total || 0)}</td>
-            <td class="text-end">${formatCurrency(r.destino_total || 0)}</td>
-            <td class="text-end">${formatCurrency(r.diferencia || 0)}</td>
+            <td class="fw-semibold">${escapeHtml(r.id || "—")}</td>
+            <td>${escapeHtml(r.oficio || "—")}</td>
+            <td>${escapeHtml(formatDate(r.fecha_elaboracion))}</td>
+            <td>${escapeHtml(r.tipo_movimiento || "—")}</td>
+            <td><span class="badge bg-light text-dark">${escapeHtml(estatus)}</span></td>
+            <td class="text-end">${escapeHtml(formatCurrency(r.origen_total || 0))}</td>
+            <td class="text-end">${escapeHtml(formatCurrency(r.destino_total || 0))}</td>
+            <td class="text-end">${escapeHtml(formatCurrency(r.diferencia || 0))}</td>
             <td class="text-center">
-              <a class="btn btn-sm btn-outline-primary" href="reconducciones.html?id=${r.id}">Ver/Editar</a>
+              <a class="btn btn-sm btn-outline-primary" href="reconducciones.html?id=${encodeURIComponent(r.id)}">Ver/Editar</a>
             </td>
           </tr>
         `;
@@ -304,17 +307,19 @@
           '<tr><td colspan="5" class="text-center text-muted py-2">Sin claves</td></tr>';
         return;
       }
+      // Sanitización anti-XSS: r.clave, r.dg_clave y r.da_clave provienen de
+      // BD y se inyectan directamente en HTML.
       el.tbodyClaves.innerHTML = rows
         .map((r) => {
           const area = `${r.dg_clave || "—"} ${r.da_clave || "—"}`.trim();
           const status = String(r.status || "—").toUpperCase();
           return `
             <tr>
-              <td class="fw-semibold">${r.clave || "—"}</td>
-              <td>${area}</td>
-              <td>${status}</td>
-              <td>${formatDate(r.created_at)}</td>
-              <td>${formatDate(r.used_at)}</td>
+              <td class="fw-semibold">${escapeHtml(r.clave || "—")}</td>
+              <td>${escapeHtml(area)}</td>
+              <td>${escapeHtml(status)}</td>
+              <td>${escapeHtml(formatDate(r.created_at))}</td>
+              <td>${escapeHtml(formatDate(r.used_at))}</td>
             </tr>
           `;
         })

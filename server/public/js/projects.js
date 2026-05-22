@@ -219,19 +219,21 @@ function renderTable() {
     const tr = document.createElement("tr");
     if (saldo < 0) tr.classList.add("row-saldo-negativo");
     const projectLabel = p.project_display || p.project;
+    // Sanitización anti-XSS: projectLabel y p.project son claves de proyecto
+    // capturadas por el usuario (texto). money() devuelve string formateado.
     tr.innerHTML = `
-      <td><span class="badge text-bg-dark pill-project">${projectLabel}</span></td>
+      <td><span class="badge text-bg-dark pill-project">${escapeHtml(projectLabel)}</span></td>
       <td class="text-end">${Number(p.partidas || 0)}</td>
-      <td class="text-end">${money(p.presupuesto_total)}</td>
-      <td class="text-end">${money(p.gastado_total)}</td>
-      <td class="text-end">${money(p.reconducido_total)}</td>
-      <td class="text-end"><span class="badge ${badgeClass}">${money(saldo)}</span></td>
+      <td class="text-end">${escapeHtml(money(p.presupuesto_total))}</td>
+      <td class="text-end">${escapeHtml(money(p.gastado_total))}</td>
+      <td class="text-end">${escapeHtml(money(p.reconducido_total))}</td>
+      <td class="text-end"><span class="badge ${badgeClass}">${escapeHtml(money(saldo))}</span></td>
       <td class="text-end">
         <div class="d-flex justify-content-end gap-2 flex-wrap">
-          <button class="btn btn-sm btn-outline-primary btn-detail" data-project="${p.project}">
+          <button class="btn btn-sm btn-outline-primary btn-detail" data-project="${escapeHtml(p.project)}">
             <i class="bi bi-list-check"></i> Detalle
           </button>
-          <button class="btn btn-sm btn-outline-info btn-open" data-project="${p.project}">
+          <button class="btn btn-sm btn-outline-info btn-open" data-project="${escapeHtml(p.project)}">
             <i class="bi bi-box-arrow-in-right"></i> Abrir
           </button>
         </div>
@@ -279,9 +281,10 @@ function renderAlerts() {
     overdrafts.slice(0, 6).forEach((p) => {
       const li = document.createElement("li");
       li.className = "list-group-item d-flex justify-content-between align-items-center";
+      // Sanitización anti-XSS: p.project es clave de proyecto capturada en BD.
       li.innerHTML = `
-        <span>${p.project}</span>
-        <span class="badge badge-saldo-negativo">${money(p.saldo_total)}</span>
+        <span>${escapeHtml(p.project)}</span>
+        <span class="badge badge-saldo-negativo">${escapeHtml(money(p.saldo_total))}</span>
       `;
       overdraftList.appendChild(li);
     });
@@ -298,9 +301,10 @@ function renderAlerts() {
       const li = document.createElement("li");
       li.className = "list-group-item d-flex justify-content-between align-items-center";
       const projectLabel = p.project_display || p.project;
+      // Sanitización anti-XSS: projectLabel es texto capturado por usuario.
       li.innerHTML = `
-        <span>${idx + 1}. ${projectLabel}</span>
-        <span class="fw-semibold">${money(p.gastado_total)}</span>
+        <span>${idx + 1}. ${escapeHtml(projectLabel)}</span>
+        <span class="fw-semibold">${escapeHtml(money(p.gastado_total))}</span>
       `;
       topSpendList.appendChild(li);
     });
@@ -339,15 +343,17 @@ function renderDetailTable(targetId, rows) {
     return;
   }
 
+  // Sanitización anti-XSS: r.key viene de aggregateRows que toma normalizeText
+  // de un campo dinámico (partida, mes, etc.) capturado por usuarios.
   const html = rows
     .map(
       (r) => `
         <tr>
-          <td>${r.key}</td>
-          <td class="text-end">${money(r.presupuesto)}</td>
-          <td class="text-end">${money(r.gastado)}</td>
-          <td class="text-end">${money(r.reconducido)}</td>
-          <td class="text-end">${money(r.saldo)}</td>
+          <td>${escapeHtml(r.key)}</td>
+          <td class="text-end">${escapeHtml(money(r.presupuesto))}</td>
+          <td class="text-end">${escapeHtml(money(r.gastado))}</td>
+          <td class="text-end">${escapeHtml(money(r.reconducido))}</td>
+          <td class="text-end">${escapeHtml(money(r.saldo))}</td>
         </tr>
       `
     )
@@ -415,10 +421,12 @@ async function loadProjectMetas(project) {
     metas.forEach((m) => {
       const col = document.createElement("div");
       col.className = "col-12 col-md-6 col-lg-4";
+      // Sanitización anti-XSS: m.meta y m.unidad_medida son texto descriptivo
+      // capturado por administradores en el catálogo de metas.
       col.innerHTML = `
         <div class="meta-card">
-          <div class="meta-title">${normalizeText(m.meta) || "Meta"}</div>
-          <div class="meta-sub text-secondary">${normalizeText(m.unidad_medida) || "Sin unidad"}</div>
+          <div class="meta-title">${escapeHtml(normalizeText(m.meta) || "Meta")}</div>
+          <div class="meta-sub text-secondary">${escapeHtml(normalizeText(m.unidad_medida) || "Sin unidad")}</div>
         </div>
       `;
       metasWrap.appendChild(col);

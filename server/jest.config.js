@@ -15,8 +15,8 @@ export default {
   // Sin transform: Jest corre los archivos .js tal cual (ESM nativo)
   transform: {},
 
-  // Indica a Jest que los .js son ESM
-  extensionsToTreatAsEsm: [".js"],
+  // NOTA: extensionsToTreatAsEsm[".js"] está deprecado porque Jest lo
+  // infiere desde "type":"module" del package.json. Lo dejamos vacío.
 
   // Permite imports sin extensión en algunos casos
   moduleNameMapper: {

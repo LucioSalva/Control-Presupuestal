@@ -505,11 +505,13 @@
   }
 
   function buildSelectOptions(items, getLabel) {
+    // Sanitización anti-XSS: tanto value (id/clave de BD) como label (texto
+    // descriptivo de catálogo) se inyectan vía innerHTML, así que escapamos.
     const opts = ['<option value="">Seleccione...</option>'];
     items.forEach((it) => {
       const value = String(it.id ?? it.clave ?? "");
       const label = getLabel(it);
-      opts.push(`<option value="${value}">${label}</option>`);
+      opts.push(`<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`);
     });
     return opts.join("");
   }
@@ -553,11 +555,13 @@
   }
 
   function fillPartidaSelect(select, selectedClave) {
+    // Sanitización anti-XSS: clave y descripción salen del catálogo de BD
+    // y podrían contener caracteres HTML si llegan a editarse por backend.
     const opts = ['<option value="">Seleccione...</option>'];
     state.catalogos.partidas.forEach((p) => {
       const clave = String(p.clave || "").trim();
       const desc = String(p.descripcion || p.partida || "");
-      opts.push(`<option value="${clave}" data-desc="${desc}">${clave} - ${desc}</option>`);
+      opts.push(`<option value="${escapeHtml(clave)}" data-desc="${escapeHtml(desc)}">${escapeHtml(clave)} - ${escapeHtml(desc)}</option>`);
     });
     select.innerHTML = opts.join("");
     if (selectedClave) {
@@ -1039,20 +1043,25 @@
     if (!hasRecientes) return;
     const estatus = String(el.filtroEstatus.value || "TODOS").toUpperCase();
     const rows = state.recientes.filter((r) => estatus === "TODOS" || String(r.estatus || "").toUpperCase() === estatus);
+    // Sanitización anti-XSS: oficio, tipo_movimiento, estatus son cadenas
+    // capturadas por el usuario en el formulario. formatDate y formatCurrency
+    // devuelven strings controladas por código pero las escapamos por defensa
+    // en profundidad. r.id es un Number pero también lo escapamos por
+    // uniformidad — escapeHtml no afecta dígitos.
     el.tablaBody.innerHTML = rows
       .map(
         (r) => `
         <tr>
-          <td>${r.id}</td>
-          <td>${r.oficio || "—"}</td>
-          <td>${formatDate(r.fecha_elaboracion)}</td>
-          <td>${r.tipo_movimiento || "—"}</td>
-          <td><span class="badge bg-light text-dark">${r.estatus || "—"}</span></td>
-          <td class="text-end">${formatCurrency(r.origen_total || 0)}</td>
-          <td class="text-end">${formatCurrency(r.destino_total || 0)}</td>
-          <td class="text-end">${formatCurrency(r.diferencia || 0)}</td>
+          <td>${escapeHtml(r.id)}</td>
+          <td>${escapeHtml(r.oficio || "—")}</td>
+          <td>${escapeHtml(formatDate(r.fecha_elaboracion))}</td>
+          <td>${escapeHtml(r.tipo_movimiento || "—")}</td>
+          <td><span class="badge bg-light text-dark">${escapeHtml(r.estatus || "—")}</span></td>
+          <td class="text-end">${escapeHtml(formatCurrency(r.origen_total || 0))}</td>
+          <td class="text-end">${escapeHtml(formatCurrency(r.destino_total || 0))}</td>
+          <td class="text-end">${escapeHtml(formatCurrency(r.diferencia || 0))}</td>
           <td class="text-end">
-            <button class="btn btn-sm btn-outline-primary rc-btn-edit" data-id="${r.id}">Ver/Editar</button>
+            <button class="btn btn-sm btn-outline-primary rc-btn-edit" data-id="${escapeHtml(r.id)}">Ver/Editar</button>
           </td>
         </tr>
       `
@@ -1208,22 +1217,24 @@
       }
 
       if (tbody) {
+        // Sanitización anti-XSS: todos los campos derivados de r.* vienen
+        // de la BD vía /api/reconducciones y son texto controlado por usuario.
         tbody.innerHTML = rows.map((r) => `
           <tr>
-            <td class="text-muted small">${r.id}</td>
-            <td class="fw-semibold">${r.oficio || "—"}</td>
-            <td>${formatDate(r.fecha_elaboracion)}</td>
-            <td><span class="badge bg-light text-dark border">${r.tipo_movimiento || "—"}</span></td>
+            <td class="text-muted small">${escapeHtml(r.id)}</td>
+            <td class="fw-semibold">${escapeHtml(r.oficio || "—")}</td>
+            <td>${escapeHtml(formatDate(r.fecha_elaboracion))}</td>
+            <td><span class="badge bg-light text-dark border">${escapeHtml(r.tipo_movimiento || "—")}</span></td>
             <td><span class="badge ${
               r.estatus === "APLICADO" ? "bg-success" :
               r.estatus === "ENVIADO" ? "bg-primary" :
               r.estatus === "AUTORIZADO" ? "bg-info text-dark" :
               r.estatus === "CANCELADO" ? "bg-danger" : "bg-secondary"
-            }">${r.estatus || "—"}</span></td>
-            <td class="text-end">${formatCurrency(r.origen_total || 0)}</td>
-            <td class="text-end">${formatCurrency(r.destino_total || 0)}</td>
+            }">${escapeHtml(r.estatus || "—")}</span></td>
+            <td class="text-end">${escapeHtml(formatCurrency(r.origen_total || 0))}</td>
+            <td class="text-end">${escapeHtml(formatCurrency(r.destino_total || 0))}</td>
             <td>
-              <button class="btn btn-sm btn-outline-primary rc-btn-abrir-modal" data-id="${r.id}">
+              <button class="btn btn-sm btn-outline-primary rc-btn-abrir-modal" data-id="${escapeHtml(r.id)}">
                 <i class="bi bi-folder2-open me-1"></i>Abrir
               </button>
             </td>
