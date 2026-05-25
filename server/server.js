@@ -121,10 +121,25 @@ app.use(
           directives: {
             "default-src": ["'self'"],
             "script-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
-            "style-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
+            "style-src": [
+              "'self'",
+              "https://cdn.jsdelivr.net",
+              "https://fonts.googleapis.com",
+              "'unsafe-inline'",
+            ],
             "img-src": ["'self'", "data:", "https:"],
-            "font-src": ["'self'", "https://cdn.jsdelivr.net", "data:"],
-            "connect-src": ["'self'", "http://localhost:3000", "http://127.0.0.1:3000"],
+            "font-src": [
+              "'self'",
+              "https://cdn.jsdelivr.net",
+              "https://fonts.gstatic.com",
+              "data:",
+            ],
+            "connect-src": [
+              "'self'",
+              "http://localhost:3000",
+              "http://127.0.0.1:3000",
+              "https://cdn.jsdelivr.net",
+            ],
           },
         }
       : false, // ✅ LOCAL: deja cargar CDNs y todo

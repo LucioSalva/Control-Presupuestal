@@ -452,9 +452,48 @@ router.put("/:id", async (req, res) => {
 // =======================
 // DELETE
 // =======================
+// Trazabilidad presupuestal: NO se permite borrar usuarios con
+// actividad registrada (suficiencias/comprometidos/devengados/
+// presupuestos), porque dejaría huérfanos los movimientos contables.
+// En ese caso devolvemos 409 con detalle y sugerencia de desactivar.
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id || 0);
   if (!id) return res.status(400).json({ error: "ID inválido" });
+
+  // ── Verificación previa: ¿tiene actividad? ──────────────────
+  try {
+    const refs = await query(
+      `SELECT
+         (SELECT COUNT(*) FROM public.suficiencias         WHERE id_usuario = $1) AS suficiencias,
+         (SELECT COUNT(*) FROM public.comprometidos        WHERE id_usuario = $1) AS comprometidos,
+         (SELECT COUNT(*) FROM public.devengados           WHERE id_usuario = $1) AS devengados,
+         (SELECT COUNT(*) FROM public.partidas_presupuesto WHERE id_usuario = $1) AS presupuestos,
+         (SELECT COUNT(*) FROM public.usuarios             WHERE updated_by = $1 AND id <> $1) AS otros_editados`,
+      [id]
+    );
+    const r = refs.rows[0] || {};
+    const partes = [];
+    if (Number(r.suficiencias)   > 0) partes.push(`${r.suficiencias} suficiencia(s)`);
+    if (Number(r.comprometidos)  > 0) partes.push(`${r.comprometidos} comprometido(s)`);
+    if (Number(r.devengados)     > 0) partes.push(`${r.devengados} devengado(s)`);
+    if (Number(r.presupuestos)   > 0) partes.push(`${r.presupuestos} registro(s) de presupuesto`);
+    if (Number(r.otros_editados) > 0) partes.push(`${r.otros_editados} edición(es) a otros usuarios`);
+
+    if (partes.length > 0) {
+      return res.status(409).json({
+        error:
+          `No se puede eliminar este usuario porque tiene ${partes.join(", ")} a su nombre. ` +
+          `Por trazabilidad presupuestal, desactívelo en lugar de eliminarlo ` +
+          `(Editar → desmarcar "Activo").`,
+        trace_id: req.cpTraceId,
+        referencias: r,
+      });
+    }
+  } catch (e) {
+    console.error("DELETE /api/admin/usuarios/:id [check refs] ERROR:", e);
+    // Si la verificación falla, dejamos pasar al DELETE real;
+    // si hay FK bloqueando, el catch de abajo devuelve 409 descriptivo.
+  }
 
   const client = await getClient();
   try {
@@ -478,6 +517,19 @@ router.delete("/:id", async (req, res) => {
   } catch (e) {
     await client.query("ROLLBACK");
     console.error("DELETE /api/admin/usuarios/:id ERROR:", e);
+
+    // 23503 = foreign_key_violation. Si alguna FK no contada arriba bloqueó
+    // el delete, respondemos 409 con el nombre de la restricción.
+    if (e.code === "23503") {
+      const cons = e.constraint || "una restricción de integridad";
+      return res.status(409).json({
+        error:
+          `No se puede eliminar: el usuario tiene registros relacionados (${cons}). ` +
+          `Desactívelo en lugar de eliminarlo.`,
+        trace_id: req.cpTraceId,
+      });
+    }
+
     res.status(500).json({ error: "Error eliminando usuario" });
   } finally {
     client.release();
