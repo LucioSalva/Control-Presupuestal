@@ -1,0 +1,65 @@
+# ================================================================
+#  .dockerignore — keep build context tiny and reproducible
+# ================================================================
+
+# --- VCS ---------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+
+# --- Node ---  (never ship host node_modules into the image)
+**/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Secrets / env -----------------------------------------------
+.env
+.env.*
+!.env.docker.example
+!server/.env.example
+
+# --- IDE / editor ------------------------------------------------
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Claude / agents ---------------------------------------------
+.claude
+.claude-*
+AGENTS.md
+
+# --- Docs / binaries we don't need at runtime --------------------
+*.md
+!server/README.md
+*.pdf
+*.csv
+*.bak
+
+# --- Tests / coverage --------------------------------------------
+**/coverage
+**/.nyc_output
+**/__snapshots__
+server/tests
+
+# --- Runtime artefacts (will be volume-mounted) ------------------
+server/uploads
+server/logs
+*.log
+
+# --- Build outputs we want regenerated inside the image ---------
+server/public/dist
+
+# --- Local docker stuff ------------------------------------------
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+
+# --- Misc OS -----------------------------------------------------
+**/*.tmp
+**/*.pid
+**/*.seed

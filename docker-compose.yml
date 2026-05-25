@@ -1,0 +1,113 @@
+# ================================================================
+#  CONTROL PRESUPUESTAL — docker-compose.yml
+# ================================================================
+#  Servicios:
+#    - db   : PostgreSQL 16 (solo red interna, NO expone puerto al host)
+#    - app  : Node.js/Express (publica 3000 en el host)
+#
+#  Red interna: cp_net
+#  Volúmenes nombrados:
+#    - cp_pgdata   -> /var/lib/postgresql/data   (datos de Postgres)
+#    - cp_uploads  -> /app/uploads               (oficios PDF, etc.)
+# ================================================================
+
+name: control-presupuestal
+
+services:
+  # --------------------------------------------------------------
+  # PostgreSQL — base de datos
+  # --------------------------------------------------------------
+  db:
+    image: postgres:17-alpine
+    container_name: cp_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-presupuesto_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio en .env}
+      # Mejora el rendimiento del initdb en arranques en frío
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - cp_pgdata:/var/lib/postgresql/data
+      # SQL de restauración inicial (solo se ejecuta cuando el volumen está vacío).
+      # Los archivos se ejecutan en orden alfabético dentro de /docker-entrypoint-initdb.d/
+      - ./docker-initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - cp_net
+    # NO se publica ningún puerto al host: la DB solo es accesible
+    # desde la red interna (servicio "db"). Si necesitas inspeccionar
+    # desde el host, usa: docker compose exec db psql ...
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-presupuesto_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    # Hardening básico
+    security_opt:
+      - no-new-privileges:true
+
+  # --------------------------------------------------------------
+  # Aplicación — Node.js + Express
+  # --------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: control-presupuestal-app:latest
+    container_name: cp_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: "3000"
+      # Importante: el host es "db" (nombre del servicio en compose),
+      # NO localhost. La red cp_net resuelve "db" al contenedor.
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-presupuesto_db}
+      PGSSL: ${PGSSL:-false}
+      PG_POOL_MAX: ${PG_POOL_MAX:-20}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatorio en .env (>=32 chars)}
+      SEED: ${SEED:-false}
+      MUNICIPIO_PREFIJO_FOLIO: ${MUNICIPIO_PREFIJO_FOLIO:-ECA}
+    ports:
+      - "${APP_HOST_PORT:-3000}:3000"
+    volumes:
+      # Persistencia de archivos subidos (oficios PDF, etc.).
+      # Si NO necesitas persistir entre rebuilds, puedes quitar
+      # esta línea, pero perderás los oficios cargados.
+      - cp_uploads:/app/uploads
+    networks:
+      - cp_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--tries=1", "--timeout=4", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    security_opt:
+      - no-new-privileges:true
+    # Logs rotados para que no llenen el disco del host
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+# --------------------------------------------------------------
+# Red interna privada
+# --------------------------------------------------------------
+networks:
+  cp_net:
+    driver: bridge
+
+# --------------------------------------------------------------
+# Volúmenes con nombre (persistentes)
+# --------------------------------------------------------------
+volumes:
+  cp_pgdata:
+    driver: local
+  cp_uploads:
+    driver: local

@@ -1,0 +1,33 @@
+# --- Env / secrets ---
+.env
+.env.*
+!.env.docker.example
+server/.env
+!server/.env.example
+
+# --- Node ---
+node_modules/
+**/node_modules/
+npm-debug.log*
+
+# --- DB dumps locales (datos municipales - NO subir) ---
+docker-initdb/
+*.dump
+*.sql.gz
+
+# --- IDE ---
+.vscode/
+.idea/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Build outputs ---
+server/public/dist/
+
+# --- Uploads runtime ---
+server/uploads/
+
+# --- Logs ---
+*.log
