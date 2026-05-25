@@ -34,7 +34,21 @@
       "Bash(PGPASSWORD=admin \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d presupuesto_db --no-psqlrc -c \"SELECT pg_sequence_last_value\\('seq_suficiencia_folio'\\) AS suf_last, pg_sequence_last_value\\('suficiencias_folio_num_seq'\\) AS suf_folio_num_last, pg_sequence_last_value\\('seq_comprometido_folio'\\) AS comp_last, pg_sequence_last_value\\('seq_devengado_folio'\\) AS dev_last;\" 2>&1)",
       "Bash(PGPASSWORD=admin psql -U postgres -h localhost -p 5432 -d presupuesto_db -f server/sql/cleanup_reset_folios.sql)",
       "Bash(where psql:*)",
-      "Bash(PGPASSWORD=admin \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h localhost -p 5432 -d presupuesto_db -f \"C:/Users/lucio/Desktop/creacionSoftware/Control-Presupuestal/server/sql/cleanup_reset_folios.sql\" 2>&1)"
+      "Bash(PGPASSWORD=admin \"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -h localhost -p 5432 -d presupuesto_db -f \"C:/Users/lucio/Desktop/creacionSoftware/Control-Presupuestal/server/sql/cleanup_reset_folios.sql\" 2>&1)",
+      "Bash(dir C:\\\\Users\\\\lua22\\\\Desktop\\\\creacionSoftware\\\\Control-Presupuestal\\\\server\\\\middleware *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(docker compose version *)",
+      "PowerShell(docker compose up *)",
+      "PowerShell(docker compose ps *)",
+      "PowerShell(docker compose logs *)",
+      "PowerShell(Get-Service *)",
+      "PowerShell(Join-Path *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(docker compose *)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri http://localhost:3000/api/health -UseBasicParsing -TimeoutSec 5; Write-Output \"STATUS: $\\($r.StatusCode\\)\"; Write-Output \"BODY: $\\($r.Content\\)\" } catch { Write-Output \"ERROR: $_\" })",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)"
     ]
   }
 }
