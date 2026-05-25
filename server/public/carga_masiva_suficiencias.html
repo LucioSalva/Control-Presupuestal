@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root { visibility: hidden; }
+  </style>
+
+  <script>
+    (function () {
+      try {
+        const u = localStorage.getItem("cp_usuario");
+        const t = localStorage.getItem("cp_token");
+        if (!u || !t) {
+          window.location.replace("login.html");
+          return;
+        }
+        document.documentElement.style.visibility = "visible";
+      } catch (e) {
+        document.documentElement.style.visibility = "visible";
+      }
+    })();
+  </script>
+
+  <title>Control de Presupuesto — Carga Masiva de Suficiencias</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/navbar.css">
+
+  <style>
+    .cp-dropzone {
+      border: 2px dashed #6c8eff;
+      border-radius: 14px;
+      padding: 32px;
+      text-align: center;
+      background: rgba(255,255,255,0.04);
+      transition: background 0.15s, border-color 0.15s;
+      cursor: pointer;
+    }
+    .cp-dropzone.is-drag {
+      background: rgba(108,142,255,0.12);
+      border-color: #a3bbff;
+    }
+    .cp-dropzone i {
+      font-size: 2.4rem;
+      color: #6c8eff;
+    }
+    .cp-dropzone-text { color: #c8d3ee; margin-top: 8px; }
+    .cp-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .cp-summary-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .cp-summary-card .label { font-size: 0.78rem; color: #9aa7c7; text-transform: uppercase; letter-spacing: 0.05em; }
+    .cp-summary-card .value { font-size: 1.4rem; font-weight: 600; color: #fff; }
+    .cp-summary-card.warn .value { color: #ffce5c; }
+    .cp-summary-card.err  .value { color: #ff7a7a; }
+    .cp-errores-list {
+      max-height: 240px; overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+    }
+    .cp-errores-list .cp-err-row { padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .cp-preview-table th { position: sticky; top: 0; background: #1a2138; z-index: 1; }
+    .cp-preview-wrapper { max-height: 420px; overflow: auto; }
+    .cp-row-detalle { background: rgba(108,142,255,0.05); }
+    .cp-row-detalle td:first-child { padding-left: 30px; color: #a3bbff; }
+    .cp-id-local { font-weight: 600; color: #ffce5c; }
+    .cp-num { text-align: right; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+
+<body class="admin-body">
+  <div id="cp-navbar"></div>
+
+  <div class="container-fluid py-4">
+
+    <!-- TOPBAR -->
+    <div class="topbar mb-4">
+      <div class="topbar-left">
+        <div class="topbar-icon">
+          <i class="bi bi-file-earmark-spreadsheet"></i>
+        </div>
+        <div>
+          <div class="topbar-title">Carga Masiva de Suficiencias</div>
+          <div class="topbar-subtitle">Sube hasta 20 suficiencias en un solo lote desde un archivo Excel</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" id="btnVolver">
+          <i class="bi bi-arrow-left"></i>
+          Volver
+        </button>
+        <a class="btn btn-primary btn-glow" href="/plantillas/suficiencias_carga_masiva.xlsx" download>
+          <i class="bi bi-download"></i>
+          Descargar plantilla
+        </a>
+      </div>
+    </div>
+
+    <!-- Alertas globales -->
+    <div id="alertBox" class="alert d-none" role="alert"></div>
+
+    <!-- DROP ZONE -->
+    <div class="card card-glass mb-4">
+      <div class="card-body">
+        <h6 class="mb-3">1) Selecciona el archivo Excel</h6>
+        <div id="dropzone" class="cp-dropzone">
+          <i class="bi bi-cloud-arrow-up"></i>
+          <div class="fw-semibold mt-2" id="dropzoneTitle">Arrastra el archivo aquí o haz clic para seleccionar</div>
+          <div class="cp-dropzone-text small">
+            Solo se acepta el formato .xlsx (Excel 2007 o superior). Máximo 20 suficiencias por lote.
+          </div>
+          <input type="file" id="fileInput" accept=".xlsx" hidden>
+        </div>
+        <div class="mt-3 small text-muted">
+          ¿No tienes la plantilla? <a href="/plantillas/suficiencias_carga_masiva.xlsx" download>Descárgala aquí</a>.
+          Las hojas obligatorias son <code>01_Suficiencias</code> y <code>02_Detalle</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- RESUMEN + VALIDACIÓN -->
+    <div class="card card-glass mb-4 d-none" id="cardResumen">
+      <div class="card-body">
+        <h6 class="mb-3">2) Resumen del archivo cargado</h6>
+        <div class="cp-summary-grid">
+          <div class="cp-summary-card">
+            <div class="label">Suficiencias</div>
+            <div class="value" id="sumCabeceras">0</div>
+          </div>
+          <div class="cp-summary-card">
+            <div class="label">Renglones</div>
+            <div class="value" id="sumRenglones">0</div>
+          </div>
+          <div class="cp-summary-card">
+            <div class="label">Importe total</div>
+            <div class="value" id="sumImporteTotal">$0.00</div>
+          </div>
+          <div class="cp-summary-card" id="cardErrores">
+            <div class="label">Errores de formato</div>
+            <div class="value" id="sumErrores">0</div>
+          </div>
+        </div>
+
+        <div id="boxErrores" class="alert alert-danger mt-3 d-none">
+          <div class="fw-semibold mb-2">
+            <i class="bi bi-exclamation-octagon"></i>
+            Corrige estos puntos antes de subir el lote:
+          </div>
+          <div class="cp-errores-list" id="listaErrores"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISTA PREVIA -->
+    <div class="card card-glass mb-4 d-none" id="cardPreview">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">3) Vista previa (agrupada por id_local)</h6>
+          <small class="text-muted">Estos datos se enviarán al endpoint <code>/api/suficiencias/lote</code>.</small>
+        </div>
+        <div class="cp-preview-wrapper border rounded-3">
+          <table class="table table-sm table-hover table-pro cp-preview-table mb-0">
+            <thead>
+              <tr>
+                <th>id_local</th>
+                <th>Mes pago</th>
+                <th>DG / DA / Proy / Fuente</th>
+                <th class="cp-num">Subtotal</th>
+                <th class="cp-num">IVA</th>
+                <th class="cp-num">Total</th>
+                <th class="text-center">Renglones</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPreview"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCIÓN FINAL -->
+    <div class="card card-glass mb-4 d-none" id="cardAccion">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <div class="fw-semibold">4) Subir el lote</div>
+          <div class="small text-muted">
+            Se enviará en grupos de hasta 20 suficiencias. El sistema validará saldos y permisos del lado del servidor.
+          </div>
+        </div>
+        <button class="btn btn-primary btn-glow" id="btnSubir" disabled>
+          <i class="bi bi-cloud-upload"></i>
+          Subir lote
+        </button>
+      </div>
+    </div>
+
+    <!-- RESULTADOS -->
+    <div class="card card-glass mb-4 d-none" id="cardResultados">
+      <div class="card-body">
+        <h6 class="mb-3">5) Resultados</h6>
+        <div id="boxResultadoOk" class="alert alert-success d-none"></div>
+        <div id="boxResultadoErr" class="alert alert-danger d-none"></div>
+        <div class="cp-preview-wrapper border rounded-3 d-none" id="wrapperFolios">
+          <table class="table table-sm table-hover table-pro mb-0">
+            <thead>
+              <tr>
+                <th>id_local</th>
+                <th>No. suficiencia</th>
+                <th class="cp-num">Total</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyResultados"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/safe-render.js"></script>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- SheetJS (cliente, parseo de XLSX) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script src="/js/navbar.js"></script>
+  <script src="/js/user-info.js"></script>
+
+  <!-- JS propio de esta página -->
+  <script src="/js/carga_masiva_suficiencias.js"></script>
+</body>
+
+</html>

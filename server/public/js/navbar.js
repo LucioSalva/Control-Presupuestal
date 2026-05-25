@@ -62,6 +62,7 @@
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Catálogos</a>
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="partidas_base.html">Carga Partidas</a></li>
+                <li id="navCargaMasiva"><a class="dropdown-item" href="carga_masiva_suficiencias.html">Carga Masiva de Suficiencias</a></li>
               </ul>
             </li>
             <li class="nav-item dropdown" id="cpNavDashboards">
@@ -219,6 +220,28 @@
     }
   }
 
+  // Carga Masiva de Suficiencias: visible solo para GOD o ADMIN.
+  // La página tiene su propio guard, esto es solo para la UI.
+  function applyCargaMasivaVisibility() {
+    const li = document.getElementById("navCargaMasiva");
+    if (!li) return;
+    try {
+      const raw = localStorage.getItem("cp_usuario");
+      if (!raw) {
+        li.classList.add("d-none");
+        return;
+      }
+      const user = JSON.parse(raw);
+      const roles = Array.isArray(user?.roles) ? user.roles : [];
+      const rolesNorm = roles.map((r) => String(r || "").trim().toUpperCase());
+      const allowed = rolesNorm.includes("GOD") || rolesNorm.includes("ADMIN");
+      if (allowed) li.classList.remove("d-none");
+      else li.classList.add("d-none");
+    } catch {
+      li.classList.add("d-none");
+    }
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       mountNavbar();
@@ -228,6 +251,7 @@
       applyReconHistorialVisibility();
       applyDashboardsVisibility();
       applyGodVisibility();
+      applyCargaMasivaVisibility();
     });
   } else {
     mountNavbar();
@@ -237,5 +261,6 @@
     applyReconHistorialVisibility();
     applyDashboardsVisibility();
     applyGodVisibility();
+    applyCargaMasivaVisibility();
   }
 })();
