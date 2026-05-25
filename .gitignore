@@ -31,3 +31,6 @@ server/uploads/
 
 # --- Logs ---
 *.log
+
+# --- Claude Code (per-machine config) ---
+.claude/settings.local.json
